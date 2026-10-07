@@ -11,13 +11,17 @@
 
 </div>
 
-Picking a stack is the easy part. Keeping it right is harder: the project grows, the agent adds a new service, a plan runs out of quota, a customer asks for EU data. Manifestack handles this inside your coding agent (Claude Code, Cursor, Codex and others):
+Picking a stack is the easy part. Keeping it right is harder: the project grows, the agent adds a service nobody checks, a plan runs out of quota, a customer asks for EU data. Manifestack works inside your coding agent (Claude Code, Cursor, Codex and others) and looks at the whole product: frontend, backend, workers, infrastructure and every third-party API.
 
 - **Starting a project?** It picks hosting, database, auth, email and the rest for your budget, users, data rules and team, priced at 1k, 10k and 100k users.
 - **Changing the stack?** Every service the agent adds is checked against your requirements, your avoid list and the services you already run, before you rely on it.
 - **Already running?** It tells you which limit or bill you'll hit first, when, what it will cost and how to avoid it.
 
-Built for developers, small teams and agencies who choose their own services, from the first commit to a few hundred thousand users. No API keys, no account, runs locally. Every fact comes from the vendor's public pages (pricing, regions, certifications), with the date it was read.
+Built for developers, small teams and agencies who choose their own services, from the first commit to a few hundred thousand users.
+
+- **Read-only.** It never changes code, config or vendor settings on its own. The only file it writes is `.manifestack/STACK.md`.
+- **No API keys, no account, runs locally.** It reads env var names, never their values.
+- **Current facts.** Every price, limit and region comes from the vendor's public pages, with the date it was read.
 
 ## Quick start
 
@@ -31,12 +35,30 @@ Then, in your agent:
 /manifestack
 ```
 
-It runs `init` on an empty repo and `audit` on an existing one. An audit looks like this:
+It runs `init` on an empty repo and `audit` on an existing one.
+
+## What it looks at
+
+The whole product, not one `package.json`. Example: a Next.js frontend, a Python API and a Go worker.
+
+```text
+1. Reads                     2. Sorts by role                                  3. Checks against
+web/package.json         ->  Hosting     Vercel                            ->  .manifestack/STACK.md
+api/requirements.txt         Database    Supabase                                budget, users, requires,
+worker/go.mod                Auth        Clerk + Supabase Auth  ← Overlap        prefer, avoid
+vercel.json, infra/*.tf      Payments    Stripe                                vendor pages, read today
+.env (names only)            Email       Resend                                  pricing, limits, regions,
+                             Monitoring  Sentry                                  certifications
+                             AI          OpenAI
+```
+
+It reads dependencies from `package.json`, `requirements.txt`, `pyproject.toml`, `Pipfile` and `go.mod`, plus config files and env var names in any project. An audit of that product looks like this:
 
 | Finding | When | Cost | Fix |
 | --- | --- | --- | --- |
 | **Requirement** Supabase project in us-east-1, STACK.md requires an EU database | Before launch | ~1 day of migration | Create the production project in an EU region and move the data while it is small |
 | **Overlap** Clerk and Supabase Auth both sign users in | Now | $25/mo on Clerk Pro | Keep the one whose features you use, remove the other |
+| **Risk** OpenAI usage tier 1: the launch-day estimate is above the tokens-per-minute limit | Launch day | Higher tiers need paid history and time | Request a tier increase now, queue uploads, use a smaller model for short summaries |
 | **Limit** Supabase Free: database size. 312 / 500 MB, +1.1 MB/day | ETA ~Mar 2027 | $25/mo on Pro | Archive `events` rows older than 90 days, or schedule the upgrade |
 
 Findings are `Requirement`, `Overlap`, `Overbuilt`, `Limit`, `Bill` or `Risk`, each with evidence, when, cost, fix and source.
@@ -85,6 +107,7 @@ cp -r manifestack/skills/manifestack .agents/skills/   # Claude Code: .claude/sk
 | `/manifestack` | `init` for an empty repo, `audit` otherwise |
 | `/manifestack init "B2B dashboard, EU users"` | Asks about budget, users, requirements and what the team prefers and avoids, proposes and prices a whole stack |
 | `/manifestack audit` | Scans the repo, checks every service against your requirements and growth, reports findings |
+| *(automatic)* | In Claude Code and Cursor, a hook checks every vendor the agent adds against `STACK.md` before you rely on it |
 
 ## STACK.md
 
@@ -130,7 +153,7 @@ Works with any vendor: the skill finds its public pages during the audit. Built-
 | Monitoring | Sentry, PostHog, Datadog |
 | AI | OpenAI, Anthropic, Google Gemini |
 
-Dependencies are read from JavaScript, Python and Go projects (`package.json`, `requirements.txt`, `pyproject.toml`, `Pipfile`, `go.mod`). New maps ship as releases. [Request a map](https://github.com/manifestack/manifestack/issues).
+New maps ship as releases. [Request a map](https://github.com/manifestack/manifestack/issues).
 
 ## Contributing
 

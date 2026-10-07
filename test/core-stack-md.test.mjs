@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
 import { parseStackMd, setFields, checkStack, lintStackMd, parseRevisit, parseUsage, findSecrets, scrubSecrets } from '../packages/core/src/stack-md.mjs';
@@ -9,7 +9,8 @@ const SITE_EXAMPLE = `## Requirements
 budget: ~$600/mo
 users: 9k now, 50k by Q3
 requires: EU database, SOC 2 vendors
-team_knows: Postgres, Next.js
+prefer: Postgres, Next.js
+avoid: Kubernetes
 
 ## Database: Supabase
 plan: free
@@ -24,7 +25,7 @@ env: SUPABASE_URL, SUPABASE_ANON_KEY  # names only
 
 test('parses the example from the site', () => {
 	const doc = parseStackMd(SITE_EXAMPLE);
-	assert.deepEqual(doc.requirements, { budget: '~$600/mo', users: '9k now, 50k by Q3', requires: 'EU database, SOC 2 vendors', team_knows: 'Postgres, Next.js' });
+	assert.deepEqual(doc.requirements, { budget: '~$600/mo', users: '9k now, 50k by Q3', requires: 'EU database, SOC 2 vendors', prefer: 'Postgres, Next.js', avoid: 'Kubernetes' });
 	const db = doc.sections[1];
 	assert.equal(db.role, 'Database');
 	assert.equal(db.vendor, 'Supabase');
@@ -76,7 +77,7 @@ test('revisit_when: unknown metrics, units by name and AND/OR with unknowns', ()
 });
 
 test('fixture next-vercel-supabase-resend: Vercel triggered, Resend ETA', () => {
-	const r = checkStack(readFileSync(join(FIXTURES, 'next-vercel-supabase-resend/STACK.md'), 'utf8'), { today: '2026-10-07' });
+	const r = checkStack(readFileSync(join(FIXTURES, 'next-vercel-supabase-resend/.manifestack/STACK.md'), 'utf8'), { today: '2026-10-07' });
 	const by = Object.fromEntries(r.sections.map((s) => [s.heading, s]));
 	assert.equal(by['Hosting: Vercel'].status, 'triggered');
 	assert.equal(by['Database: Supabase'].status, 'ok');
@@ -107,6 +108,11 @@ test('setFields updates only its fields and keeps comments, unknown keys and oth
 test('setFields keeps the key order and replaces a comment only when asked', () => {
 	const out = setFields('## Email: Resend\nplan: Free\nenv: RESEND_API_KEY\n', 'Email: Resend', { limit: '3,000/mo, 100/day', source: 'resend.com/pricing' }, { source: 'read 2026-10-07' });
 	assert.equal(out, '## Email: Resend\nplan: Free\nlimit: 3,000/mo, 100/day\nsource: resend.com/pricing  # read 2026-10-07\nenv: RESEND_API_KEY\n');
+});
+
+test('setFields puts avoid right after prefer', () => {
+	const out = setFields('## Requirements\nbudget: $50/mo\nprefer: React\nnote: kept\n', 'Requirements', { avoid: 'Kubernetes' });
+	assert.equal(out, '## Requirements\nbudget: $50/mo\nprefer: React\navoid: Kubernetes\nnote: kept\n');
 });
 
 test('setFields creates a missing section in the site layout', () => {
@@ -144,19 +150,29 @@ test('lint reports secrets as errors and format issues as warnings', () => {
 test('stack-md.mjs CLI: parse, check, lint, set and refusal', (t) => {
 	const dir = tempDir(t);
 	const script = join(ROOT, 'skills/manifestack-guard/scripts/stack-md.mjs');
-	assert.deepEqual(JSON.parse(runNode(script, ['parse'], { cwd: dir }).stdout), { exists: false, file: 'STACK.md' });
-	writeFileSync(join(dir, 'STACK.md'), SITE_EXAMPLE);
+	assert.deepEqual(JSON.parse(runNode(script, ['parse'], { cwd: dir }).stdout), { exists: false, file: '.manifestack/STACK.md' });
+	mkdirSync(join(dir, '.manifestack'));
+	writeFileSync(join(dir, '.manifestack/STACK.md'), SITE_EXAMPLE);
 	assert.equal(JSON.parse(runNode(script, ['parse'], { cwd: dir }).stdout).sections.length, 2);
 	const check = JSON.parse(runNode(script, ['check', '--today', '2026-10-07', '--metric', 'db_size=450 MB'], { cwd: dir }).stdout);
 	assert.equal(check.sections[0].status, 'triggered');
 	assert.equal(runNode(script, ['lint'], { cwd: dir }).code, 0);
 	const set = runNode(script, ['set', '--section', 'Email: Resend', '--set', 'plan=Free', '--set', 'revisit_when=monthly_sent >= 2500', '--comment', 'plan=checked 2026-10-07'], { cwd: dir });
 	assert.equal(set.code, 0, set.stderr);
-	assert.match(readFileSync(join(dir, 'STACK.md'), 'utf8'), /## Email: Resend\nplan: Free  # checked 2026-10-07\nrevisit_when: monthly_sent >= 2500\n$/);
-	const before = readFileSync(join(dir, 'STACK.md'), 'utf8');
+	assert.match(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), /## Email: Resend\nplan: Free  # checked 2026-10-07\nrevisit_when: monthly_sent >= 2500\n$/);
+	const before = readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8');
 	const bad = runNode(script, ['set', '--section', 'Auth: Clerk', '--set', 'env=CLERK_SECRET_KEY=sk_live_abcdefgh12345678'], { cwd: dir });
 	assert.notEqual(bad.code, 0);
-	assert.equal(readFileSync(join(dir, 'STACK.md'), 'utf8'), before);
+	assert.equal(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), before);
 	assert.ok(!bad.stdout.includes('sk_live') && !bad.stderr.includes('sk_live'));
-	assert.ok(existsSync(join(dir, 'STACK.md')));
+	assert.ok(existsSync(join(dir, '.manifestack/STACK.md')));
+});
+
+test('stack-md.mjs set creates .manifestack/ when it is missing', (t) => {
+	const dir = tempDir(t);
+	const script = join(ROOT, 'skills/manifestack/scripts/stack-md.mjs');
+	const r = runNode(script, ['set', '--section', 'Database: Neon', '--set', 'plan=Free'], { cwd: dir });
+	assert.equal(r.code, 0, r.stderr);
+	assert.equal(JSON.parse(r.stdout).file, '.manifestack/STACK.md');
+	assert.match(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), /## Database: Neon\nplan: Free\n/);
 });

@@ -29,7 +29,8 @@
         "Shows monthly costs at 1k, 10k and 100k users with the assumptions stated",
         "Cites pricing pages with the date they were read",
         "States in one sentence up to about how many users the stack fits the $150/mo budget (or that it is over budget from launch)",
-        "STACK.md passes `stack-md.mjs lint` with zero errors and zero warnings",
+        ".manifestack/STACK.md passes `stack-md.mjs lint` with zero errors and zero warnings",
+        "No new files in the repository root: STACK.md and the cost model are inside .manifestack/",
         "The decided lines in STACK.md are marked as proposed by init (not presented as the team's confirmed decision)",
         "The cost table totals equal the sum of the per-vendor rows"
       ]

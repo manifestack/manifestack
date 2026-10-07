@@ -205,7 +205,7 @@ function splitInline(s) {
 // A map says where to look and what to extract, never the prices themselves.
 
 const VENDOR_SCHEMA = 1;
-const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'other'];
+const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'ai', 'other'];
 
 /** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
 function upgradeVendorMap(data) {
@@ -231,6 +231,8 @@ function parseVendorMap(text, file = '<vendor map>') {
 		roles: data.roles ?? [],
 		detect: {
 			packages: detect.packages ?? [],
+			pypi: detect.pypi ?? [],
+			go: detect.go ?? [],
 			imports: detect.imports ?? [],
 			env_prefixes: detect.env_prefixes ?? [],
 			config_files: detect.config_files ?? [],
@@ -251,7 +253,7 @@ function validateVendorMap(v) {
 	if (!Array.isArray(v.roles) || !v.roles.length) errors.push('roles must be a non-empty list');
 	for (const r of v.roles ?? []) if (!VENDOR_ROLES.includes(r)) errors.push(`unknown role "${r}"`);
 	const d = v.detect ?? {};
-	if (![d.packages, d.imports, d.env_prefixes, d.config_files].some((x) => x?.length)) errors.push('detect needs at least one signature');
+	if (![d.packages, d.pypi, d.go, d.imports, d.env_prefixes, d.config_files].some((x) => x?.length)) errors.push('detect needs at least one signature');
 	for (const role of Object.keys(d.role_signals ?? {})) if (!(v.roles ?? []).includes(role)) errors.push(`role_signals.${role} is not in roles`);
 	if (!/^https:\/\//.test(String(v.pages?.pricing ?? ''))) errors.push('pages.pricing must be an https URL');
 	for (const [k, url] of Object.entries(v.pages ?? {})) if (!/^https:\/\//.test(String(url))) errors.push(`pages.${k} must be an https URL`);
@@ -285,51 +287,34 @@ function vendorSignatures(vendors) {
 // ---- packages/core/src/known-sdks.mjs
 // SDKs of common vendors that have no page map yet. Detection reports them as `unmapped` so the
 // audit still covers them (the skill finds the pricing page itself) and the hook can flag them.
-// Prefix entries end with `/` and match every package in that scope or path.
+// npm prefix entries end with `/` and match every package in that scope or path. `pypi` and `go` follow the rules in
+// manifests.mjs (PyPI names normalized, trailing `*` = prefix; Go module path prefixes).
 const UNMAPPED_SDKS = [
-	{ name: 'Stripe', role: 'payments', packages: ['stripe', '@stripe/'] },
-	{ name: 'Paddle', role: 'payments', packages: ['@paddle/'] },
-	{ name: 'Lemon Squeezy', role: 'payments', packages: ['@lemonsqueezy/'] },
-	{ name: 'Polar', role: 'payments', packages: ['@polar-sh/'] },
-	{ name: 'Auth0', role: 'auth', packages: ['@auth0/', 'auth0'] },
-	{ name: 'WorkOS', role: 'auth', packages: ['@workos-inc/'] },
-	{ name: 'Firebase', role: 'database', packages: ['firebase', 'firebase-admin'] },
-	{ name: 'PlanetScale', role: 'database', packages: ['@planetscale/'] },
 	{ name: 'Turso', role: 'database', packages: ['@libsql/', '@tursodatabase/'] },
-	{ name: 'MongoDB Atlas', role: 'database', packages: ['mongodb', 'mongoose'] },
-	{ name: 'Upstash', role: 'database', packages: ['@upstash/'] },
-	{ name: 'Convex', role: 'database', packages: ['convex'] },
 	{ name: 'Prisma Postgres', role: 'database', packages: ['@prisma/ppg', '@prisma/extension-accelerate'] },
-	{ name: 'AWS', role: 'other', packages: ['@aws-sdk/', 'aws-sdk', 'aws-cdk-lib'] },
-	{ name: 'Google Cloud', role: 'other', packages: ['@google-cloud/'] },
-	{ name: 'Azure', role: 'other', packages: ['@azure/'] },
-	{ name: 'Cloudflare', role: 'hosting', packages: ['wrangler', '@cloudflare/'] },
-	{ name: 'Netlify', role: 'hosting', packages: ['@netlify/', 'netlify-cli'] },
-	{ name: 'Fly.io', role: 'hosting', packages: ['@fly/'] },
-	{ name: 'SendGrid', role: 'email', packages: ['@sendgrid/'] },
-	{ name: 'Postmark', role: 'email', packages: ['postmark'] },
+	{ name: 'AWS', role: 'other', packages: ['@aws-sdk/', 'aws-sdk', 'aws-cdk-lib'], pypi: ['boto3', 'botocore', 'aws-cdk-lib'], go: ['github.com/aws/aws-sdk-go-v2', 'github.com/aws/aws-sdk-go'] },
+	{ name: 'Google Cloud', role: 'other', packages: ['@google-cloud/'], pypi: ['google-cloud-*'], go: ['cloud.google.com/go'] },
+	{ name: 'Azure', role: 'other', packages: ['@azure/'], pypi: ['azure-*'], go: ['github.com/Azure/azure-sdk-for-go'] },
 	{ name: 'Mailgun', role: 'email', packages: ['mailgun.js', 'mailgun-js'] },
 	{ name: 'Loops', role: 'email', packages: ['loops'] },
-	{ name: 'Twilio', role: 'other', packages: ['twilio'] },
-	{ name: 'Sentry', role: 'monitoring', packages: ['@sentry/'] },
-	{ name: 'Datadog', role: 'monitoring', packages: ['@datadog/', 'dd-trace'] },
-	{ name: 'PostHog', role: 'monitoring', packages: ['posthog-js', 'posthog-node'] },
+	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
 	{ name: 'Better Stack', role: 'monitoring', packages: ['@logtail/'] },
-	{ name: 'UploadThing', role: 'storage', packages: ['uploadthing', '@uploadthing/'] },
-	{ name: 'Cloudinary', role: 'storage', packages: ['cloudinary', 'next-cloudinary'] },
 	{ name: 'Algolia', role: 'other', packages: ['algoliasearch', '@algolia/'] },
 	{ name: 'Pusher', role: 'other', packages: ['pusher', 'pusher-js'] },
 	{ name: 'Ably', role: 'other', packages: ['ably'] },
 	{ name: 'Liveblocks', role: 'other', packages: ['@liveblocks/'] },
 	{ name: 'Inngest', role: 'other', packages: ['inngest'] },
 	{ name: 'Trigger.dev', role: 'other', packages: ['@trigger.dev/'] },
-	{ name: 'OpenAI', role: 'other', packages: ['openai', '@ai-sdk/openai'] },
-	{ name: 'Anthropic', role: 'other', packages: ['@anthropic-ai/sdk', '@ai-sdk/anthropic'] },
-	{ name: 'Pinecone', role: 'database', packages: ['@pinecone-database/'] },
+	{ name: 'Mistral', role: 'ai', packages: ['@mistralai/mistralai', '@ai-sdk/mistral'], pypi: ['mistralai', 'langchain-mistralai'] },
+	{ name: 'Groq', role: 'ai', packages: ['groq-sdk', '@ai-sdk/groq'], pypi: ['groq', 'langchain-groq'] },
+	{ name: 'Cohere', role: 'ai', packages: ['cohere-ai'], pypi: ['cohere', 'langchain-cohere'] },
+	{ name: 'Replicate', role: 'ai', packages: ['replicate'], pypi: ['replicate'], go: ['github.com/replicate/replicate-go'] },
+	{ name: 'Together AI', role: 'ai', packages: ['together-ai'], pypi: ['together'] },
+	{ name: 'Pinecone', role: 'database', packages: ['@pinecone-database/'], pypi: ['pinecone', 'pinecone-client'], go: ['github.com/pinecone-io/go-pinecone'] },
 ];
 
-// Frameworks and infrastructure tooling: inputs for Overbuilt findings, not vendors.
+// Frameworks: inputs for Overbuilt findings, not vendors. Keys are matched like vendor patterns of that ecosystem.
 const FRAMEWORK_PACKAGES = {
 	next: 'Next.js',
 	nuxt: 'Nuxt',
@@ -346,20 +331,160 @@ const FRAMEWORK_PACKAGES = {
 	'@nestjs/core': 'NestJS',
 	'@tanstack/react-start': 'TanStack Start',
 };
+const FRAMEWORK_PYPI = { django: 'Django', fastapi: 'FastAPI', flask: 'Flask', litestar: 'Litestar', starlette: 'Starlette' };
+const FRAMEWORK_GO = { 'github.com/gin-gonic/gin': 'Gin', 'github.com/labstack/echo': 'Echo', 'github.com/gofiber/fiber': 'Fiber', 'github.com/go-chi/chi': 'Chi' };
 
 function packageMatches(pkg, patterns) {
 	return patterns.some((p) => (p.endsWith('/') ? pkg.startsWith(p) : pkg === p));
 }
 
+// ---- packages/core/src/manifests.mjs
+// Dependency names from each ecosystem's manifest: package.json (npm), requirements*.txt, pyproject.toml and
+// Pipfile (PyPI), go.mod (Go). Lightweight line parsers, no TOML library: only the dependency lists are read.
+
+/** Signature field that holds each ecosystem's package names in a vendor map. */
+const ECOSYSTEM_FIELDS = { npm: 'packages', pypi: 'pypi', go: 'go' };
+
+/** Which ecosystem a manifest belongs to, from its repo-relative path; null if it is not a manifest. */
+function manifestKind(path) {
+	const parts = String(path).split(/[\\/]/);
+	const name = parts.at(-1);
+	if (name === 'package.json') return 'npm';
+	if (name === 'go.mod') return 'go';
+	if (name === 'pyproject.toml' || name === 'Pipfile') return 'pypi';
+	if (/^requirements([-._][\w.-]*)?\.(txt|in)$/i.test(name)) return 'pypi';
+	if (parts.at(-2) === 'requirements' && /\.(txt|in)$/.test(name)) return 'pypi';
+	return null;
+}
+
+function dependencyNames(pkgJson) {
+	const names = new Set();
+	for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+		for (const name of Object.keys(pkgJson?.[field] ?? {})) names.add(name);
+	}
+	return [...names];
+}
+
+/** PEP 503 normalization: case-insensitive, runs of `-`, `_` and `.` are equal. */
+function normalizePypi(name) {
+	return String(name).toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+/** The distribution name at the start of a PEP 508 requirement ("stripe[async]>=7 ; python_version>'3.8'"). */
+function requirementName(spec) {
+	const m = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(spec);
+	return m ? m[1] : null;
+}
+
+function requirementsTxt(text) {
+	const names = [];
+	for (let line of text.split(/\r?\n/)) {
+		line = line.replace(/(^|\s)#.*$/, '').trim();
+		if (!line || line.startsWith('-') || /^[./~]/.test(line)) continue;
+		// "name @ https://…" is a direct reference with a name; a bare URL has none.
+		if (line.includes('://') && !/^[A-Za-z0-9][A-Za-z0-9._-]*(\[[^\]]*\])?\s*@/.test(line)) continue;
+		const name = requirementName(line);
+		if (name) names.push(name);
+	}
+	return names;
+}
+
+const tomlKey = (line) => /^\s*("?)([A-Za-z0-9_.-]+)\1\s*=/.exec(line)?.[2];
+
+/** Dependencies from pyproject.toml (PEP 621, PEP 735 groups, Poetry) and Pipfile. */
+function pythonToml(text) {
+	const names = [];
+	let table = '';
+	let collecting = false;
+	for (const raw of text.split(/\r?\n/)) {
+		const line = raw.replace(/\s+#.*$/, '');
+		if (collecting) {
+			for (const m of line.matchAll(/["']([^"']+)["']/g)) {
+				const name = requirementName(m[1]);
+				if (name) names.push(name);
+			}
+			if (line.includes(']')) collecting = false;
+			continue;
+		}
+		const header = /^\s*\[{1,2}\s*([^\]]+?)\s*\]{1,2}\s*$/.exec(line);
+		if (header) {
+			table = header[1].replace(/["']/g, '');
+			continue;
+		}
+		const key = tomlKey(line);
+		if (!key) continue;
+		const arrayTable = (table === 'project' && key === 'dependencies') || table === 'project.optional-dependencies' || table === 'dependency-groups';
+		const keyTable = /^tool\.poetry(\.group\.[^.]+)?\.(dev-)?dependencies$/.test(table) || table === 'packages' || table === 'dev-packages';
+		if (arrayTable && /=\s*\[/.test(line)) {
+			const rest = line.slice(line.indexOf('[') + 1);
+			for (const m of rest.matchAll(/["']([^"']+)["']/g)) {
+				const name = requirementName(m[1]);
+				if (name) names.push(name);
+			}
+			collecting = !rest.includes(']');
+		} else if (keyTable && key.toLowerCase() !== 'python') {
+			names.push(key);
+		}
+	}
+	return names;
+}
+
+/** Module paths from go.mod `require` lines and blocks; `// indirect` entries are left out. */
+function goMod(text) {
+	const names = [];
+	let block = false;
+	for (const raw of text.split(/\r?\n/)) {
+		const indirect = /\/\/\s*indirect\b/.test(raw);
+		const line = raw.replace(/\/\/.*$/, '').trim();
+		if (block) {
+			if (line === ')') block = false;
+			else if (line && !indirect) names.push(line.split(/\s+/)[0]);
+			continue;
+		}
+		if (/^require\s*\($/.test(line)) block = true;
+		else if (/^require\s+\S+/.test(line) && !indirect) names.push(line.split(/\s+/)[1]);
+	}
+	return names;
+}
+
+/** Dependency names declared in a manifest of the given kind. Unparseable files give an empty list. */
+function manifestDependencies(kind, text, path = '') {
+	try {
+		if (kind === 'npm') return dependencyNames(JSON.parse(text));
+		if (kind === 'go') return goMod(text);
+		if (kind === 'pypi') return /\.toml$|(^|[\\/])Pipfile$/.test(path) ? pythonToml(text) : requirementsTxt(text);
+	} catch {}
+	return [];
+}
+
+/** Whether a dependency matches a vendor's patterns, by the naming rules of its ecosystem. */
+function dependencyMatches(kind, dep, patterns = []) {
+	if (kind === 'npm') return packageMatches(dep, patterns);
+	if (kind === 'go') return patterns.some((p) => dep === p || dep.startsWith(p + '/'));
+	if (kind === 'pypi') {
+		const d = normalizePypi(dep);
+		return patterns.some((p) => (p.endsWith('*') ? d.startsWith(normalizePypi(p.slice(0, -1))) : d === normalizePypi(p)));
+	}
+	return false;
+}
+
 // ---- packages/core/src/detect.mjs
-// Finds vendors in a repository: package.json dependencies, imports, config files and env var NAMES.
+// Finds vendors in a repository: dependencies from package.json, requirements*.txt, pyproject.toml, Pipfile and
+// go.mod, JS imports, config files and env var NAMES.
 // Env values are dropped while reading a line, before anything else sees them. No network.
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'venv', '__pycache__', 'target', 'tmp']);
-const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro)$/;
+const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro|py|go)$/;
+const FRAMEWORKS = { npm: FRAMEWORK_PACKAGES, pypi: FRAMEWORK_PYPI, go: FRAMEWORK_GO };
 const ENV_FILE = /^\.env(\..+)?$/;
 const MAX_SOURCE_BYTES = 512 * 1024;
 const MAX_EVIDENCE = 8;
+// The "new vendor" hook as `npx manifestack install` or `npx manifestack hook` registers it (packages/cli/src/agents.js).
+const HOOK_FILE = 'manifestack-new-vendor.mjs';
+const HOOK_SETUPS = {
+	'claude-code': { configs: ['.claude/settings.json', '.claude/settings.local.json'], script: `.claude/hooks/${HOOK_FILE}` },
+	cursor: { configs: ['.cursor/hooks.json'], script: `.cursor/hooks/${HOOK_FILE}` },
+};
 // Files that do not make a repository "existing code" on their own.
 const NON_PROJECT_FILES = /^(readme|license|licence|changelog|contributing|code_of_conduct|security|stack|agents|claude|gemini)(\.[a-z]+)?$|^\.(gitignore|gitattributes|editorconfig|env.*)$/i;
 
@@ -381,24 +506,17 @@ export function extractImports(source) {
 	return [...specs];
 }
 
-export function dependencyNames(pkgJson) {
-	const names = new Set();
-	for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-		for (const name of Object.keys(pkgJson?.[field] ?? {})) names.add(name);
-	}
-	return [...names];
-}
-
-/** Which mapped vendors and unmapped SDKs a list of package names contains. */
-export function matchPackages(packages, signatures) {
+/** Which mapped vendors and unmapped SDKs a list of dependencies of one ecosystem (npm, pypi, go) contains. */
+export function matchDependencies(deps, signatures, kind = 'npm') {
+	const field = ECOSYSTEM_FIELDS[kind];
 	const vendors = [];
 	for (const sig of signatures) {
-		const hits = packages.filter((p) => packageMatches(p, sig.packages));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]));
 		if (hits.length) vendors.push({ id: sig.id, name: sig.name, roles: sig.roles, packages: hits });
 	}
 	const unmapped = [];
 	for (const sdk of UNMAPPED_SDKS) {
-		const hits = packages.filter((p) => packageMatches(p, sdk.packages));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sdk[field]));
 		if (hits.length) unmapped.push({ name: sdk.name, role: sdk.role, packages: hits });
 	}
 	return { vendors, unmapped };
@@ -430,11 +548,28 @@ function* walk(root, limits) {
 	}
 }
 
+/** Per agent: `on` (registered in the project), `plugin` (the Claude Code plugin brings its own) or `off`. */
+export function hookStatus(root, { plugin = false } = {}) {
+	const status = {};
+	for (const [agent, setup] of Object.entries(HOOK_SETUPS)) {
+		const registered = setup.configs.some((c) => {
+			try {
+				return readFileSync(join(root, c), 'utf8').includes(HOOK_FILE);
+			} catch {
+				return false;
+			}
+		});
+		if (registered && existsSync(join(root, setup.script))) status[agent] = 'on';
+		else status[agent] = agent === 'claude-code' && plugin ? 'plugin' : 'off';
+	}
+	return status;
+}
+
 function isKubernetesManifest(text) {
 	return /^apiVersion:/m.test(text) && /^kind:\s*(Deployment|StatefulSet|DaemonSet|Service|Ingress|HorizontalPodAutoscaler|CronJob)\b/m.test(text);
 }
 
-export function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
+export function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {}) {
 	root = resolve(root);
 	if (!existsSync(root) || !statSync(root).isDirectory()) throw new Error(`not a directory: ${root}`);
 	const sigs = signatures ?? [];
@@ -479,21 +614,26 @@ export function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
 			for (const cfg of sig.config_files) if (rel === cfg || rel.endsWith('/' + cfg)) hit(sig, 'config', rel, cfg);
 		}
 
-		if (name === 'package.json') {
-			let pkg;
+		const manifest = manifestKind(rel);
+		if (manifest) {
+			let text;
 			try {
-				pkg = JSON.parse(readFileSync(full, 'utf8'));
+				text = readFileSync(full, 'utf8');
 			} catch {
 				continue;
 			}
-			const deps = dependencyNames(pkg);
-			const m = matchPackages(deps, sigs);
+			const deps = manifestDependencies(manifest, text, rel);
+			const m = matchDependencies(deps, sigs, manifest);
 			for (const v of m.vendors) for (const p of v.packages) hit(sigs.find((s) => s.id === v.id), 'package', rel, p);
 			for (const u of m.unmapped) {
 				if (!unmapped.has(u.name)) unmapped.set(u.name, { name: u.name, role: u.role, evidence: [] });
 				for (const p of u.packages) unmapped.get(u.name).evidence.push({ kind: 'package', file: rel, match: p });
 			}
-			for (const d of deps) if (FRAMEWORK_PACKAGES[d] && !frameworks.has(FRAMEWORK_PACKAGES[d])) frameworks.set(FRAMEWORK_PACKAGES[d], { name: FRAMEWORK_PACKAGES[d], package: d, file: rel });
+			for (const d of deps) {
+				const key = Object.keys(FRAMEWORKS[manifest]).find((k) => dependencyMatches(manifest, d, [k]));
+				const fw = key && FRAMEWORKS[manifest][key];
+				if (fw && !frameworks.has(fw)) frameworks.set(fw, { name: fw, package: d, file: rel });
+			}
 			continue;
 		}
 
@@ -554,6 +694,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
 		frameworks: [...frameworks.values()],
 		infra,
 		env_names: [...envNames].sort(),
+		hook: hookStatus(root, { plugin }),
 	};
 }
 
@@ -564,17 +705,27 @@ function defaultVendorsDir() {
 	return null;
 }
 
+/** True when this script runs from the Claude Code plugin, which registers the hook itself (hooks/hooks.json). */
+function runsFromPlugin() {
+	const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+	try {
+		return existsSync(join(pluginRoot, '.claude-plugin', 'plugin.json')) && readFileSync(join(pluginRoot, 'hooks', 'hooks.json'), 'utf8').includes('new-vendor');
+	} catch {
+		return false;
+	}
+}
+
 export function detectMain(argv) {
 	const args = parseArgs(argv);
 	if (args.help) {
-		process.stdout.write('usage: node detect.mjs [repo-dir] [--vendors <dir>] [--max-files N]\nPrints JSON: vendors with evidence, unmapped SDKs, overlaps, frameworks, infra, env var names (never values).\n');
+		process.stdout.write('usage: node detect.mjs [repo-dir] [--vendors <dir>] [--max-files N]\nPrints JSON: vendors with evidence, unmapped SDKs, overlaps, frameworks, infra, env var names (never values), new-vendor hook status.\n');
 		return;
 	}
 	const vendorsDir = args.vendors || defaultVendorsDir();
 	if (!vendorsDir) fail('vendor maps not found; pass --vendors <dir>');
 	const signatures = vendorSignatures(loadCatalog(vendorsDir));
 	try {
-		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000 }));
+		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000, plugin: runsFromPlugin() }));
 	} catch (e) {
 		fail(e.message);
 	}

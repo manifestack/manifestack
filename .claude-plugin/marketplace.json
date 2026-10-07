@@ -3,12 +3,12 @@
   "owner": {
     "name": "Manifestack"
   },
-  "description": "Manifestack: an Agent Skill that chooses the stack that fits your project and tells you when it stops fitting.",
+  "description": "Manifestack: an Agent Skill that fits your stack to your project and keeps it fitting as it changes.",
   "plugins": [
     {
       "name": "manifestack",
       "source": "./",
-      "description": "Choose the stack that fits. Know when it stops fitting."
+      "description": "A stack that fits your project: pick one, audit it, and check every new vendor against budget, users and data rules."
     }
   ]
 }

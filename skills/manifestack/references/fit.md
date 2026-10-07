@@ -10,7 +10,8 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 | Users now and in 6–12 months, peaks | Picks the plan tier, shows which free-tier limits come first, and sets the size of the infrastructure. |
 | Budget | A ceiling for the monthly bill at the expected size; decides whether free tiers are acceptable for now. |
 | Requirements | Data region, certifications (SOC 2, ISO 27001, HIPAA), SSO, contracts. Hard filters on vendors and plans. |
-| Team experience | A stack the team knows beats a theoretically better one. Unknown tech costs weeks. |
+| Team preferences (`prefer`) | What the team knows or wants to use. A stack the team knows beats a theoretically better one. Unknown tech costs weeks. |
+| Things to avoid (`avoid`) | Vendors, clouds or setups the team rules out. A filter like requirements, but set by the team. |
 | Operations | Who gets paged. A team without ops time needs managed services, not clusters. |
 
 ## Rules of thumb
@@ -46,6 +47,27 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 - Transactional email vendors have daily and monthly caps on low tiers. A launch or a digest can exceed a daily cap in an hour: a Risk, not a Limit.
 - Separate transactional and marketing streams if volume grows.
 
+### Payments
+
+- First question: who is the merchant of record. Selling to consumers in many countries means collecting and filing VAT and sales tax; a payment processor leaves that to you, a merchant of record (Paddle, Lemon Squeezy) takes it on for a higher fee. This is a requirement, not a price comparison.
+- Fees are per transaction, so cost grows with revenue, not users. Add the paid extras the product needs (subscriptions, tax, invoicing, fraud tools) before comparing.
+- Check supported countries for the business entity and payouts, not only for customers.
+- One payment provider unless there is a reason (a marketplace, a region the first one does not serve).
+
+### Monitoring
+
+- Error tracking first; product analytics and session replay when someone will look at them.
+- Free plans cap events per month; past the cap events are dropped or billed. Set sampling and filters before launch, not after the first spike.
+- Pick the data region at sign-up when requirements name one; it is usually fixed per organization.
+
+### AI APIs
+
+- Cost grows with every request and every user: price per token by model, not a flat plan. Estimate tokens per user action before picking a model.
+- New accounts start on low rate-limit tiers. A launch can hit requests or tokens per minute: a Risk. Check how the account moves up a tier.
+- Data retention, training on API data and data residency are requirement questions; check them against `requires` before the first customer data goes in.
+- Pinned models get retired; note the deprecation date in `revisit_when`.
+- Two providers can be deliberate (fallback, a cheaper model for simple calls); ask before reporting an Overlap.
+
 ## Overbuilt signals
 
 Report an `Overbuilt` finding when the scan shows these against small usage or a tight budget:
@@ -60,8 +82,8 @@ Give the saving in money per month and in upkeep time, and the simpler setup. Pr
 
 ## Picking among fitting options
 
-1. Drop options that fail a hard requirement.
-2. Prefer what the team knows.
+1. Drop options that fail a hard requirement or match `avoid`. If nothing fits without breaking `avoid`, say so and ask; do not quietly propose it.
+2. Prefer what is in `prefer`.
 3. Prefer fewer vendors when one really covers two jobs.
 4. Compare cost at the expected size and at 10× (use `scripts/project.mjs cost`).
 5. Note lock-in and the cost of leaving (data export, proprietary APIs).

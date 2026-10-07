@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
-import { detectVendors, readEnvNames, extractImports } from '../packages/core/src/detect.mjs';
+import { detectVendors, readEnvNames, extractImports, hookStatus } from '../packages/core/src/detect.mjs';
 import { loadCatalog, vendorSignatures } from '../packages/core/src/catalog.mjs';
 
 const signatures = vendorSignatures(loadCatalog(join(ROOT, 'catalog/vendors')));
@@ -77,11 +77,80 @@ test('extractImports covers import, require and dynamic import', () => {
 
 test('unmapped SDKs are reported and count for overlaps; dot-folders are skipped', (t) => {
 	const dir = tempDir(t);
-	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { stripe: '1', '@auth0/nextjs-auth0': '1', '@clerk/nextjs': '1' } }));
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { 'mailgun.js': '1', inngest: '1', resend: '1' } }));
 	mkdirSync(join(dir, '.claude/skills/x'), { recursive: true });
 	writeFileSync(join(dir, '.claude/skills/x/a.mjs'), "import x from '@supabase/supabase-js'; supabase.auth.getUser()");
 	const r = detectVendors(dir, { signatures });
-	assert.deepEqual(ids(r), ['clerk']);
-	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['Auth0', 'Stripe']);
-	assert.deepEqual(r.overlaps, [{ role: 'auth', vendors: ['clerk', 'Auth0'] }]);
+	assert.deepEqual(ids(r), ['resend']);
+	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['Inngest', 'Mailgun']);
+	assert.deepEqual(r.overlaps, [{ role: 'email', vendors: ['resend', 'Mailgun'] }]);
+});
+
+test('hookStatus: off, on once config and script are both there, plugin for Claude Code', (t) => {
+	const dir = tempDir(t);
+	assert.deepEqual(hookStatus(dir), { 'claude-code': 'off', cursor: 'off' });
+	assert.deepEqual(hookStatus(dir, { plugin: true }), { 'claude-code': 'plugin', cursor: 'off' });
+	mkdirSync(join(dir, '.claude/hooks'), { recursive: true });
+	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Write|Edit', hooks: [{ type: 'command', command: 'node .claude/hooks/manifestack-new-vendor.mjs' }] }] } }));
+	assert.equal(hookStatus(dir)['claude-code'], 'off', 'config without the script does not count');
+	writeFileSync(join(dir, '.claude/hooks/manifestack-new-vendor.mjs'), '');
+	assert.equal(hookStatus(dir)['claude-code'], 'on');
+	mkdirSync(join(dir, '.cursor/hooks'), { recursive: true });
+	writeFileSync(join(dir, '.cursor/hooks.json'), JSON.stringify({ version: 1, hooks: { afterFileEdit: [{ command: 'node .cursor/hooks/manifestack-new-vendor.mjs' }] } }));
+	writeFileSync(join(dir, '.cursor/hooks/manifestack-new-vendor.mjs'), '');
+	assert.equal(detectVendors(dir, { signatures }).hook.cursor, 'on');
+});
+
+test('detect.mjs from the repo checkout counts as the plugin (hooks/hooks.json next to .claude-plugin)', (t) => {
+	const r = runNode(join(ROOT, 'skills/manifestack/scripts/detect.mjs'), [tempDir(t)]);
+	assert.equal(r.code, 0, r.stderr);
+	assert.deepEqual(JSON.parse(r.stdout).hook, { 'claude-code': 'plugin', cursor: 'off' });
+});
+
+test('many-vendors: SDKs and config files find every newer vendor map', () => {
+	const r = detect('many-vendors');
+	assert.deepEqual(ids(r), ['anthropic', 'auth0', 'cloudflare', 'firebase', 'fly', 'netlify', 'openai', 'paddle', 'posthog', 'postmark', 'railway', 'render', 'sendgrid', 'sentry', 'stripe']);
+	assert.deepEqual(r.unmapped, []);
+	const firebase = r.vendors.find((v) => v.id === 'firebase');
+	assert.deepEqual(firebase.roles_used, ['database'], 'auth, hosting and storage are not used here');
+	for (const id of ['fly', 'railway', 'render', 'netlify', 'cloudflare']) {
+		const v = r.vendors.find((x) => x.id === id);
+		assert.ok(v.evidence.some((e) => e.kind === 'config'), `${id} found from its config file`);
+	}
+	assert.deepEqual(r.overlaps.find((o) => o.role === 'ai').vendors, ['anthropic', 'openai']);
+});
+
+test('Python and Go manifests: unmapped SDKs and frameworks', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'requirements.txt'), 'boto3==1.35\nmistralai>=1\n');
+	writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "api"\ndependencies = ["fastapi>=0.110"]\n');
+	mkdirSync(join(dir, 'worker'));
+	writeFileSync(join(dir, 'worker/go.mod'), 'module example.com/worker\n\ngo 1.23\n\nrequire (\n\tgithub.com/gin-gonic/gin v1.10.0\n\tgithub.com/aws/aws-sdk-go-v2 v1.30.0\n)\n');
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['AWS', 'Mistral']);
+	assert.deepEqual(r.unmapped.find((u) => u.name === 'AWS').evidence.map((e) => e.file).sort(), ['requirements.txt', 'worker/go.mod']);
+	assert.deepEqual(r.frameworks.map((f) => f.name).sort(), ['FastAPI', 'Gin']);
+	assert.equal(r.empty, false);
+});
+
+test('python-api: vendors from requirements.txt and pyproject.toml, Heroku from its Procfile', () => {
+	const r = detect('python-api');
+	assert.deepEqual(ids(r), ['datadog', 'gemini', 'heroku', 'mongodb-atlas', 'openai', 'sentry', 'stripe', 'upstash']);
+	const stripe = r.vendors.find((v) => v.id === 'stripe');
+	assert.ok(stripe.evidence.some((e) => e.kind === 'package' && e.file === 'requirements.txt' && e.match === 'stripe'));
+	assert.ok(r.vendors.find((v) => v.id === 'datadog').evidence.some((e) => e.file === 'pyproject.toml'));
+	assert.deepEqual(r.frameworks.map((f) => f.name), ['FastAPI']);
+});
+
+test('go-worker: vendors from go.mod (major-version paths), DigitalOcean from its app spec', () => {
+	const r = detect('go-worker');
+	assert.deepEqual(ids(r), ['anthropic', 'digitalocean', 'sentry', 'stripe', 'workos']);
+	assert.ok(r.vendors.find((v) => v.id === 'stripe').evidence.some((e) => e.match === 'github.com/stripe/stripe-go/v82'));
+	assert.deepEqual(r.frameworks.map((f) => f.name), ['Gin']);
+});
+
+test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
+	const r = detect('mobile-app');
+	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);
+	assert.deepEqual(r.overlaps.find((o) => o.role === 'payments').vendors, ['adapty', 'lemon-squeezy', 'polar', 'revenuecat']);
 });

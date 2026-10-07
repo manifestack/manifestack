@@ -1,132 +1,141 @@
+<div align="center">
+
 # Manifestack
 
-Choose the stack that fits your project. Know when it stops fitting.
+**A stack that fits your project, and keeps fitting as it changes.**
 
-Manifestack is a free, MIT-licensed [Agent Skill](https://agentskills.io) for Claude Code, Cursor, Codex and other coding agents. It proposes a stack for your budget, users, requirements and team, then keeps checking it: plan limits, bills, launch-day risks, requirement gaps, overlapping services and overbuilt infrastructure. Decisions live in a `STACK.md` file in your repo.
+[![Website](https://img.shields.io/badge/website-manifestack.com-0a7cff)](https://manifestack.com)
+[![npm](https://img.shields.io/npm/v/manifestack?logo=npm&color=cb3837)](https://www.npmjs.com/package/manifestack)
+[![CI](https://github.com/manifestack/manifestack/actions/workflows/ci.yml/badge.svg)](https://github.com/manifestack/manifestack/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/manifestack/manifestack/blob/main/LICENSE)
 
-- **No API keys, no account.** It reads your repo and env var *names*, never their values, and asks you for usage numbers.
-- **Runs locally.** There is no Manifestack server. The only network use is reading vendors' public pricing pages.
-- **Current prices.** Every finding cites the vendor page and the date it was read. If a page can't be read, the finding says `unverified`.
-- **Neutral.** No rankings, no affiliate links, no "switch to X". Fixes are settings, planned upgrades, or a deliberate switch when the fit is wrong.
+</div>
 
-Site: [manifestack.com](https://manifestack.com)
+Picking a stack is the easy part. Keeping it right is harder: the project grows, the agent adds a new service, a plan runs out of quota, a customer asks for EU data. Manifestack handles this inside your coding agent (Claude Code, Cursor, Codex and others):
+
+- **Starting a project?** It picks hosting, database, auth, email and the rest for your budget, users, data rules and team, priced at 1k, 10k and 100k users.
+- **Changing the stack?** Every service the agent adds is checked against your requirements, your avoid list and the services you already run, before you rely on it.
+- **Already running?** It tells you which limit or bill you'll hit first, when, what it will cost and how to avoid it.
+
+Built for developers, small teams and agencies who choose their own services, from the first commit to a few hundred thousand users. No API keys, no account, runs locally. Every fact comes from the vendor's public pages (pricing, regions, certifications), with the date it was read.
+
+## Quick start
+
+```bash
+npx manifestack
+```
+
+Then, in your agent:
+
+```text
+/manifestack
+```
+
+It runs `init` on an empty repo and `audit` on an existing one. An audit looks like this:
+
+| Finding | When | Cost | Fix |
+| --- | --- | --- | --- |
+| **Requirement** Supabase project in us-east-1, STACK.md requires an EU database | Before launch | ~1 day of migration | Create the production project in an EU region and move the data while it is small |
+| **Overlap** Clerk and Supabase Auth both sign users in | Now | $25/mo on Clerk Pro | Keep the one whose features you use, remove the other |
+| **Limit** Supabase Free: database size. 312 / 500 MB, +1.1 MB/day | ETA ~Mar 2027 | $25/mo on Pro | Archive `events` rows older than 90 days, or schedule the upgrade |
+
+Findings are `Requirement`, `Overlap`, `Overbuilt`, `Limit`, `Bill` or `Risk`, each with evidence, when, cost, fix and source.
 
 ## Install
 
-| Agent | Command | Then |
+`npx manifestack` detects your agent. To pick one explicitly:
+
+| Agent | Install | Run |
 | --- | --- | --- |
-| Claude Code | `npx manifestack install --agent claude-code` | `/manifestack` |
-| Cursor | `npx manifestack install --agent cursor` | ask the agent to run `manifestack` |
-| Codex | `npx manifestack install --agent codex` | `$manifestack` |
-| Other agents | `npx manifestack install` | detects Copilot, Windsurf, OpenCode, Cline, Gemini CLI and asks |
+| Claude Code | `npx manifestack --agent claude-code` | `/manifestack` |
+| Cursor | `npx manifestack --agent cursor` | ask the agent to run `manifestack` |
+| Codex | `npx manifestack --agent codex` | `$manifestack` |
 
-`npx manifestack install` copies both skills into the agent's project skills folder. For Claude Code and Cursor it also registers the "new vendor" hook. `npx manifestack uninstall` removes them and leaves `STACK.md` alone. Run `npx manifestack --help` for options (`--skill`, `--dir`, `--dry-run`, `--yes`).
+It also detects Copilot, Windsurf, OpenCode, Cline and Gemini CLI. For Claude Code and Cursor it adds a hook that flags each new vendor the agent adds to `package.json`, `requirements.txt`, `pyproject.toml` or `go.mod`. `npx manifestack uninstall` removes everything except your `.manifestack/` folder.
 
-### Claude Code plugin
+<details>
+<summary>Other ways to install</summary>
 
-```
+**Claude Code plugin** (run it as `/manifestack:manifestack`):
+
+```text
 /plugin marketplace add manifestack/manifestack
 /plugin install manifestack@manifestack
 ```
 
-The plugin brings both skills and the hook. Skills from a plugin are namespaced: run `/manifestack:manifestack`.
-
-### skills CLI (skills.sh)
+**skills CLI** (skills only; `/manifestack` offers to add the hook later):
 
 ```bash
 npx skills add manifestack/manifestack
-npx skills add manifestack/manifestack --skill manifestack -a claude-code
-npx skills add manifestack/manifestack --list
 ```
 
-The `skills` CLI installs the skills only, without the hook. In Claude Code and Cursor, use `npx manifestack install` if you want the hook. Without a hook, `manifestack-guard` runs only when the agent picks it up on its own, which doesn't always happen for routine coding tasks, so run `/manifestack audit` before you merge a change that adds or swaps a service.
-
-### Manual
+**Manual:**
 
 ```bash
 git clone https://github.com/manifestack/manifestack
-cp -r manifestack/skills/manifestack .agents/skills/      # Claude Code: .claude/skills/
+cp -r manifestack/skills/manifestack .agents/skills/   # Claude Code: .claude/skills/
 ```
 
-## Use
+</details>
+
+## Commands
 
 | Command | What it does |
 | --- | --- |
-| `/manifestack` | Picks `init` for an empty repo and `audit` otherwise |
-| `/manifestack init "B2B dashboard, EU users"` | Asks about budget, users, requirements and team, proposes a whole stack priced at 1k, 10k and 100k users, writes `STACK.md` |
-| `/manifestack audit` | Scans the repo, reads current pricing, projects growth, and reports findings with a when, a cost and a fix |
+| `/manifestack` | `init` for an empty repo, `audit` otherwise |
+| `/manifestack init "B2B dashboard, EU users"` | Asks about budget, users, requirements and what the team prefers and avoids, proposes and prices a whole stack |
+| `/manifestack audit` | Scans the repo, checks every service against your requirements and growth, reports findings |
 
-Planned: `compare`, `migrate`, `watch`.
+## STACK.md
 
-Every audit finding has a kind (`Limit`, `Bill`, `Risk`, `Requirement`, `Overlap`, `Overbuilt`), evidence, when, cost, fix and source:
+Manifestack writes only to `.manifestack/` and never to your repository root:
 
-| Finding | When | Cost | Fix |
-| --- | --- | --- | --- |
-| **Limit** Supabase Free: database size. 312 / 500 MB, +1.1 MB/day | ETA ~Mar 2027 | $25/mo on Pro | Archive `events` rows older than 90 days, or schedule the upgrade for February |
-| **Bill** Vercel Pro: data transfer. 3.4 TB last month, 1 TB included | Every month, growing | ~$360/mo overage | Cache `/og/*` at the edge, set `Cache-Control` on `/api/feed` |
-
-(Sample output; numbers come from your inputs and today's vendor pages.)
-
-### Where usage numbers come from
-
-1. You: the skill asks 4–6 questions at most and says where each number is in the vendor dashboard.
-2. Exports (CSV/JSON) you put in the repo.
-3. A vendor's official MCP server connected in **read-only** mode (Supabase with `read_only=true`, Neon with `readonly=true`). Vercel and Resend MCP servers are not used: they have write tools and no read-only mode.
-
-### STACK.md
+```text
+.manifestack/
+├── STACK.md   # requirements and decisions, commit it
+└── tmp/       # working files, ignored by git
+```
 
 ```markdown
 ## Requirements
 budget: ~$600/mo
 users: 9k now, 50k by Q3
 requires: EU database, SOC 2 vendors
-team_knows: Postgres, Next.js
+prefer: Postgres, Next.js
+avoid: Kubernetes  # no ops on-call
 
 ## Database: Supabase
 plan: free
 limit: 500 MB database, pauses after 7 days idle
 source: supabase.com/pricing  # read 2026-10-06
-usage: 312 MB, +1.1 MB/day (2026-10-06)
 decided: stay on Free until first paying user
 revisit_when: db_size > 400 MB OR date >= 2027-02-01
-next: Pro, $25/mo
-env: SUPABASE_URL, SUPABASE_ANON_KEY  # names only
 ```
 
-Format and `revisit_when` grammar: [skills/manifestack/references/stack-md.md](skills/manifestack/references/stack-md.md).
+`requires` holds hard rules, `prefer` what the team knows or wants to use, `avoid` what it rules out. Every pick and every new service is checked against them. Decisions are only written after your yes. Secrets never go in. [Full format](https://github.com/manifestack/manifestack/blob/main/skills/manifestack/references/stack-md.md).
 
-## Vendors with a page map
+## Vendors
 
-Vercel, Supabase, Neon, Clerk, Resend. A map says which pages to read, what to extract and where usage lives in the dashboard; it never stores prices. For any other vendor the skill finds the public pricing page itself. New maps ship as releases; to request one, open an issue with the pricing page.
+Works with any vendor: the skill finds its public pages during the audit. Built-in page maps make that faster and more reliable. So far they cover:
 
-## What is in this repository
-
-| Path | What |
+| Role | Vendors |
 | --- | --- |
-| `skills/manifestack/` | Main skill: `init` and `audit` |
-| `skills/manifestack-guard/` | Small skill the agent calls on its own before adding or changing a vendor |
-| `catalog/vendors/` | Vendor maps (source of truth) |
-| `catalog/shared/` | Rules shared by all skills (source of truth) |
-| `packages/core/` | Detection, projections, STACK.md logic (source of truth for the scripts) |
-| `packages/cli/` | The `manifestack` npm package |
-| `hooks/` | Claude Code plugin hook and the generated hook script |
-| `tools/sync.mjs` | Copies `catalog/` and `packages/core/` into `skills/` and `hooks/` |
-| `.claude-plugin/` | Plugin manifest and marketplace |
+| Hosting | Vercel, Netlify, Cloudflare, Railway, Render, Fly.io, Heroku, DigitalOcean |
+| Database | Supabase, Neon, Firebase, PlanetScale, MongoDB Atlas, Upstash, Convex |
+| Auth | Clerk, Auth0, WorkOS |
+| Email | Resend, Postmark, SendGrid |
+| Storage | Cloudinary, UploadThing |
+| Payments | Stripe, Paddle, Lemon Squeezy, Polar |
+| Mobile | RevenueCat, Adapty, Expo EAS |
+| Monitoring | Sentry, PostHog, Datadog |
+| AI | OpenAI, Anthropic, Google Gemini |
 
-Files in `skills/*/vendors/`, `skills/*/scripts/`, `skills/*/references/security.md` and `hooks/new-vendor.mjs` are generated. Edit the sources and run `node tools/sync.mjs`.
+Dependencies are read from JavaScript, Python and Go projects (`package.json`, `requirements.txt`, `pyproject.toml`, `Pipfile`, `go.mod`). New maps ship as releases. [Request a map](https://github.com/manifestack/manifestack/issues).
 
-## Development
+## Contributing
 
-Node.js 18+. No dependencies.
-
-```bash
-node tools/sync.mjs          # regenerate copies after editing catalog/ or packages/core/
-npm test                     # unit, CLI, hook and format tests
-node tools/sync.mjs --check  # what CI runs to catch stale copies
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) to add a vendor map or a skill, and [SECURITY.md](SECURITY.md) to report a vulnerability.
+See [CONTRIBUTING.md](https://github.com/manifestack/manifestack/blob/main/CONTRIBUTING.md). Security issues: [SECURITY.md](https://github.com/manifestack/manifestack/blob/main/SECURITY.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/manifestack/manifestack/blob/main/LICENSE)

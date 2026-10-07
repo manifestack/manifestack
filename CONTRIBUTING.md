@@ -5,11 +5,33 @@ Thanks for helping. Two rules shape everything here:
 - **Sources and copies.** Edit `catalog/` (data and shared rules) and `packages/core/` (logic). `node tools/sync.mjs` copies them into `skills/` and `hooks/`. Generated files say so on their first lines; CI fails if they are out of date. Commit the generated files too: the plugin and the `skills` CLI install straight from GitHub.
 - **No backend, no keys, no dependencies.** Scripts use only the Node.js standard library and never touch the network. Skills never ask for keys and never read env values.
 
+## Repository layout
+
+| Path | What |
+| --- | --- |
+| `skills/manifestack/` | Main skill: `init` and `audit` |
+| `skills/manifestack-guard/` | Small skill the agent calls on its own before adding or changing a vendor |
+| `catalog/vendors/` | Vendor maps (source of truth) |
+| `catalog/shared/` | Rules shared by all skills (source of truth) |
+| `packages/core/` | Detection, projections, STACK.md logic (source of truth for the scripts) |
+| `packages/cli/` | The `manifestack` npm package |
+| `hooks/` | Claude Code plugin hook and the generated hook script |
+| `tools/sync.mjs` | Copies `catalog/` and `packages/core/` into `skills/` and `hooks/` |
+| `.claude-plugin/` | Plugin manifest and marketplace |
+
+Generated: `skills/*/vendors/`, `skills/*/scripts/`, `skills/*/references/security.md`, `hooks/new-vendor.mjs`.
+
+```bash
+node tools/sync.mjs          # regenerate copies after editing catalog/ or packages/core/
+npm test                     # unit, CLI, hook and format tests (Node.js 18+)
+node tools/sync.mjs --check  # what CI runs to catch stale copies
+```
+
 ## Add a vendor map
 
 1. Copy `catalog/vendors/_template.md` to `catalog/vendors/<id>.md`. The `id` is lowercase and matches the file name.
 2. Fill in:
-   - `detect`: npm package names (a trailing `/` matches a whole scope), import prefixes, env var name prefixes, config files. Add `role_signals` if the vendor has several roles and a role should count only when its code is used.
+   - `detect`: npm package names (a trailing `/` matches a whole scope), PyPI names (`pypi`) and Go module paths (`go`) of the official SDKs, import prefixes, env var name prefixes, config files. Verify every name on npmjs.com, pypi.org and pkg.go.dev. Add `role_signals` if the vendor has several roles and a role should count only when its code is used.
    - `pages`: official pricing, limits, regions and security/compliance pages. Open every URL.
    - `read`: what the auditor extracts from the pages: quota *names*, what happens at the limit, the next plan.
    - `usage_questions`: what to ask and the exact dashboard path. Use the standard metric names where they fit (`db_size`, `monthly_sent`, `daily_peak`, `transfer_tb`, `mau`, `users`, `monthly_bill`).

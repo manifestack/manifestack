@@ -1,35 +1,36 @@
 ---
 name: manifestack-guard
-description: Use before adding, removing or replacing an infrastructure dependency or vendor SDK - hosting, database, auth, email, storage, payments, monitoring, queues or AI APIs (for example "add Stripe", "set up Resend for emails", "install @supabase/supabase-js", "move auth to Clerk"), and when a hook reports that a new vendor was added. Checks the change against STACK.md requirements, budget and revisit_when, and points to a full manifestack audit when limits need a look. Not for UI, styling, copy, tests or ordinary code changes.
+description: Use before adding, removing or replacing an infrastructure dependency or vendor SDK - hosting, database, auth, email, storage, payments, monitoring, queues or AI APIs (for example "add Stripe", "set up Resend for emails", "install @supabase/supabase-js", "move auth to Clerk"), and when a hook reports that a new vendor was added. Checks the change against STACK.md requirements, the team's avoid list, budget, services already in the stack and revisit_when, and points to a full manifestack audit when limits need a look. Not for UI, styling, copy, tests or ordinary code changes.
 license: MIT
 compatibility: Node.js 18+ to run the bundled script. No network needed.
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   homepage: https://manifestack.com
 ---
 
 # Manifestack guard
 
-A quick check before the stack changes. It reads STACK.md only; it does not run a full audit and does not read vendor pages.
+A quick check before the stack changes. It reads `.manifestack/STACK.md` only; it does not run a full audit and does not read vendor pages.
 
 `<skill-dir>` is the folder that contains this file.
 
 ## Steps
 
-1. Run `node <skill-dir>/scripts/stack-md.mjs parse STACK.md` from the repository root.
-   - `exists: false` → tell the user there is no STACK.md and suggest `/manifestack` (it records the stack and its limits). Then continue with their task.
-2. Name the service being added, removed or changed, and its role (Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Other).
+1. Run `node <skill-dir>/scripts/stack-md.mjs parse .manifestack/STACK.md` from the repository root.
+   - `exists: false` → tell the user there is no `.manifestack/STACK.md` and suggest `/manifestack` (it records the stack and its limits). Then continue with their task.
+2. Name the service being added, removed or changed, and its role (Hosting, Database, Auth, Email, Storage, Payments, Monitoring, AI, Other).
 3. Check it against STACK.md:
    - **Requirements**: go through every item in `requires` one by one (data region, certifications such as SOC 2, SSO) and say for each whether this vendor meets it or needs checking. A payments, email or auth vendor holds customer data, so a data-region rule applies to it as much as to the database. Do not guess the answer; do not skip an item.
+   - **Avoid**: does the vendor, its cloud or the setup it needs match anything in `avoid`? Quote the line.
    - **Budget**: does a paid plan of this service fit `budget`?
    - **Limits**: name the plan limits that matter for how this service will be used, as things to check (by name, without numbers): daily and monthly send caps for email, billed users for auth, storage and egress for databases and files, API rate limits for payments or AI. A welcome email that works in testing and stops at the free daily cap on launch day is exactly what this check is for.
    - **Overlap**: is there already a section with the same role (a second auth provider, a second email sender)?
-   - **revisit_when**: run `node <skill-dir>/scripts/stack-md.mjs check STACK.md`. A `triggered` section touched by this change is worth a full audit.
+   - **revisit_when**: run `node <skill-dir>/scripts/stack-md.mjs check .manifestack/STACK.md`. A `triggered` section touched by this change is worth a full audit.
    - **decided**: does the change contradict a recorded decision? Quote it.
 4. Report in two to four lines:
    - nothing to flag → say so in one line and continue;
    - a conflict or a new vendor → say what it is and suggest checking it before relying on it: `/manifestack audit` when STACK.md exists, `/manifestack` when it does not (it records the stack first). Do not block the user's task.
-5. If the user confirms the change, offer to add a section for the new service to STACK.md. Write it only on a yes, with `node <skill-dir>/scripts/stack-md.mjs set STACK.md --section "<Role>: <Vendor>" --set "plan=…"`, and then `… lint STACK.md`.
+5. If the user confirms the change, offer to add a section for the new service to STACK.md. Write it only on a yes, with `node <skill-dir>/scripts/stack-md.mjs set .manifestack/STACK.md --section "<Role>: <Vendor>" --set "plan=…"`, and then `… lint .manifestack/STACK.md`.
 
 ## Rules
 

@@ -1,12 +1,13 @@
-// Reads and updates STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
+// Reads and updates .manifestack/STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
 // Updates touch only the named fields: other lines, unknown keys and user comments stay as they are.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { isMain, parseArgs, printJson, fail, todayIso } from './cli-util.mjs';
 import { parseQuantity, eta, approxMonth } from './project.mjs';
+import { STACK_FILE, ensureWorkDir } from './workdir.mjs';
 
-export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'Other'];
+export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'AI', 'Other'];
 export const STACK_KEYS = ['plan', 'limit', 'source', 'usage', 'decided', 'revisit_when', 'next', 'env'];
-export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'team_knows'];
+export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid'];
 export const REVISIT_METRICS = ['db_size', 'monthly_sent', 'daily_peak', 'transfer_tb', 'mau', 'users', 'monthly_bill', 'date'];
 
 const SECRET_PATTERNS = [
@@ -372,11 +373,11 @@ export function lintStackMd(text) {
 }
 
 const STACK_USAGE = `usage:
-  node stack-md.mjs parse [STACK.md]
-  node stack-md.mjs check [STACK.md] [--today YYYY-MM-DD] [--metric db_size="420 MB"]...
-  node stack-md.mjs lint [STACK.md]
-  node stack-md.mjs set [STACK.md] --section "Database: Supabase" --set "plan=free" [--set ...] [--comment "source=read 2026-10-06"]
-Prints JSON. set refuses values that look like secrets and keeps every other line as it is.`;
+  node stack-md.mjs parse [file]
+  node stack-md.mjs check [file] [--today YYYY-MM-DD] [--metric db_size="420 MB"]...
+  node stack-md.mjs lint [file]
+  node stack-md.mjs set [file] --section "Database: Supabase" --set "plan=free" [--set ...] [--comment "source=read 2026-10-06"]
+file defaults to .manifestack/STACK.md. Prints JSON. set refuses values that look like secrets and keeps every other line as it is.`;
 
 function keyValues(list) {
 	const out = {};
@@ -391,7 +392,7 @@ function keyValues(list) {
 export function stackMdMain(argv) {
 	const args = parseArgs(argv);
 	const cmd = args._[0];
-	const file = args._[1] ?? 'STACK.md';
+	const file = args._[1] ?? STACK_FILE;
 	try {
 		if (!['parse', 'check', 'lint', 'set'].includes(cmd)) {
 			process.stdout.write(STACK_USAGE + '\n');
@@ -424,6 +425,7 @@ export function stackMdMain(argv) {
 				process.exitCode = 2;
 				throw new Error(`refusing to write: lines ${secrets.map((s) => s.line).join(', ')} look like secrets`);
 			}
+			ensureWorkDir(file);
 			writeFileSync(file, out);
 			printJson({ file, written: true, section: args.section });
 		}

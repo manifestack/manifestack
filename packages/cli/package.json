@@ -1,14 +1,14 @@
 {
   "name": "manifestack",
-  "version": "0.1.0",
-  "description": "Choose the stack that fits your project and know when it stops fitting: costs, limits, requirements. Installs the Manifestack Agent Skill.",
+  "version": "0.2.0",
+  "description": "Installs the Manifestack Agent Skill for Claude Code, Cursor, Codex and other agents: fits your stack to budget, users and data rules, audits limits, bills, requirement gaps and overlaps, and checks every new vendor.",
   "type": "module",
   "license": "MIT",
   "bin": { "manifestack": "src/manifestack.js" },
   "files": ["src", "skills", "hooks"],
   "scripts": { "prepack": "node ../../tools/sync.mjs --into packages/cli" },
   "engines": { "node": ">=18" },
-  "keywords": ["agent-skills", "skill", "claude-code", "cursor", "codex", "stack", "pricing", "limits", "costs", "vercel", "supabase"],
+  "keywords": ["agent-skills", "skill", "claude-code", "cursor", "codex", "stack", "architecture", "audit", "pricing", "limits", "costs", "compliance", "vendors", "vercel", "supabase", "firebase", "stripe", "openai"],
   "repository": { "type": "git", "url": "git+https://github.com/manifestack/manifestack.git", "directory": "packages/cli" },
   "homepage": "https://manifestack.com",
   "bugs": "https://github.com/manifestack/manifestack/issues"

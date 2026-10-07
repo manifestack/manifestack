@@ -5,6 +5,8 @@ name: Resend
 roles: [email]
 detect:
   packages: ["resend", "@react-email/", "react-email"]
+  pypi: ["resend"]
+  go: ["github.com/resend/resend-go"]
   imports: ["resend", "@react-email/"]
   env_prefixes: ["RESEND_"]
   config_files: []

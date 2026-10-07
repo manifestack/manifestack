@@ -1,0 +1,2 @@
+name = "many-vendors"
+main = "src/worker.ts"

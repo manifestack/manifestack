@@ -1,6 +1,6 @@
 // generated, edit catalog/ or packages/core/ (then run: node tools/sync.mjs)
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -206,7 +206,7 @@ function splitInline(s) {
 // A map says where to look and what to extract, never the prices themselves.
 
 const VENDOR_SCHEMA = 1;
-const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'other'];
+const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'ai', 'other'];
 
 /** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
 function upgradeVendorMap(data) {
@@ -232,6 +232,8 @@ function parseVendorMap(text, file = '<vendor map>') {
 		roles: data.roles ?? [],
 		detect: {
 			packages: detect.packages ?? [],
+			pypi: detect.pypi ?? [],
+			go: detect.go ?? [],
 			imports: detect.imports ?? [],
 			env_prefixes: detect.env_prefixes ?? [],
 			config_files: detect.config_files ?? [],
@@ -252,7 +254,7 @@ function validateVendorMap(v) {
 	if (!Array.isArray(v.roles) || !v.roles.length) errors.push('roles must be a non-empty list');
 	for (const r of v.roles ?? []) if (!VENDOR_ROLES.includes(r)) errors.push(`unknown role "${r}"`);
 	const d = v.detect ?? {};
-	if (![d.packages, d.imports, d.env_prefixes, d.config_files].some((x) => x?.length)) errors.push('detect needs at least one signature');
+	if (![d.packages, d.pypi, d.go, d.imports, d.env_prefixes, d.config_files].some((x) => x?.length)) errors.push('detect needs at least one signature');
 	for (const role of Object.keys(d.role_signals ?? {})) if (!(v.roles ?? []).includes(role)) errors.push(`role_signals.${role} is not in roles`);
 	if (!/^https:\/\//.test(String(v.pages?.pricing ?? ''))) errors.push('pages.pricing must be an https URL');
 	for (const [k, url] of Object.entries(v.pages ?? {})) if (!/^https:\/\//.test(String(url))) errors.push(`pages.${k} must be an https URL`);
@@ -286,51 +288,34 @@ function vendorSignatures(vendors) {
 // ---- packages/core/src/known-sdks.mjs
 // SDKs of common vendors that have no page map yet. Detection reports them as `unmapped` so the
 // audit still covers them (the skill finds the pricing page itself) and the hook can flag them.
-// Prefix entries end with `/` and match every package in that scope or path.
+// npm prefix entries end with `/` and match every package in that scope or path. `pypi` and `go` follow the rules in
+// manifests.mjs (PyPI names normalized, trailing `*` = prefix; Go module path prefixes).
 const UNMAPPED_SDKS = [
-	{ name: 'Stripe', role: 'payments', packages: ['stripe', '@stripe/'] },
-	{ name: 'Paddle', role: 'payments', packages: ['@paddle/'] },
-	{ name: 'Lemon Squeezy', role: 'payments', packages: ['@lemonsqueezy/'] },
-	{ name: 'Polar', role: 'payments', packages: ['@polar-sh/'] },
-	{ name: 'Auth0', role: 'auth', packages: ['@auth0/', 'auth0'] },
-	{ name: 'WorkOS', role: 'auth', packages: ['@workos-inc/'] },
-	{ name: 'Firebase', role: 'database', packages: ['firebase', 'firebase-admin'] },
-	{ name: 'PlanetScale', role: 'database', packages: ['@planetscale/'] },
 	{ name: 'Turso', role: 'database', packages: ['@libsql/', '@tursodatabase/'] },
-	{ name: 'MongoDB Atlas', role: 'database', packages: ['mongodb', 'mongoose'] },
-	{ name: 'Upstash', role: 'database', packages: ['@upstash/'] },
-	{ name: 'Convex', role: 'database', packages: ['convex'] },
 	{ name: 'Prisma Postgres', role: 'database', packages: ['@prisma/ppg', '@prisma/extension-accelerate'] },
-	{ name: 'AWS', role: 'other', packages: ['@aws-sdk/', 'aws-sdk', 'aws-cdk-lib'] },
-	{ name: 'Google Cloud', role: 'other', packages: ['@google-cloud/'] },
-	{ name: 'Azure', role: 'other', packages: ['@azure/'] },
-	{ name: 'Cloudflare', role: 'hosting', packages: ['wrangler', '@cloudflare/'] },
-	{ name: 'Netlify', role: 'hosting', packages: ['@netlify/', 'netlify-cli'] },
-	{ name: 'Fly.io', role: 'hosting', packages: ['@fly/'] },
-	{ name: 'SendGrid', role: 'email', packages: ['@sendgrid/'] },
-	{ name: 'Postmark', role: 'email', packages: ['postmark'] },
+	{ name: 'AWS', role: 'other', packages: ['@aws-sdk/', 'aws-sdk', 'aws-cdk-lib'], pypi: ['boto3', 'botocore', 'aws-cdk-lib'], go: ['github.com/aws/aws-sdk-go-v2', 'github.com/aws/aws-sdk-go'] },
+	{ name: 'Google Cloud', role: 'other', packages: ['@google-cloud/'], pypi: ['google-cloud-*'], go: ['cloud.google.com/go'] },
+	{ name: 'Azure', role: 'other', packages: ['@azure/'], pypi: ['azure-*'], go: ['github.com/Azure/azure-sdk-for-go'] },
 	{ name: 'Mailgun', role: 'email', packages: ['mailgun.js', 'mailgun-js'] },
 	{ name: 'Loops', role: 'email', packages: ['loops'] },
-	{ name: 'Twilio', role: 'other', packages: ['twilio'] },
-	{ name: 'Sentry', role: 'monitoring', packages: ['@sentry/'] },
-	{ name: 'Datadog', role: 'monitoring', packages: ['@datadog/', 'dd-trace'] },
-	{ name: 'PostHog', role: 'monitoring', packages: ['posthog-js', 'posthog-node'] },
+	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
 	{ name: 'Better Stack', role: 'monitoring', packages: ['@logtail/'] },
-	{ name: 'UploadThing', role: 'storage', packages: ['uploadthing', '@uploadthing/'] },
-	{ name: 'Cloudinary', role: 'storage', packages: ['cloudinary', 'next-cloudinary'] },
 	{ name: 'Algolia', role: 'other', packages: ['algoliasearch', '@algolia/'] },
 	{ name: 'Pusher', role: 'other', packages: ['pusher', 'pusher-js'] },
 	{ name: 'Ably', role: 'other', packages: ['ably'] },
 	{ name: 'Liveblocks', role: 'other', packages: ['@liveblocks/'] },
 	{ name: 'Inngest', role: 'other', packages: ['inngest'] },
 	{ name: 'Trigger.dev', role: 'other', packages: ['@trigger.dev/'] },
-	{ name: 'OpenAI', role: 'other', packages: ['openai', '@ai-sdk/openai'] },
-	{ name: 'Anthropic', role: 'other', packages: ['@anthropic-ai/sdk', '@ai-sdk/anthropic'] },
-	{ name: 'Pinecone', role: 'database', packages: ['@pinecone-database/'] },
+	{ name: 'Mistral', role: 'ai', packages: ['@mistralai/mistralai', '@ai-sdk/mistral'], pypi: ['mistralai', 'langchain-mistralai'] },
+	{ name: 'Groq', role: 'ai', packages: ['groq-sdk', '@ai-sdk/groq'], pypi: ['groq', 'langchain-groq'] },
+	{ name: 'Cohere', role: 'ai', packages: ['cohere-ai'], pypi: ['cohere', 'langchain-cohere'] },
+	{ name: 'Replicate', role: 'ai', packages: ['replicate'], pypi: ['replicate'], go: ['github.com/replicate/replicate-go'] },
+	{ name: 'Together AI', role: 'ai', packages: ['together-ai'], pypi: ['together'] },
+	{ name: 'Pinecone', role: 'database', packages: ['@pinecone-database/'], pypi: ['pinecone', 'pinecone-client'], go: ['github.com/pinecone-io/go-pinecone'] },
 ];
 
-// Frameworks and infrastructure tooling: inputs for Overbuilt findings, not vendors.
+// Frameworks: inputs for Overbuilt findings, not vendors. Keys are matched like vendor patterns of that ecosystem.
 const FRAMEWORK_PACKAGES = {
 	next: 'Next.js',
 	nuxt: 'Nuxt',
@@ -347,20 +332,160 @@ const FRAMEWORK_PACKAGES = {
 	'@nestjs/core': 'NestJS',
 	'@tanstack/react-start': 'TanStack Start',
 };
+const FRAMEWORK_PYPI = { django: 'Django', fastapi: 'FastAPI', flask: 'Flask', litestar: 'Litestar', starlette: 'Starlette' };
+const FRAMEWORK_GO = { 'github.com/gin-gonic/gin': 'Gin', 'github.com/labstack/echo': 'Echo', 'github.com/gofiber/fiber': 'Fiber', 'github.com/go-chi/chi': 'Chi' };
 
 function packageMatches(pkg, patterns) {
 	return patterns.some((p) => (p.endsWith('/') ? pkg.startsWith(p) : pkg === p));
 }
 
+// ---- packages/core/src/manifests.mjs
+// Dependency names from each ecosystem's manifest: package.json (npm), requirements*.txt, pyproject.toml and
+// Pipfile (PyPI), go.mod (Go). Lightweight line parsers, no TOML library: only the dependency lists are read.
+
+/** Signature field that holds each ecosystem's package names in a vendor map. */
+const ECOSYSTEM_FIELDS = { npm: 'packages', pypi: 'pypi', go: 'go' };
+
+/** Which ecosystem a manifest belongs to, from its repo-relative path; null if it is not a manifest. */
+function manifestKind(path) {
+	const parts = String(path).split(/[\\/]/);
+	const name = parts.at(-1);
+	if (name === 'package.json') return 'npm';
+	if (name === 'go.mod') return 'go';
+	if (name === 'pyproject.toml' || name === 'Pipfile') return 'pypi';
+	if (/^requirements([-._][\w.-]*)?\.(txt|in)$/i.test(name)) return 'pypi';
+	if (parts.at(-2) === 'requirements' && /\.(txt|in)$/.test(name)) return 'pypi';
+	return null;
+}
+
+function dependencyNames(pkgJson) {
+	const names = new Set();
+	for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+		for (const name of Object.keys(pkgJson?.[field] ?? {})) names.add(name);
+	}
+	return [...names];
+}
+
+/** PEP 503 normalization: case-insensitive, runs of `-`, `_` and `.` are equal. */
+function normalizePypi(name) {
+	return String(name).toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+/** The distribution name at the start of a PEP 508 requirement ("stripe[async]>=7 ; python_version>'3.8'"). */
+function requirementName(spec) {
+	const m = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(spec);
+	return m ? m[1] : null;
+}
+
+function requirementsTxt(text) {
+	const names = [];
+	for (let line of text.split(/\r?\n/)) {
+		line = line.replace(/(^|\s)#.*$/, '').trim();
+		if (!line || line.startsWith('-') || /^[./~]/.test(line)) continue;
+		// "name @ https://…" is a direct reference with a name; a bare URL has none.
+		if (line.includes('://') && !/^[A-Za-z0-9][A-Za-z0-9._-]*(\[[^\]]*\])?\s*@/.test(line)) continue;
+		const name = requirementName(line);
+		if (name) names.push(name);
+	}
+	return names;
+}
+
+const tomlKey = (line) => /^\s*("?)([A-Za-z0-9_.-]+)\1\s*=/.exec(line)?.[2];
+
+/** Dependencies from pyproject.toml (PEP 621, PEP 735 groups, Poetry) and Pipfile. */
+function pythonToml(text) {
+	const names = [];
+	let table = '';
+	let collecting = false;
+	for (const raw of text.split(/\r?\n/)) {
+		const line = raw.replace(/\s+#.*$/, '');
+		if (collecting) {
+			for (const m of line.matchAll(/["']([^"']+)["']/g)) {
+				const name = requirementName(m[1]);
+				if (name) names.push(name);
+			}
+			if (line.includes(']')) collecting = false;
+			continue;
+		}
+		const header = /^\s*\[{1,2}\s*([^\]]+?)\s*\]{1,2}\s*$/.exec(line);
+		if (header) {
+			table = header[1].replace(/["']/g, '');
+			continue;
+		}
+		const key = tomlKey(line);
+		if (!key) continue;
+		const arrayTable = (table === 'project' && key === 'dependencies') || table === 'project.optional-dependencies' || table === 'dependency-groups';
+		const keyTable = /^tool\.poetry(\.group\.[^.]+)?\.(dev-)?dependencies$/.test(table) || table === 'packages' || table === 'dev-packages';
+		if (arrayTable && /=\s*\[/.test(line)) {
+			const rest = line.slice(line.indexOf('[') + 1);
+			for (const m of rest.matchAll(/["']([^"']+)["']/g)) {
+				const name = requirementName(m[1]);
+				if (name) names.push(name);
+			}
+			collecting = !rest.includes(']');
+		} else if (keyTable && key.toLowerCase() !== 'python') {
+			names.push(key);
+		}
+	}
+	return names;
+}
+
+/** Module paths from go.mod `require` lines and blocks; `// indirect` entries are left out. */
+function goMod(text) {
+	const names = [];
+	let block = false;
+	for (const raw of text.split(/\r?\n/)) {
+		const indirect = /\/\/\s*indirect\b/.test(raw);
+		const line = raw.replace(/\/\/.*$/, '').trim();
+		if (block) {
+			if (line === ')') block = false;
+			else if (line && !indirect) names.push(line.split(/\s+/)[0]);
+			continue;
+		}
+		if (/^require\s*\($/.test(line)) block = true;
+		else if (/^require\s+\S+/.test(line) && !indirect) names.push(line.split(/\s+/)[1]);
+	}
+	return names;
+}
+
+/** Dependency names declared in a manifest of the given kind. Unparseable files give an empty list. */
+function manifestDependencies(kind, text, path = '') {
+	try {
+		if (kind === 'npm') return dependencyNames(JSON.parse(text));
+		if (kind === 'go') return goMod(text);
+		if (kind === 'pypi') return /\.toml$|(^|[\\/])Pipfile$/.test(path) ? pythonToml(text) : requirementsTxt(text);
+	} catch {}
+	return [];
+}
+
+/** Whether a dependency matches a vendor's patterns, by the naming rules of its ecosystem. */
+function dependencyMatches(kind, dep, patterns = []) {
+	if (kind === 'npm') return packageMatches(dep, patterns);
+	if (kind === 'go') return patterns.some((p) => dep === p || dep.startsWith(p + '/'));
+	if (kind === 'pypi') {
+		const d = normalizePypi(dep);
+		return patterns.some((p) => (p.endsWith('*') ? d.startsWith(normalizePypi(p.slice(0, -1))) : d === normalizePypi(p)));
+	}
+	return false;
+}
+
 // ---- packages/core/src/detect.mjs
-// Finds vendors in a repository: package.json dependencies, imports, config files and env var NAMES.
+// Finds vendors in a repository: dependencies from package.json, requirements*.txt, pyproject.toml, Pipfile and
+// go.mod, JS imports, config files and env var NAMES.
 // Env values are dropped while reading a line, before anything else sees them. No network.
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'venv', '__pycache__', 'target', 'tmp']);
-const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro)$/;
+const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro|py|go)$/;
+const FRAMEWORKS = { npm: FRAMEWORK_PACKAGES, pypi: FRAMEWORK_PYPI, go: FRAMEWORK_GO };
 const ENV_FILE = /^\.env(\..+)?$/;
 const MAX_SOURCE_BYTES = 512 * 1024;
 const MAX_EVIDENCE = 8;
+// The "new vendor" hook as `npx manifestack install` or `npx manifestack hook` registers it (packages/cli/src/agents.js).
+const HOOK_FILE = 'manifestack-new-vendor.mjs';
+const HOOK_SETUPS = {
+	'claude-code': { configs: ['.claude/settings.json', '.claude/settings.local.json'], script: `.claude/hooks/${HOOK_FILE}` },
+	cursor: { configs: ['.cursor/hooks.json'], script: `.cursor/hooks/${HOOK_FILE}` },
+};
 // Files that do not make a repository "existing code" on their own.
 const NON_PROJECT_FILES = /^(readme|license|licence|changelog|contributing|code_of_conduct|security|stack|agents|claude|gemini)(\.[a-z]+)?$|^\.(gitignore|gitattributes|editorconfig|env.*)$/i;
 
@@ -382,24 +507,17 @@ function extractImports(source) {
 	return [...specs];
 }
 
-function dependencyNames(pkgJson) {
-	const names = new Set();
-	for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-		for (const name of Object.keys(pkgJson?.[field] ?? {})) names.add(name);
-	}
-	return [...names];
-}
-
-/** Which mapped vendors and unmapped SDKs a list of package names contains. */
-function matchPackages(packages, signatures) {
+/** Which mapped vendors and unmapped SDKs a list of dependencies of one ecosystem (npm, pypi, go) contains. */
+function matchDependencies(deps, signatures, kind = 'npm') {
+	const field = ECOSYSTEM_FIELDS[kind];
 	const vendors = [];
 	for (const sig of signatures) {
-		const hits = packages.filter((p) => packageMatches(p, sig.packages));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]));
 		if (hits.length) vendors.push({ id: sig.id, name: sig.name, roles: sig.roles, packages: hits });
 	}
 	const unmapped = [];
 	for (const sdk of UNMAPPED_SDKS) {
-		const hits = packages.filter((p) => packageMatches(p, sdk.packages));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sdk[field]));
 		if (hits.length) unmapped.push({ name: sdk.name, role: sdk.role, packages: hits });
 	}
 	return { vendors, unmapped };
@@ -431,11 +549,28 @@ function* walk(root, limits) {
 	}
 }
 
+/** Per agent: `on` (registered in the project), `plugin` (the Claude Code plugin brings its own) or `off`. */
+function hookStatus(root, { plugin = false } = {}) {
+	const status = {};
+	for (const [agent, setup] of Object.entries(HOOK_SETUPS)) {
+		const registered = setup.configs.some((c) => {
+			try {
+				return readFileSync(join(root, c), 'utf8').includes(HOOK_FILE);
+			} catch {
+				return false;
+			}
+		});
+		if (registered && existsSync(join(root, setup.script))) status[agent] = 'on';
+		else status[agent] = agent === 'claude-code' && plugin ? 'plugin' : 'off';
+	}
+	return status;
+}
+
 function isKubernetesManifest(text) {
 	return /^apiVersion:/m.test(text) && /^kind:\s*(Deployment|StatefulSet|DaemonSet|Service|Ingress|HorizontalPodAutoscaler|CronJob)\b/m.test(text);
 }
 
-function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
+function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {}) {
 	root = resolve(root);
 	if (!existsSync(root) || !statSync(root).isDirectory()) throw new Error(`not a directory: ${root}`);
 	const sigs = signatures ?? [];
@@ -480,21 +615,26 @@ function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
 			for (const cfg of sig.config_files) if (rel === cfg || rel.endsWith('/' + cfg)) hit(sig, 'config', rel, cfg);
 		}
 
-		if (name === 'package.json') {
-			let pkg;
+		const manifest = manifestKind(rel);
+		if (manifest) {
+			let text;
 			try {
-				pkg = JSON.parse(readFileSync(full, 'utf8'));
+				text = readFileSync(full, 'utf8');
 			} catch {
 				continue;
 			}
-			const deps = dependencyNames(pkg);
-			const m = matchPackages(deps, sigs);
+			const deps = manifestDependencies(manifest, text, rel);
+			const m = matchDependencies(deps, sigs, manifest);
 			for (const v of m.vendors) for (const p of v.packages) hit(sigs.find((s) => s.id === v.id), 'package', rel, p);
 			for (const u of m.unmapped) {
 				if (!unmapped.has(u.name)) unmapped.set(u.name, { name: u.name, role: u.role, evidence: [] });
 				for (const p of u.packages) unmapped.get(u.name).evidence.push({ kind: 'package', file: rel, match: p });
 			}
-			for (const d of deps) if (FRAMEWORK_PACKAGES[d] && !frameworks.has(FRAMEWORK_PACKAGES[d])) frameworks.set(FRAMEWORK_PACKAGES[d], { name: FRAMEWORK_PACKAGES[d], package: d, file: rel });
+			for (const d of deps) {
+				const key = Object.keys(FRAMEWORKS[manifest]).find((k) => dependencyMatches(manifest, d, [k]));
+				const fw = key && FRAMEWORKS[manifest][key];
+				if (fw && !frameworks.has(fw)) frameworks.set(fw, { name: fw, package: d, file: rel });
+			}
 			continue;
 		}
 
@@ -555,6 +695,7 @@ function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
 		frameworks: [...frameworks.values()],
 		infra,
 		env_names: [...envNames].sort(),
+		hook: hookStatus(root, { plugin }),
 	};
 }
 
@@ -565,19 +706,48 @@ function defaultVendorsDir() {
 	return null;
 }
 
+/** True when this script runs from the Claude Code plugin, which registers the hook itself (hooks/hooks.json). */
+function runsFromPlugin() {
+	const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+	try {
+		return existsSync(join(pluginRoot, '.claude-plugin', 'plugin.json')) && readFileSync(join(pluginRoot, 'hooks', 'hooks.json'), 'utf8').includes('new-vendor');
+	} catch {
+		return false;
+	}
+}
+
 function detectMain(argv) {
 	const args = parseArgs(argv);
 	if (args.help) {
-		process.stdout.write('usage: node detect.mjs [repo-dir] [--vendors <dir>] [--max-files N]\nPrints JSON: vendors with evidence, unmapped SDKs, overlaps, frameworks, infra, env var names (never values).\n');
+		process.stdout.write('usage: node detect.mjs [repo-dir] [--vendors <dir>] [--max-files N]\nPrints JSON: vendors with evidence, unmapped SDKs, overlaps, frameworks, infra, env var names (never values), new-vendor hook status.\n');
 		return;
 	}
 	const vendorsDir = args.vendors || defaultVendorsDir();
 	if (!vendorsDir) fail('vendor maps not found; pass --vendors <dir>');
 	const signatures = vendorSignatures(loadCatalog(vendorsDir));
 	try {
-		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000 }));
+		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000, plugin: runsFromPlugin() }));
 	} catch (e) {
 		fail(e.message);
+	}
+}
+
+// ---- packages/core/src/workdir.mjs
+// Everything Manifestack writes in a project lives in one folder, .manifestack/ at the repository root:
+//   .manifestack/STACK.md   decisions, committed with the code
+//   .manifestack/tmp/       working files such as cost models, ignored by git
+
+const WORK_DIR = '.manifestack';
+const STACK_FILE = `${WORK_DIR}/STACK.md`;
+const TMP_DIR = `${WORK_DIR}/tmp`;
+
+/** Creates the folder a file goes into. Inside .manifestack/tmp it also adds a .gitignore that ignores the folder. */
+function ensureWorkDir(file) {
+	const dir = dirname(file);
+	mkdirSync(dir, { recursive: true });
+	if (basename(dir) === 'tmp' && basename(dirname(dir)) === WORK_DIR) {
+		const ignore = join(dir, '.gitignore');
+		if (!existsSync(ignore)) writeFileSync(ignore, '*\n');
 	}
 }
 
@@ -743,7 +913,7 @@ const USAGE = `usage:
   node project.mjs eta --current 41200 --limit 50000 --growth "18%/mo"
   node project.mjs eta --points "2026-09-06=280 MB,2026-10-06=312 MB" --limit "500 MB"
   node project.mjs overage --used "3.4 TB" --included "1 TB" --price 0.15 --per GB
-  node project.mjs cost <model.json | ->
+  node project.mjs cost <.manifestack/tmp/model.json | ->
 Prints JSON. Prices are inputs: read them from the vendor page first.`;
 
 function projectMain(argv) {
@@ -784,7 +954,10 @@ function projectMain(argv) {
 		} else if (cmd === 'cost') {
 			const file = args._[1];
 			if (!file) throw new Error('pass a model file or - for stdin');
-			printJson(costAt(JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'))));
+			const model = JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'));
+			// The model is a working file: in .manifestack/tmp it stays out of git.
+			if (file !== '-') ensureWorkDir(file);
+			printJson(costAt(model));
 		} else {
 			process.stdout.write(USAGE + '\n');
 			if (cmd && cmd !== 'help') process.exitCode = 1;
@@ -795,12 +968,12 @@ function projectMain(argv) {
 }
 
 // ---- packages/core/src/stack-md.mjs
-// Reads and updates STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
+// Reads and updates .manifestack/STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
 // Updates touch only the named fields: other lines, unknown keys and user comments stay as they are.
 
-const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'Other'];
+const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'AI', 'Other'];
 const STACK_KEYS = ['plan', 'limit', 'source', 'usage', 'decided', 'revisit_when', 'next', 'env'];
-const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'team_knows'];
+const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid'];
 const REVISIT_METRICS = ['db_size', 'monthly_sent', 'daily_peak', 'transfer_tb', 'mau', 'users', 'monthly_bill', 'date'];
 
 const SECRET_PATTERNS = [
@@ -1166,11 +1339,11 @@ function lintStackMd(text) {
 }
 
 const STACK_USAGE = `usage:
-  node stack-md.mjs parse [STACK.md]
-  node stack-md.mjs check [STACK.md] [--today YYYY-MM-DD] [--metric db_size="420 MB"]...
-  node stack-md.mjs lint [STACK.md]
-  node stack-md.mjs set [STACK.md] --section "Database: Supabase" --set "plan=free" [--set ...] [--comment "source=read 2026-10-06"]
-Prints JSON. set refuses values that look like secrets and keeps every other line as it is.`;
+  node stack-md.mjs parse [file]
+  node stack-md.mjs check [file] [--today YYYY-MM-DD] [--metric db_size="420 MB"]...
+  node stack-md.mjs lint [file]
+  node stack-md.mjs set [file] --section "Database: Supabase" --set "plan=free" [--set ...] [--comment "source=read 2026-10-06"]
+file defaults to .manifestack/STACK.md. Prints JSON. set refuses values that look like secrets and keeps every other line as it is.`;
 
 function keyValues(list) {
 	const out = {};
@@ -1185,7 +1358,7 @@ function keyValues(list) {
 function stackMdMain(argv) {
 	const args = parseArgs(argv);
 	const cmd = args._[0];
-	const file = args._[1] ?? 'STACK.md';
+	const file = args._[1] ?? STACK_FILE;
 	try {
 		if (!['parse', 'check', 'lint', 'set'].includes(cmd)) {
 			process.stdout.write(STACK_USAGE + '\n');
@@ -1218,6 +1391,7 @@ function stackMdMain(argv) {
 				process.exitCode = 2;
 				throw new Error(`refusing to write: lines ${secrets.map((s) => s.line).join(', ')} look like secrets`);
 			}
+			ensureWorkDir(file);
 			writeFileSync(file, out);
 			printJson({ file, written: true, section: args.section });
 		}
@@ -1228,14 +1402,13 @@ function stackMdMain(argv) {
 
 // ---- packages/core/src/hook.mjs
 // "New vendor" hook for Claude Code (PostToolUse) and Cursor (afterFileEdit).
-// After an edit to package.json it compares dependencies before and after the edit and with the
-// services already in STACK.md. A new vendor gets one line of context for the agent; otherwise it
-// prints nothing. Offline, never blocks, always exits 0.
+// After an edit to a dependency manifest (package.json, requirements*.txt, pyproject.toml, Pipfile, go.mod) it
+// compares dependencies before and after the edit and with the
+// services already in .manifestack/STACK.md. A new vendor gets one line of context for the agent;
+// otherwise it prints nothing. Offline, never blocks, always exits 0.
 
 // tools/sync.mjs replaces this line with the signatures from catalog/vendors.
-let EMBEDDED_SIGNATURES = [{"id":"clerk","name":"Clerk","roles":["auth"],"packages":["@clerk/"],"imports":["@clerk/"],"env_prefixes":["CLERK_","NEXT_PUBLIC_CLERK_","VITE_CLERK_","EXPO_PUBLIC_CLERK_","PUBLIC_CLERK_"],"config_files":[],"role_signals":{}},{"id":"neon","name":"Neon","roles":["database","auth"],"packages":["@neondatabase/serverless","@neondatabase/neon-js","@neondatabase/auth","neonctl"],"imports":["@neondatabase/"],"env_prefixes":["NEON_"],"config_files":[],"role_signals":{"auth":["@neondatabase/auth"]}},{"id":"resend","name":"Resend","roles":["email"],"packages":["resend","@react-email/","react-email"],"imports":["resend","@react-email/"],"env_prefixes":["RESEND_"],"config_files":[],"role_signals":{}},{"id":"supabase","name":"Supabase","roles":["database","auth","storage"],"packages":["@supabase/supabase-js","@supabase/ssr","@supabase/auth-helpers-nextjs","@supabase/auth-helpers-react","@supabase/auth-ui-react","supabase"],"imports":["@supabase/"],"env_prefixes":["SUPABASE_","NEXT_PUBLIC_SUPABASE_","VITE_SUPABASE_","EXPO_PUBLIC_SUPABASE_"],"config_files":["supabase/config.toml"],"role_signals":{"auth":["supabase.auth.","@supabase/auth-helpers","@supabase/auth-ui",".auth.signInWith",".auth.getUser("],"storage":["supabase.storage.",".storage.from("]}},{"id":"vercel","name":"Vercel","roles":["hosting","storage"],"packages":["vercel","@vercel/"],"imports":["@vercel/"],"env_prefixes":["VERCEL_","NEXT_PUBLIC_VERCEL_","BLOB_READ_WRITE_TOKEN"],"config_files":["vercel.json","vercel.ts","vercel.toml"],"role_signals":{"storage":["@vercel/blob"]}}];
-
-const MANIFESTS = new Set(['package.json']);
+let EMBEDDED_SIGNATURES = [{"id":"adapty","name":"Adapty","roles":["payments"],"packages":["react-native-adapty","@adapty/","adapty"],"pypi":[],"go":[],"imports":["react-native-adapty","@adapty/"],"env_prefixes":["ADAPTY_","EXPO_PUBLIC_ADAPTY_","NEXT_PUBLIC_ADAPTY_","VITE_ADAPTY_"],"config_files":[],"role_signals":{}},{"id":"anthropic","name":"Anthropic","roles":["ai"],"packages":["@anthropic-ai/sdk","@anthropic-ai/claude-agent-sdk","@ai-sdk/anthropic","@langchain/anthropic"],"pypi":["anthropic","claude-agent-sdk","langchain-anthropic","llama-index-llms-anthropic"],"go":["github.com/anthropics/anthropic-sdk-go"],"imports":["@anthropic-ai/sdk","@anthropic-ai/claude-agent-sdk","@ai-sdk/anthropic","@langchain/anthropic"],"env_prefixes":["ANTHROPIC_"],"config_files":[],"role_signals":{}},{"id":"auth0","name":"Auth0","roles":["auth"],"packages":["@auth0/","auth0","express-openid-connect"],"pypi":["auth0-python","auth0-server-python","auth0-fastapi","auth0-api-python"],"go":["github.com/auth0/go-auth0","github.com/auth0/go-jwt-middleware"],"imports":["@auth0/","auth0","express-openid-connect"],"env_prefixes":["AUTH0_","NEXT_PUBLIC_AUTH0_"],"config_files":[],"role_signals":{}},{"id":"clerk","name":"Clerk","roles":["auth"],"packages":["@clerk/"],"pypi":["clerk-backend-api"],"go":["github.com/clerk/clerk-sdk-go"],"imports":["@clerk/"],"env_prefixes":["CLERK_","NEXT_PUBLIC_CLERK_","VITE_CLERK_","EXPO_PUBLIC_CLERK_","PUBLIC_CLERK_"],"config_files":[],"role_signals":{}},{"id":"cloudflare","name":"Cloudflare","roles":["hosting","storage","database"],"packages":["wrangler","@cloudflare/","@opennextjs/cloudflare"],"pypi":["cloudflare","workers-py","langchain-cloudflare"],"go":["github.com/cloudflare/cloudflare-go"],"imports":["cloudflare:","@cloudflare/","@opennextjs/cloudflare"],"env_prefixes":["CLOUDFLARE_","CF_"],"config_files":["wrangler.toml","wrangler.json","wrangler.jsonc"],"role_signals":{"storage":["R2Bucket","KVNamespace","r2.cloudflarestorage.com"],"database":["D1Database","drizzle-orm/d1","@prisma/adapter-d1","kysely-d1"]}},{"id":"cloudinary","name":"Cloudinary","roles":["storage"],"packages":["cloudinary","@cloudinary/","next-cloudinary","cloudinary-core","cloudinary-react","astro-cloudinary","svelte-cloudinary"],"pypi":["cloudinary","django-cloudinary-storage"],"go":["github.com/cloudinary/cloudinary-go"],"imports":["cloudinary","@cloudinary/","next-cloudinary"],"env_prefixes":["CLOUDINARY_","NEXT_PUBLIC_CLOUDINARY_"],"config_files":[],"role_signals":{}},{"id":"convex","name":"Convex","roles":["database"],"packages":["convex","@convex-dev/","convex-helpers"],"pypi":["convex"],"go":[],"imports":["convex/","@convex-dev/","convex-helpers"],"env_prefixes":["CONVEX_","NEXT_PUBLIC_CONVEX_","VITE_CONVEX_","EXPO_PUBLIC_CONVEX_","PUBLIC_CONVEX_"],"config_files":["convex.json","convex/schema.ts","convex/_generated/api.d.ts"],"role_signals":{}},{"id":"datadog","name":"Datadog","roles":["monitoring"],"packages":["dd-trace","dd-trace-api","@datadog/","datadog-lambda-js"],"pypi":["ddtrace","datadog","datadog-api-client","datadog-lambda"],"go":["github.com/DataDog/dd-trace-go","gopkg.in/DataDog/dd-trace-go.v1","github.com/DataDog/datadog-go","github.com/DataDog/datadog-api-client-go","github.com/DataDog/datadog-lambda-go"],"imports":["dd-trace","@datadog/","datadog-lambda-js"],"env_prefixes":["DD_","DATADOG_","NEXT_PUBLIC_DATADOG_","VITE_DATADOG_"],"config_files":["datadog.yaml","datadog-values.yaml","datadog-ci.json"],"role_signals":{}},{"id":"digitalocean","name":"DigitalOcean","roles":["hosting","storage","database"],"packages":["@digitalocean/"],"pypi":["pydo"],"go":["github.com/digitalocean/godo"],"imports":["@digitalocean/"],"env_prefixes":["DIGITALOCEAN_","SPACES_ACCESS_KEY_ID","SPACES_SECRET_ACCESS_KEY","SPACES_ENDPOINT_URL"],"config_files":[".do/app.yaml",".do/deploy.template.yaml"],"role_signals":{"storage":["digitaloceanspaces.com"],"database":["db.ondigitalocean.com"]}},{"id":"expo","name":"Expo EAS","roles":["other"],"packages":["eas-cli","expo-updates","expo-insights","@expo/eas-json"],"pypi":[],"go":[],"imports":["expo-updates","expo-insights"],"env_prefixes":["EAS_","EXPO_TOKEN"],"config_files":["eas.json"],"role_signals":{}},{"id":"firebase","name":"Firebase","roles":["database","auth","hosting","storage"],"packages":["firebase","firebase-admin","firebase-functions","firebase-tools","@firebase/","reactfire","react-firebase-hooks","@angular/fire","vuefire","@apphosting/"],"pypi":["firebase-admin","firebase-functions"],"go":["firebase.google.com/go"],"imports":["firebase/","firebase-admin","firebase-functions","@firebase/","reactfire","react-firebase-hooks","@angular/fire","vuefire"],"env_prefixes":["FIREBASE_","NEXT_PUBLIC_FIREBASE_","VITE_FIREBASE_","EXPO_PUBLIC_FIREBASE_"],"config_files":["firebase.json",".firebaserc","firestore.rules","database.rules.json","storage.rules","apphosting.yaml"],"role_signals":{"database":["firebase/firestore","firebase/database","firebase-admin/firestore","firebase-admin/database","@firebase/firestore","@firebase/database","getFirestore(","admin.firestore()","admin.database()"],"auth":["firebase/auth","firebase-admin/auth","@firebase/auth","react-firebase-hooks/auth","onAuthStateChanged(","signInWithPopup(","admin.auth()"],"hosting":["firebase-functions","@apphosting/"],"storage":["firebase/storage","firebase-admin/storage","@firebase/storage","admin.storage()"]}},{"id":"fly","name":"Fly.io","roles":["hosting"],"packages":["@fly/","@flydotio/dockerfile"],"pypi":[],"go":["github.com/superfly/fly-go","github.com/superfly/flyctl"],"imports":["@fly/"],"env_prefixes":["FLY_"],"config_files":["fly.toml"],"role_signals":{}},{"id":"gemini","name":"Google Gemini","roles":["ai"],"packages":["@google/genai","@google/generative-ai","@ai-sdk/google","@langchain/google-genai"],"pypi":["google-genai","google-generativeai","langchain-google-genai"],"go":["google.golang.org/genai","github.com/google/generative-ai-go"],"imports":["@google/genai","@google/generative-ai","@langchain/google-genai"],"env_prefixes":["GEMINI_","NEXT_PUBLIC_GEMINI_","VITE_GEMINI_","GOOGLE_GENERATIVE_AI_"],"config_files":[],"role_signals":{}},{"id":"heroku","name":"Heroku","roles":["hosting"],"packages":["heroku","@heroku/","@heroku-cli/"],"pypi":[],"go":["github.com/heroku/heroku-go"],"imports":["@heroku/"],"env_prefixes":["HEROKU_"],"config_files":["Procfile","heroku.yml"],"role_signals":{}},{"id":"lemon-squeezy","name":"Lemon Squeezy","roles":["payments"],"packages":["@lemonsqueezy/","@lemonsqueezy/lemonsqueezy.js"],"pypi":[],"go":[],"imports":["@lemonsqueezy/"],"env_prefixes":["LEMONSQUEEZY_","LEMON_SQUEEZY_","NEXT_PUBLIC_LEMONSQUEEZY_","VITE_LEMONSQUEEZY_"],"config_files":[],"role_signals":{}},{"id":"mongodb-atlas","name":"MongoDB Atlas","roles":["database"],"packages":["mongodb","mongoose"],"pypi":["pymongo","motor","mongoengine","beanie","django-mongodb-backend"],"go":["go.mongodb.org/mongo-driver","go.mongodb.org/atlas","go.mongodb.org/atlas-sdk"],"imports":["mongodb","mongoose"],"env_prefixes":["MONGODB_","MONGO_"],"config_files":[],"role_signals":{}},{"id":"neon","name":"Neon","roles":["database","auth"],"packages":["@neondatabase/serverless","@neondatabase/neon-js","@neondatabase/auth","@neondatabase/api-client","@neon/sdk","neonctl"],"pypi":["neon-api"],"go":[],"imports":["@neondatabase/"],"env_prefixes":["NEON_"],"config_files":[],"role_signals":{"auth":["@neondatabase/auth"]}},{"id":"netlify","name":"Netlify","roles":["hosting"],"packages":["netlify-cli","netlify","@netlify/"],"pypi":[],"go":["github.com/netlify/open-api"],"imports":["@netlify/"],"env_prefixes":["NETLIFY_"],"config_files":["netlify.toml"],"role_signals":{}},{"id":"openai","name":"OpenAI","roles":["ai"],"packages":["openai","@openai/agents","@ai-sdk/openai","@langchain/openai"],"pypi":["openai","openai-agents","langchain-openai","llama-index-llms-openai","llama-index-embeddings-openai"],"go":["github.com/openai/openai-go"],"imports":["openai","@openai/agents","@ai-sdk/openai","@langchain/openai"],"env_prefixes":["OPENAI_"],"config_files":[],"role_signals":{}},{"id":"paddle","name":"Paddle","roles":["payments"],"packages":["@paddle/","@paddle/paddle-js","@paddle/paddle-node-sdk"],"pypi":["paddle-python-sdk"],"go":["github.com/PaddleHQ/paddle-go-sdk"],"imports":["@paddle/"],"env_prefixes":["PADDLE_","NEXT_PUBLIC_PADDLE_","VITE_PADDLE_"],"config_files":[],"role_signals":{}},{"id":"planetscale","name":"PlanetScale","roles":["database"],"packages":["@planetscale/database","@prisma/adapter-planetscale","kysely-planetscale"],"pypi":[],"go":["github.com/planetscale/planetscale-go"],"imports":["@planetscale/database","@prisma/adapter-planetscale","kysely-planetscale"],"env_prefixes":["PLANETSCALE_"],"config_files":[".pscale.yml"],"role_signals":{}},{"id":"polar","name":"Polar","roles":["payments"],"packages":["@polar-sh/","@polar-sh/sdk","@polar-sh/nextjs","@polar-sh/checkout","@polar-sh/better-auth"],"pypi":["polar-sdk"],"go":["github.com/polarsource/polar-go"],"imports":["@polar-sh/"],"env_prefixes":["POLAR_","NEXT_PUBLIC_POLAR_","VITE_POLAR_"],"config_files":[],"role_signals":{}},{"id":"posthog","name":"PostHog","roles":["monitoring"],"packages":["posthog-js","posthog-node","posthog-react-native","posthog-js-lite","@posthog/"],"pypi":["posthog","posthoganalytics"],"go":["github.com/posthog/posthog-go"],"imports":["posthog-js","posthog-node","posthog-react-native","posthog-js-lite","@posthog/"],"env_prefixes":["POSTHOG_","NEXT_PUBLIC_POSTHOG_","VITE_POSTHOG_","VITE_PUBLIC_POSTHOG_","EXPO_PUBLIC_POSTHOG_","PUBLIC_POSTHOG_","REACT_APP_POSTHOG_"],"config_files":[],"role_signals":{}},{"id":"postmark","name":"Postmark","roles":["email"],"packages":["postmark"],"pypi":["postmark-python","postmarker","python-postmark","pystmark"],"go":["github.com/mrz1836/postmark","github.com/keighl/postmark","github.com/hjr265/postmark.go"],"imports":["postmark"],"env_prefixes":["POSTMARK_"],"config_files":[],"role_signals":{}},{"id":"railway","name":"Railway","roles":["hosting"],"packages":["@railway/cli"],"pypi":[],"go":[],"imports":[],"env_prefixes":["RAILWAY_"],"config_files":["railway.json","railway.toml"],"role_signals":{}},{"id":"render","name":"Render","roles":["hosting"],"packages":[],"pypi":["render","render-sdk"],"go":[],"imports":[],"env_prefixes":["RENDER_SERVICE_","RENDER_EXTERNAL_","RENDER_GIT_","RENDER_INSTANCE_ID","RENDER_DISCOVERY_SERVICE","RENDER_API_KEY"],"config_files":["render.yaml"],"role_signals":{}},{"id":"resend","name":"Resend","roles":["email"],"packages":["resend","@react-email/","react-email"],"pypi":["resend"],"go":["github.com/resend/resend-go"],"imports":["resend","@react-email/"],"env_prefixes":["RESEND_"],"config_files":[],"role_signals":{}},{"id":"revenuecat","name":"RevenueCat","roles":["payments"],"packages":["react-native-purchases","react-native-purchases-ui","react-native-purchases-store-galaxy","cordova-plugin-purchases","@revenuecat/"],"pypi":[],"go":[],"imports":["react-native-purchases","cordova-plugin-purchases","@revenuecat/"],"env_prefixes":["REVENUECAT_","EXPO_PUBLIC_REVENUECAT_","NEXT_PUBLIC_REVENUECAT_","VITE_REVENUECAT_"],"config_files":[],"role_signals":{}},{"id":"sendgrid","name":"SendGrid","roles":["email"],"packages":["@sendgrid/"],"pypi":["sendgrid"],"go":["github.com/sendgrid/sendgrid-go"],"imports":["@sendgrid/"],"env_prefixes":["SENDGRID_"],"config_files":[],"role_signals":{}},{"id":"sentry","name":"Sentry","roles":["monitoring"],"packages":["@sentry/","sentry-expo"],"pypi":["sentry-sdk","raven","sentry-cli"],"go":["github.com/getsentry/sentry-go"],"imports":["@sentry/","sentry-expo"],"env_prefixes":["SENTRY_","NEXT_PUBLIC_SENTRY_","VITE_SENTRY_","EXPO_PUBLIC_SENTRY_","PUBLIC_SENTRY_","REACT_APP_SENTRY_"],"config_files":["sentry.client.config.ts","sentry.client.config.js","sentry.server.config.ts","sentry.server.config.js","sentry.edge.config.ts","sentry.edge.config.js","sentry.properties",".sentryclirc"],"role_signals":{}},{"id":"stripe","name":"Stripe","roles":["payments"],"packages":["stripe","@stripe/","@better-auth/stripe","@payloadcms/plugin-stripe"],"pypi":["stripe","stripe-agent-toolkit"],"go":["github.com/stripe/stripe-go"],"imports":["stripe","@stripe/","@better-auth/stripe","@payloadcms/plugin-stripe"],"env_prefixes":["STRIPE_","NEXT_PUBLIC_STRIPE_","VITE_STRIPE_","EXPO_PUBLIC_STRIPE_"],"config_files":[],"role_signals":{}},{"id":"supabase","name":"Supabase","roles":["database","auth","storage"],"packages":["@supabase/supabase-js","@supabase/ssr","@supabase/auth-helpers-nextjs","@supabase/auth-helpers-react","@supabase/auth-ui-react","supabase"],"pypi":["supabase","supabase-auth","supabase-functions","storage3","realtime","gotrue","supafunc"],"go":["github.com/supabase/supabase-go","github.com/supabase-community/supabase-go"],"imports":["@supabase/"],"env_prefixes":["SUPABASE_","NEXT_PUBLIC_SUPABASE_","VITE_SUPABASE_","EXPO_PUBLIC_SUPABASE_"],"config_files":["supabase/config.toml"],"role_signals":{"auth":["supabase.auth.","@supabase/auth-helpers","@supabase/auth-ui",".auth.signInWith",".auth.getUser("],"storage":["supabase.storage.",".storage.from("]}},{"id":"uploadthing","name":"UploadThing","roles":["storage"],"packages":["uploadthing","@uploadthing/"],"pypi":["uploadthing-py"],"go":[],"imports":["uploadthing","@uploadthing/"],"env_prefixes":["UPLOADTHING_"],"config_files":[],"role_signals":{}},{"id":"upstash","name":"Upstash","roles":["database"],"packages":["@upstash/","@vercel/kv"],"pypi":["upstash-*","qstash"],"go":["github.com/upstash"],"imports":["@upstash/","@vercel/kv"],"env_prefixes":["UPSTASH_","QSTASH_","KV_REST_API_"],"config_files":[],"role_signals":{}},{"id":"vercel","name":"Vercel","roles":["hosting","storage"],"packages":["vercel","@vercel/"],"pypi":["vercel","vercel-sandbox","vercel-queue","vercel-workflow","vercel-cache","vercel-oidc","vercel-headers","vercel-connect"],"go":[],"imports":["@vercel/"],"env_prefixes":["VERCEL_","NEXT_PUBLIC_VERCEL_","BLOB_READ_WRITE_TOKEN"],"config_files":["vercel.json","vercel.ts","vercel.toml"],"role_signals":{"storage":["@vercel/blob"]}},{"id":"workos","name":"WorkOS","roles":["auth"],"packages":["@workos-inc/","@workos-inc/node","@workos-inc/authkit-nextjs","@workos-inc/authkit-react","@workos-inc/authkit-js","@workos-inc/authkit-remix","@workos-inc/authkit-react-router","@workos-inc/widgets"],"pypi":["workos"],"go":["github.com/workos/workos-go"],"imports":["@workos-inc/"],"env_prefixes":["WORKOS_","NEXT_PUBLIC_WORKOS_","VITE_WORKOS_"],"config_files":[],"role_signals":{}}];
 
 function hookSignatures() {
 	if (EMBEDDED_SIGNATURES) return EMBEDDED_SIGNATURES;
@@ -1276,18 +1449,11 @@ function previousContent(current, event) {
 	return text;
 }
 
-function depsOf(text) {
-	try {
-		return dependencyNames(JSON.parse(text));
-	} catch {
-		return [];
-	}
-}
 
 function findStackMd(file, roots) {
 	let dir = dirname(file);
 	for (;;) {
-		const candidate = join(dir, 'STACK.md');
+		const candidate = join(dir, STACK_FILE);
 		if (existsSync(candidate)) return candidate;
 		if (existsSync(join(dir, '.git')) || roots.some((r) => resolve(r) === dir)) return null;
 		const parent = dirname(dir);
@@ -1300,11 +1466,12 @@ const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Returns the context line for the agent, or null when nothing new was added. */
 export function newVendorMessage(event, { signatures }) {
-	if (!event || !MANIFESTS.has(basename(event.file)) || !existsSync(event.file)) return null;
+	const kind = event && manifestKind(event.file);
+	if (!kind || !existsSync(event.file)) return null;
 	const current = readFileSync(event.file, 'utf8');
-	const now = matchPackages(depsOf(current), signatures);
+	const now = matchDependencies(manifestDependencies(kind, current, event.file), signatures, kind);
 	if (!now.vendors.length && !now.unmapped.length) return null;
-	const before = matchPackages(depsOf(previousContent(current, event)), signatures);
+	const before = matchDependencies(manifestDependencies(kind, previousContent(current, event), event.file), signatures, kind);
 	const stackFile = findStackMd(event.file, event.roots);
 	const listed = new Set();
 	if (stackFile) {
@@ -1322,9 +1489,9 @@ export function newVendorMessage(event, { signatures }) {
 	// message says what to check even if the manifestack-guard skill is never loaded.
 	let msg = `Manifestack: ${names} was added in ${basename(event.file)}. Before you finish, tell the user in two or three lines`;
 	if (stackFile) {
-		msg += ` how it fits STACK.md (${relative(dirname(event.file), stackFile) || 'STACK.md'}): the "requires" line (data region, certifications), the budget, any section with the same role, and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
+		msg += ` how it fits STACK.md (${relative(dirname(event.file), stackFile)}): the "requires" line (data region, certifications), the "avoid" line (vendors or tech the team rules out), the budget, any section with the same role, and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
 	} else {
-		msg += ' which plan limits to check for it (send caps, billed users, storage, rate limits), and suggest running /manifestack to record the stack in STACK.md.';
+		msg += ` which plan limits to check for it (send caps, billed users, storage, rate limits), and suggest running /manifestack to record the stack in ${STACK_FILE}.`;
 	}
 	if (unmapped.length) msg += ` Manifestack has no page map for ${unmapped.join(', ')}; its public pricing page is the source for prices.`;
 	msg += ' Do not quote prices or limits from memory. Keep going with the task.';

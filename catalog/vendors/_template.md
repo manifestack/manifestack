@@ -5,9 +5,11 @@
 schema: 1
 id: example                     # lowercase a-z, 0-9, hyphens; same as the file name
 name: Example
-roles: [database, auth]         # hosting, database, auth, email, storage, payments, monitoring, other
+roles: [database, auth]         # hosting, database, auth, email, storage, payments, monitoring, ai, other
 detect:
   packages: ["example-sdk", "@example/"]   # exact npm names; a trailing "/" matches the whole scope
+  pypi: ["example-sdk"]                     # PyPI names (case-insensitive, - _ . equal); a trailing "*" is a prefix
+  go: ["github.com/example/example-go"]     # Go module paths; ".../v2" suffixes match the base path
   imports: ["@example/", "example-sdk"]    # import specifier prefixes
   env_prefixes: ["EXAMPLE_"]               # env var NAME prefixes (values are never read)
   config_files: ["example.config.json"]    # repo-relative paths or file names

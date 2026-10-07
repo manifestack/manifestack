@@ -41,7 +41,7 @@
    - **Next deadline**: the nearest `when` with a date.
    - **Spend to review**: total monthly cost of all `Bill` findings plus upgrades the `Limit` and `Risk` findings make necessary, and ×12 per year. Say what is included.
    - **Pricing read**: number of pages and the date (`5 pages, Oct 6`). List `unverified` ones.
-   - **STACK.md**: the path and what changed.
+   - **STACK.md**: the path (`.manifestack/STACK.md`) and what changed.
 4. If requirements were checked: one sentence that this compares the vendors' published regions and certifications and is not a legal guarantee; compliance decisions stay with the user.
 5. **Also noticed** (optional): one line each for blockers outside pricing seen during the scan (security advisories on framework versions, missing lockfile, infrastructure code that cannot apply). No `when`/`cost` needed; say what you saw and where.
 6. **Proposed STACK.md changes** (if any): the exact lines for `plan`, `decided`, `revisit_when` or `next` you suggest, waiting for a yes.

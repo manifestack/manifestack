@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, runNode } from './helpers.mjs';
+import { ROOT, runNode, tempDir } from './helpers.mjs';
 import { parseQuantity, overage, eta, linearRate, costAt, approxMonth } from '../packages/core/src/project.mjs';
 
 test('parseQuantity reads sizes, money, counts, rates and percents', () => {
@@ -94,4 +95,15 @@ test('bundled project.mjs CLI', () => {
 	const d = runNode(script, ['overage', '--used', '60000', '--included', '50000', '--price', '0.9', '--per', '1000']);
 	assert.equal(JSON.parse(d.stdout).monthly, 9);
 	assert.notEqual(runNode(script, ['eta']).code, 0);
+});
+
+test('project.mjs cost keeps .manifestack/tmp out of git', (t) => {
+	const dir = tempDir(t);
+	const script = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	mkdirSync(join(dir, '.manifestack/tmp'), { recursive: true });
+	writeFileSync(join(dir, '.manifestack/tmp/model.json'), JSON.stringify({ users: [1000], vendors: [{ id: 'db', plans: [{ name: 'Free', base: 0 }] }] }));
+	const r = runNode(script, ['cost', '.manifestack/tmp/model.json'], { cwd: dir });
+	assert.equal(r.code, 0, r.stderr);
+	assert.equal(JSON.parse(r.stdout)[0].monthly, 0);
+	assert.equal(readFileSync(join(dir, '.manifestack/tmp/.gitignore'), 'utf8'), '*\n');
 });

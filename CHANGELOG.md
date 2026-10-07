@@ -2,7 +2,50 @@
 
 All notable changes are listed here. Versions follow [semver](https://semver.org); 0.x until the formats settle. Each new vendor map gets its own line.
 
-## Unreleased
+## 0.2.0
+
+- CLI: `npx manifestack hook` registers only the new-vendor hook, for skills installed with `npx skills add` or by hand.
+- CLI: a bare `npx manifestack` runs `install`.
+- CLI: `install` keeps a manifestack skill another tool installed and says so, instead of reporting it as skipped.
+- `detect.mjs` reports whether the new-vendor hook is on for Claude Code and Cursor (`hook`: `on`, `plugin` or `off`).
+- Skill `manifestack`: in Claude Code and Cursor, offers to turn the hook on at the end of `init` and `audit` when it is off.
+- Everything Manifestack writes lives in `.manifestack/`, never in the repository root: `.manifestack/STACK.md` (the scripts' default path, and where the hook and `manifestack-guard` look) and working files such as cost models in `.manifestack/tmp/`, which `project.mjs cost` keeps out of git.
+- STACK.md `## Requirements`: `prefer` lists what the team knows or wants to use, `avoid` lists vendors, technologies or setups the team rules out. `init` asks for both; picks skip what is in `avoid`, and `manifestack-guard` and the hook check new services against it.
+- New role `AI` for STACK.md sections and vendor maps; Gemini, Mistral, Groq, Cohere, Replicate and Together AI SDKs are detected without a map.
+- Railway, Render and Fly.io are detected from their config files and env names, without an SDK.
+- `fit.md`: rules for picking payments (merchant of record first), monitoring and AI APIs.
+- Python and Go: dependencies are read from `requirements*.txt`, `pyproject.toml` (PEP 621, dependency groups, Poetry), `Pipfile` and `go.mod`, vendor maps list `pypi` and `go` packages, and the new-vendor hook reacts to edits of those files. Django, FastAPI, Flask, Gin, Echo, Fiber and Chi count as frameworks.
+- Vendor map: Adapty
+- Vendor map: Cloudinary
+- Vendor map: Convex
+- Vendor map: Datadog
+- Vendor map: DigitalOcean
+- Vendor map: Expo EAS
+- Vendor map: Google Gemini
+- Vendor map: Heroku
+- Vendor map: Lemon Squeezy
+- Vendor map: MongoDB Atlas
+- Vendor map: PlanetScale
+- Vendor map: Polar
+- Vendor map: RevenueCat
+- Vendor map: UploadThing
+- Vendor map: Upstash
+- Vendor map: WorkOS
+- Vendor map: Anthropic
+- Vendor map: Auth0
+- Vendor map: Cloudflare
+- Vendor map: Firebase
+- Vendor map: Fly.io
+- Vendor map: Netlify
+- Vendor map: OpenAI
+- Vendor map: Paddle
+- Vendor map: PostHog
+- Vendor map: Postmark
+- Vendor map: Railway
+- Vendor map: Render
+- Vendor map: SendGrid
+- Vendor map: Sentry
+- Vendor map: Stripe
 
 ## 0.1.0
 

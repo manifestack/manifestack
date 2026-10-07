@@ -2,7 +2,7 @@
 budget: ~$600/mo
 users: 9k now, 50k by Q3
 requires: EU database, SOC 2 vendors
-team_knows: Postgres, Next.js
+prefer: Postgres, Next.js
 
 ## Hosting: Vercel
 plan: Pro

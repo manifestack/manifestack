@@ -6,10 +6,12 @@ For an existing repository. Goal: a report of findings (`Limit`, `Bill`, `Risk`,
 
 Run `node <skill-dir>/scripts/detect.mjs .` from the repository root. It returns:
 
-- `vendors`: mapped vendors with `evidence` (package, import, config, env name, code signal) and `roles_used`;
-- `unmapped`: known SDKs without a page map (Stripe, Sentry, Auth0, …);
+- `vendors`: mapped vendors with `evidence` (package from package.json, requirements*.txt, pyproject.toml, Pipfile or go.mod; import; config; env name; code signal) and `roles_used`;
+- `unmapped`: known SDKs without a page map (AWS, Gemini, Mistral, …);
 - `overlaps`: roles served by more than one vendor (candidate `Overlap` findings);
-- `frameworks` and `infra`: inputs for `Overbuilt` (Next.js, Docker, Terraform, Helm, Kubernetes manifests);
+- `frameworks` and `infra`: inputs for `Overbuilt` (Next.js, Django, FastAPI, Gin, Docker, Terraform, Helm, Kubernetes manifests);
+
+Other ecosystems (Ruby, PHP, Java, native mobile) are found only through config files and env names; ask the user about services the scan cannot see.
 - `env_names`: variable names only.
 
 Do not open `.env*` files yourself. If `truncated` is true, say the scan stopped at the file limit and which folders it may have missed.
@@ -20,13 +22,14 @@ While you are in the code, note anything that would block shipping even though i
 
 ## Step 2. Read STACK.md
 
-Run `node <skill-dir>/scripts/stack-md.mjs parse STACK.md` and `… check STACK.md`.
+Run `node <skill-dir>/scripts/stack-md.mjs parse .manifestack/STACK.md` and `… check .manifestack/STACK.md`.
 
 - `Requirements` drive `Requirement` findings and the budget comparison.
+- `avoid` lists what the team rules out. A service in use that matches it gets one line in the report (it may predate the rule), not a finding.
 - `decided` tells you what the team already chose on purpose. Do not re-argue a decision unless its `revisit_when` is triggered or the facts changed.
 - `check` evaluates every `revisit_when` and gives a status (`triggered`, `ok`, `unknown`, `manual`) and an ETA when a rate is known. `unknown` lists the metrics you need to ask for.
 
-If there is no STACK.md, continue; you will create it in Step 6.
+If there is no `.manifestack/STACK.md`, continue; you will create it in Step 6.
 
 ## Step 3. Read the vendor pages
 
@@ -53,7 +56,7 @@ Use the scripts for every calculation and show the inputs:
 - compounding growth: `… eta --current 41200 --limit 50000 --growth "18%/mo"`
 - from two readings: `… eta --points "2026-09-06=280 MB,2026-10-06=312 MB" --limit "500 MB"`
 - overage: `… overage --used "3.4 TB" --included "1 TB" --price 0.15 --per GB`
-- cost at other user counts: `… cost model.json` (model format in `references/workflow-init.md`)
+- cost at other user counts: `… cost .manifestack/tmp/model.json` (model format in `references/workflow-init.md`)
 
 ## Step 6. Report and update STACK.md
 
@@ -62,15 +65,15 @@ Use the scripts for every calculation and show the inputs:
    - `Bill`: overage on published rates, now or growing.
    - `Risk`: something that breaks at a peak (daily send caps, rate limits, pausing, cold starts on launch day).
    - `Requirement`: a vendor's published region or certification against `Requirements` (also: a commercial product on a non-commercial plan).
-   - `Overlap`: from `overlaps`, confirmed in the code (both really used, not one leftover import).
+   - `Overlap`: from `overlaps`, confirmed in the code (both really used, not one leftover import) and doing the same job. Two monitoring tools often do different jobs (errors and product analytics), and two AI providers can be a deliberate fallback; ask before calling either an Overlap.
    - `Overbuilt`: from `frameworks` and `infra` against the users and budget (`references/fit.md`).
 2. Order findings by `when` (nearest first), then by cost.
 3. If you noted blockers in Step 1, add the "Also noticed" list.
-4. Write the summary: nearest deadline, spend to review per month and per year, how many pages were read and on which date, the path to STACK.md.
+4. Write the summary: nearest deadline, spend to review per month and per year, how many pages were read and on which date, the path to `.manifestack/STACK.md`.
 5. Update STACK.md with `node <skill-dir>/scripts/stack-md.mjs set`. STACK.md mixes facts and decisions, and they are treated differently (`references/stack-md.md` → "Who changes what"):
    - facts you may write: `usage` (with its date), `limit`, `source` (with `# read <today>`), `env`, and new sections or fields for services that have none;
    - decisions you only propose: `plan`, `decided`, `revisit_when`, `next`. List the proposed lines at the end of the report ("Proposed STACK.md changes") and write them only after the user says yes. A decision rewritten silently is a decision the team did not make.
-   Keep user comments and unknown keys. Run `… lint STACK.md` at the end.
+   Keep user comments and unknown keys. Run `… lint .manifestack/STACK.md` at the end.
 
 ## Done when
 

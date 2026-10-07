@@ -2,6 +2,7 @@
 // Sizes are decimal (1 GB = 1000 MB), as vendors bill them. Money is USD. No network.
 import { readFileSync } from 'node:fs';
 import { isMain, parseArgs, printJson, fail, todayIso } from './cli-util.mjs';
+import { ensureWorkDir } from './workdir.mjs';
 
 const SIZE_UNITS = { B: 1e-6, KB: 1e-3, MB: 1, GB: 1e3, TB: 1e6 };
 const PERIOD_DAYS = { day: 1, d: 1, week: 7, wk: 7, w: 7, month: 30.4375, mo: 30.4375, year: 365.25, yr: 365.25 };
@@ -161,7 +162,7 @@ const USAGE = `usage:
   node project.mjs eta --current 41200 --limit 50000 --growth "18%/mo"
   node project.mjs eta --points "2026-09-06=280 MB,2026-10-06=312 MB" --limit "500 MB"
   node project.mjs overage --used "3.4 TB" --included "1 TB" --price 0.15 --per GB
-  node project.mjs cost <model.json | ->
+  node project.mjs cost <.manifestack/tmp/model.json | ->
 Prints JSON. Prices are inputs: read them from the vendor page first.`;
 
 export function projectMain(argv) {
@@ -202,7 +203,10 @@ export function projectMain(argv) {
 		} else if (cmd === 'cost') {
 			const file = args._[1];
 			if (!file) throw new Error('pass a model file or - for stdin');
-			printJson(costAt(JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'))));
+			const model = JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'));
+			// The model is a working file: in .manifestack/tmp it stays out of git.
+			if (file !== '-') ensureWorkDir(file);
+			printJson(costAt(model));
 		} else {
 			process.stdout.write(USAGE + '\n');
 			if (cmd && cmd !== 'help') process.exitCode = 1;

@@ -1,13 +1,14 @@
 # STACK.md format
 
-STACK.md lives in the repository root. People read it; agents parse it. Keep it short.
+STACK.md lives in `.manifestack/STACK.md` at the repository root. People read it; agents parse it. Keep it short. Scripts use that path when no file is given.
 
 ```markdown
 ## Requirements
 budget: ~$600/mo
 users: 9k now, 50k by Q3
 requires: EU database, SOC 2 vendors
-team_knows: Postgres, Next.js
+prefer: Postgres, Next.js
+avoid: Kubernetes, MongoDB
 
 ## Database: Supabase
 plan: free
@@ -22,8 +23,8 @@ env: SUPABASE_URL, SUPABASE_ANON_KEY  # names only
 
 ## Sections
 
-- `## Requirements`: keys `budget`, `users`, `requires`, `team_knows`. Free text values.
-- `## <Role>: <Vendor>`: one per service. Roles: `Hosting`, `Database`, `Auth`, `Email`, `Storage`, `Payments`, `Monitoring`, `Other`. A vendor that serves two roles gets two sections (`## Database: Supabase`, `## Auth: Supabase`) only if both are used.
+- `## Requirements`: keys `budget`, `users`, `requires`, `prefer`, `avoid`. Free text values. `requires` holds hard rules from outside (region, certifications, contracts); `prefer` what the team knows or wants to use; `avoid` vendors, technologies or setups the team rules out (Kubernetes, a specific cloud, self-hosting, lock-in), with an optional reason as a comment.
+- `## <Role>: <Vendor>`: one per service. Roles: `Hosting`, `Database`, `Auth`, `Email`, `Storage`, `Payments`, `Monitoring`, `AI`, `Other`. A vendor that serves two roles gets two sections (`## Database: Supabase`, `## Auth: Supabase`) only if both are used.
 
 ## Keys of a service section
 
@@ -93,10 +94,10 @@ revisit_when: before launch
 ## Commands
 
 ```bash
-node <skill-dir>/scripts/stack-md.mjs parse STACK.md
-node <skill-dir>/scripts/stack-md.mjs check STACK.md --metric db_size="420 MB"
-node <skill-dir>/scripts/stack-md.mjs lint STACK.md
-node <skill-dir>/scripts/stack-md.mjs set STACK.md --section "Database: Supabase" \
+node <skill-dir>/scripts/stack-md.mjs parse .manifestack/STACK.md
+node <skill-dir>/scripts/stack-md.mjs check .manifestack/STACK.md --metric db_size="420 MB"
+node <skill-dir>/scripts/stack-md.mjs lint .manifestack/STACK.md
+node <skill-dir>/scripts/stack-md.mjs set .manifestack/STACK.md --section "Database: Supabase" \
   --set "usage=312 MB, +1.1 MB/day (2026-10-06)" \
   --set "source=supabase.com/pricing" --comment "source=read 2026-10-06"
 ```

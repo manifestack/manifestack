@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, runNode, tempDir } from './helpers.mjs';
 import { AGENTS } from '../packages/cli/src/agents.js';
@@ -13,7 +13,8 @@ const json = (p) => JSON.parse(readFileSync(p, 'utf8'));
 for (const agent of AGENTS) {
 	test(`install, reinstall and uninstall for ${agent.id}`, (t) => {
 		const dir = tempDir(t);
-		writeFileSync(join(dir, 'STACK.md'), '## Requirements\nbudget: $0\n');
+		mkdirSync(join(dir, '.manifestack'));
+		writeFileSync(join(dir, '.manifestack/STACK.md'), '## Requirements\nbudget: $0\n');
 		const first = cli(dir, 'install', '--agent', agent.id);
 		assert.equal(first.code, 0, first.stderr);
 		for (const s of SKILLS) {
@@ -29,7 +30,7 @@ for (const agent of AGENTS) {
 		const removed = cli(dir, 'uninstall', '--agent', agent.id);
 		assert.equal(removed.code, 0, removed.stderr);
 		for (const s of SKILLS) assert.ok(!existsSync(join(dir, agent.skillsDir, s)), `${s} removed`);
-		assert.equal(readFileSync(join(dir, 'STACK.md'), 'utf8'), '## Requirements\nbudget: $0\n', 'STACK.md untouched');
+		assert.equal(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), '## Requirements\nbudget: $0\n', 'STACK.md untouched');
 	});
 }
 
@@ -136,7 +137,7 @@ test('--dry-run changes nothing; unknown agent and command fail', (t) => {
 	assert.deepEqual(readdirSync(dir), []);
 	assert.match(cli(dir, 'install', '--agent', 'vim').stderr, /unknown agent vim/);
 	assert.match(cli(dir, 'frobnicate').stderr, /unknown command/);
-	assert.match(runNode(CLI, ['--help']).stdout, /npx manifestack install/);
+	assert.match(runNode(CLI, ['--help']).stdout, /npx manifestack hook/);
 	assert.equal(runNode(CLI, ['--version']).stdout.trim(), json(join(ROOT, 'packages/cli/package.json')).version);
 });
 
@@ -146,4 +147,49 @@ test('the installed hook works from the project', (t) => {
 	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { resend: '6' } }));
 	const r = runNode(join(dir, '.claude/hooks/manifestack-new-vendor.mjs'), [], { input: JSON.stringify({ cwd: dir, tool_name: 'Write', tool_input: { file_path: join(dir, 'package.json') } }) });
 	assert.match(r.stdout, /Resend \(email\) was added/);
+});
+
+test('a bare `npx manifestack` installs, like `install`', (t) => {
+	const dir = tempDir(t);
+	const r = cli(dir, '--agent', 'codex');
+	assert.equal(r.code, 0, r.stderr);
+	assert.ok(existsSync(join(dir, '.agents/skills/manifestack/SKILL.md')));
+});
+
+test('the same skill installed by another tool is kept, and the hook is still added', (t) => {
+	const dir = tempDir(t);
+	// What `npx skills add` leaves: a canonical copy in .agents/skills and a symlink from .claude/skills.
+	mkdirSync(join(dir, '.agents/skills/manifestack'), { recursive: true });
+	const theirs = '---\nname: manifestack\ndescription: x\n---\nfrom skills CLI\n';
+	writeFileSync(join(dir, '.agents/skills/manifestack/SKILL.md'), theirs);
+	mkdirSync(join(dir, '.claude/skills'), { recursive: true });
+	symlinkSync(join(dir, '.agents/skills/manifestack'), join(dir, '.claude/skills/manifestack'), 'dir');
+	const r = cli(dir, 'install', '--agent', 'claude-code');
+	assert.equal(r.code, 0, r.stderr);
+	assert.match(r.stdout, /installed by another tool, kept/);
+	assert.doesNotMatch(r.stdout, /skipped/);
+	assert.equal(readFileSync(join(dir, '.claude/skills/manifestack/SKILL.md'), 'utf8'), theirs);
+	assert.ok(existsSync(join(dir, '.claude/hooks/manifestack-new-vendor.mjs')));
+});
+
+test('hook: registers only the hook, for Claude Code and Cursor only', (t) => {
+	const dir = tempDir(t);
+	const r = cli(dir, 'hook', '--agent', 'claude-code,cursor');
+	assert.equal(r.code, 0, r.stderr);
+	assert.ok(existsSync(join(dir, '.claude/hooks/manifestack-new-vendor.mjs')));
+	assert.ok(existsSync(join(dir, '.cursor/hooks/manifestack-new-vendor.mjs')));
+	assert.match(readFileSync(join(dir, '.claude/settings.json'), 'utf8'), /manifestack-new-vendor/);
+	assert.ok(!existsSync(join(dir, '.claude/skills')), 'no skills copied');
+	assert.ok(!existsSync(join(dir, '.agents')), 'no skills copied');
+	const again = readFileSync(join(dir, '.cursor/hooks.json'), 'utf8');
+	assert.equal(cli(dir, 'hook', '--agent', 'cursor').code, 0);
+	assert.equal(readFileSync(join(dir, '.cursor/hooks.json'), 'utf8'), again, 'running twice does not duplicate the hook');
+	const codex = cli(dir, 'hook', '--agent', 'codex');
+	assert.notEqual(codex.code, 0);
+	assert.match(codex.stderr, /codex has no hook support/);
+	const none = cli(tempDir(t), 'hook');
+	assert.notEqual(none.code, 0);
+	assert.match(none.stderr, /no agent folders found.*claude-code, cursor\)/);
+	assert.equal(cli(dir, 'uninstall').code, 0);
+	assert.ok(!existsSync(join(dir, '.claude/settings.json')), 'uninstall removes a hook added by `hook`');
 });

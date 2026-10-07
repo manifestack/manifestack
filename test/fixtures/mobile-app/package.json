@@ -1,0 +1,16 @@
+{
+  "name": "mobile-app",
+  "private": true,
+  "dependencies": {
+    "expo": "52.0.0",
+    "expo-updates": "0.26.0",
+    "react-native-purchases": "8.0.0",
+    "react-native-adapty": "3.0.0",
+    "@polar-sh/sdk": "0.20.0",
+    "@lemonsqueezy/lemonsqueezy.js": "4.0.0",
+    "@planetscale/database": "1.19.0",
+    "convex": "1.17.0",
+    "cloudinary": "2.5.0",
+    "uploadthing": "7.0.0"
+  }
+}

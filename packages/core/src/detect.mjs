@@ -1,17 +1,26 @@
-// Finds vendors in a repository: package.json dependencies, imports, config files and env var NAMES.
+// Finds vendors in a repository: dependencies from package.json, requirements*.txt, pyproject.toml, Pipfile and
+// go.mod, JS imports, config files and env var NAMES.
 // Env values are dropped while reading a line, before anything else sees them. No network.
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, basename, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain, parseArgs, printJson, fail } from './cli-util.mjs';
 import { loadCatalog, vendorSignatures } from './catalog.mjs';
-import { UNMAPPED_SDKS, FRAMEWORK_PACKAGES, packageMatches } from './known-sdks.mjs';
+import { UNMAPPED_SDKS, FRAMEWORK_PACKAGES, FRAMEWORK_PYPI, FRAMEWORK_GO } from './known-sdks.mjs';
+import { ECOSYSTEM_FIELDS, manifestKind, manifestDependencies, dependencyMatches } from './manifests.mjs';
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'venv', '__pycache__', 'target', 'tmp']);
-const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro)$/;
+const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro|py|go)$/;
+const FRAMEWORKS = { npm: FRAMEWORK_PACKAGES, pypi: FRAMEWORK_PYPI, go: FRAMEWORK_GO };
 const ENV_FILE = /^\.env(\..+)?$/;
 const MAX_SOURCE_BYTES = 512 * 1024;
 const MAX_EVIDENCE = 8;
+// The "new vendor" hook as `npx manifestack install` or `npx manifestack hook` registers it (packages/cli/src/agents.js).
+const HOOK_FILE = 'manifestack-new-vendor.mjs';
+const HOOK_SETUPS = {
+	'claude-code': { configs: ['.claude/settings.json', '.claude/settings.local.json'], script: `.claude/hooks/${HOOK_FILE}` },
+	cursor: { configs: ['.cursor/hooks.json'], script: `.cursor/hooks/${HOOK_FILE}` },
+};
 // Files that do not make a repository "existing code" on their own.
 const NON_PROJECT_FILES = /^(readme|license|licence|changelog|contributing|code_of_conduct|security|stack|agents|claude|gemini)(\.[a-z]+)?$|^\.(gitignore|gitattributes|editorconfig|env.*)$/i;
 
@@ -33,24 +42,17 @@ export function extractImports(source) {
 	return [...specs];
 }
 
-export function dependencyNames(pkgJson) {
-	const names = new Set();
-	for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-		for (const name of Object.keys(pkgJson?.[field] ?? {})) names.add(name);
-	}
-	return [...names];
-}
-
-/** Which mapped vendors and unmapped SDKs a list of package names contains. */
-export function matchPackages(packages, signatures) {
+/** Which mapped vendors and unmapped SDKs a list of dependencies of one ecosystem (npm, pypi, go) contains. */
+export function matchDependencies(deps, signatures, kind = 'npm') {
+	const field = ECOSYSTEM_FIELDS[kind];
 	const vendors = [];
 	for (const sig of signatures) {
-		const hits = packages.filter((p) => packageMatches(p, sig.packages));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]));
 		if (hits.length) vendors.push({ id: sig.id, name: sig.name, roles: sig.roles, packages: hits });
 	}
 	const unmapped = [];
 	for (const sdk of UNMAPPED_SDKS) {
-		const hits = packages.filter((p) => packageMatches(p, sdk.packages));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sdk[field]));
 		if (hits.length) unmapped.push({ name: sdk.name, role: sdk.role, packages: hits });
 	}
 	return { vendors, unmapped };
@@ -82,11 +84,28 @@ function* walk(root, limits) {
 	}
 }
 
+/** Per agent: `on` (registered in the project), `plugin` (the Claude Code plugin brings its own) or `off`. */
+export function hookStatus(root, { plugin = false } = {}) {
+	const status = {};
+	for (const [agent, setup] of Object.entries(HOOK_SETUPS)) {
+		const registered = setup.configs.some((c) => {
+			try {
+				return readFileSync(join(root, c), 'utf8').includes(HOOK_FILE);
+			} catch {
+				return false;
+			}
+		});
+		if (registered && existsSync(join(root, setup.script))) status[agent] = 'on';
+		else status[agent] = agent === 'claude-code' && plugin ? 'plugin' : 'off';
+	}
+	return status;
+}
+
 function isKubernetesManifest(text) {
 	return /^apiVersion:/m.test(text) && /^kind:\s*(Deployment|StatefulSet|DaemonSet|Service|Ingress|HorizontalPodAutoscaler|CronJob)\b/m.test(text);
 }
 
-export function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
+export function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {}) {
 	root = resolve(root);
 	if (!existsSync(root) || !statSync(root).isDirectory()) throw new Error(`not a directory: ${root}`);
 	const sigs = signatures ?? [];
@@ -131,21 +150,26 @@ export function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
 			for (const cfg of sig.config_files) if (rel === cfg || rel.endsWith('/' + cfg)) hit(sig, 'config', rel, cfg);
 		}
 
-		if (name === 'package.json') {
-			let pkg;
+		const manifest = manifestKind(rel);
+		if (manifest) {
+			let text;
 			try {
-				pkg = JSON.parse(readFileSync(full, 'utf8'));
+				text = readFileSync(full, 'utf8');
 			} catch {
 				continue;
 			}
-			const deps = dependencyNames(pkg);
-			const m = matchPackages(deps, sigs);
+			const deps = manifestDependencies(manifest, text, rel);
+			const m = matchDependencies(deps, sigs, manifest);
 			for (const v of m.vendors) for (const p of v.packages) hit(sigs.find((s) => s.id === v.id), 'package', rel, p);
 			for (const u of m.unmapped) {
 				if (!unmapped.has(u.name)) unmapped.set(u.name, { name: u.name, role: u.role, evidence: [] });
 				for (const p of u.packages) unmapped.get(u.name).evidence.push({ kind: 'package', file: rel, match: p });
 			}
-			for (const d of deps) if (FRAMEWORK_PACKAGES[d] && !frameworks.has(FRAMEWORK_PACKAGES[d])) frameworks.set(FRAMEWORK_PACKAGES[d], { name: FRAMEWORK_PACKAGES[d], package: d, file: rel });
+			for (const d of deps) {
+				const key = Object.keys(FRAMEWORKS[manifest]).find((k) => dependencyMatches(manifest, d, [k]));
+				const fw = key && FRAMEWORKS[manifest][key];
+				if (fw && !frameworks.has(fw)) frameworks.set(fw, { name: fw, package: d, file: rel });
+			}
 			continue;
 		}
 
@@ -206,6 +230,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000 } = {}) {
 		frameworks: [...frameworks.values()],
 		infra,
 		env_names: [...envNames].sort(),
+		hook: hookStatus(root, { plugin }),
 	};
 }
 
@@ -216,17 +241,27 @@ function defaultVendorsDir() {
 	return null;
 }
 
+/** True when this script runs from the Claude Code plugin, which registers the hook itself (hooks/hooks.json). */
+function runsFromPlugin() {
+	const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+	try {
+		return existsSync(join(pluginRoot, '.claude-plugin', 'plugin.json')) && readFileSync(join(pluginRoot, 'hooks', 'hooks.json'), 'utf8').includes('new-vendor');
+	} catch {
+		return false;
+	}
+}
+
 export function detectMain(argv) {
 	const args = parseArgs(argv);
 	if (args.help) {
-		process.stdout.write('usage: node detect.mjs [repo-dir] [--vendors <dir>] [--max-files N]\nPrints JSON: vendors with evidence, unmapped SDKs, overlaps, frameworks, infra, env var names (never values).\n');
+		process.stdout.write('usage: node detect.mjs [repo-dir] [--vendors <dir>] [--max-files N]\nPrints JSON: vendors with evidence, unmapped SDKs, overlaps, frameworks, infra, env var names (never values), new-vendor hook status.\n');
 		return;
 	}
 	const vendorsDir = args.vendors || defaultVendorsDir();
 	if (!vendorsDir) fail('vendor maps not found; pass --vendors <dir>');
 	const signatures = vendorSignatures(loadCatalog(vendorsDir));
 	try {
-		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000 }));
+		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000, plugin: runsFromPlugin() }));
 	} catch (e) {
 		fail(e.message);
 	}

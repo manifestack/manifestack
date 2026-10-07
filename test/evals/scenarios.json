@@ -20,7 +20,8 @@
       "reads current pricing pages and cites each page with today's date",
       "checks EU region availability for each vendor and states the compliance caveat",
       "shows monthly cost at 1k, 10k and 100k users computed with scripts/project.mjs cost, with assumptions",
-      "writes STACK.md with Requirements and one section per service; stack-md.mjs lint passes"
+      "writes .manifestack/STACK.md with Requirements and one section per service; stack-md.mjs lint passes",
+      "writes nothing in the repository root: the cost model goes to .manifestack/tmp/"
     ]
   },
   {

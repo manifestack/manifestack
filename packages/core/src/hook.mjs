@@ -1,20 +1,21 @@
 // "New vendor" hook for Claude Code (PostToolUse) and Cursor (afterFileEdit).
-// After an edit to package.json it compares dependencies before and after the edit and with the
-// services already in STACK.md. A new vendor gets one line of context for the agent; otherwise it
-// prints nothing. Offline, never blocks, always exits 0.
+// After an edit to a dependency manifest (package.json, requirements*.txt, pyproject.toml, Pipfile, go.mod) it
+// compares dependencies before and after the edit and with the
+// services already in .manifestack/STACK.md. A new vendor gets one line of context for the agent;
+// otherwise it prints nothing. Offline, never blocks, always exits 0.
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join, basename, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { isMain } from './cli-util.mjs';
 import { loadCatalog, vendorSignatures } from './catalog.mjs';
-import { dependencyNames, matchPackages } from './detect.mjs';
+import { matchDependencies } from './detect.mjs';
+import { manifestKind, manifestDependencies } from './manifests.mjs';
 import { parseStackMd } from './stack-md.mjs';
+import { STACK_FILE } from './workdir.mjs';
 
 // tools/sync.mjs replaces this line with the signatures from catalog/vendors.
 let EMBEDDED_SIGNATURES = null; // @embed:signatures
-
-const MANIFESTS = new Set(['package.json']);
 
 function hookSignatures() {
 	if (EMBEDDED_SIGNATURES) return EMBEDDED_SIGNATURES;
@@ -55,18 +56,11 @@ function previousContent(current, event) {
 	return text;
 }
 
-function depsOf(text) {
-	try {
-		return dependencyNames(JSON.parse(text));
-	} catch {
-		return [];
-	}
-}
 
 function findStackMd(file, roots) {
 	let dir = dirname(file);
 	for (;;) {
-		const candidate = join(dir, 'STACK.md');
+		const candidate = join(dir, STACK_FILE);
 		if (existsSync(candidate)) return candidate;
 		if (existsSync(join(dir, '.git')) || roots.some((r) => resolve(r) === dir)) return null;
 		const parent = dirname(dir);
@@ -79,11 +73,12 @@ const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Returns the context line for the agent, or null when nothing new was added. */
 export function newVendorMessage(event, { signatures }) {
-	if (!event || !MANIFESTS.has(basename(event.file)) || !existsSync(event.file)) return null;
+	const kind = event && manifestKind(event.file);
+	if (!kind || !existsSync(event.file)) return null;
 	const current = readFileSync(event.file, 'utf8');
-	const now = matchPackages(depsOf(current), signatures);
+	const now = matchDependencies(manifestDependencies(kind, current, event.file), signatures, kind);
 	if (!now.vendors.length && !now.unmapped.length) return null;
-	const before = matchPackages(depsOf(previousContent(current, event)), signatures);
+	const before = matchDependencies(manifestDependencies(kind, previousContent(current, event), event.file), signatures, kind);
 	const stackFile = findStackMd(event.file, event.roots);
 	const listed = new Set();
 	if (stackFile) {
@@ -101,9 +96,9 @@ export function newVendorMessage(event, { signatures }) {
 	// message says what to check even if the manifestack-guard skill is never loaded.
 	let msg = `Manifestack: ${names} was added in ${basename(event.file)}. Before you finish, tell the user in two or three lines`;
 	if (stackFile) {
-		msg += ` how it fits STACK.md (${relative(dirname(event.file), stackFile) || 'STACK.md'}): the "requires" line (data region, certifications), the budget, any section with the same role, and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
+		msg += ` how it fits STACK.md (${relative(dirname(event.file), stackFile)}): the "requires" line (data region, certifications), the "avoid" line (vendors or tech the team rules out), the budget, any section with the same role, and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
 	} else {
-		msg += ' which plan limits to check for it (send caps, billed users, storage, rate limits), and suggest running /manifestack to record the stack in STACK.md.';
+		msg += ` which plan limits to check for it (send caps, billed users, storage, rate limits), and suggest running /manifestack to record the stack in ${STACK_FILE}.`;
 	}
 	if (unmapped.length) msg += ` Manifestack has no page map for ${unmapped.join(', ')}; its public pricing page is the source for prices.`;
 	msg += ' Do not quote prices or limits from memory. Keep going with the task.';

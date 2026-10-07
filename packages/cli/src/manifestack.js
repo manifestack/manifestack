@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// npx manifestack install | uninstall
+// npx manifestack [install] | hook | uninstall
 // Copies the skills into the agent's project skills folder and, for Claude Code and Cursor,
-// registers the "new vendor" hook. No network, no dependencies.
+// registers the "new vendor" hook. `hook` registers only the hook, for skills installed another way
+// (npx skills add, a manual copy). No network, no dependencies.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, cpSync, statSync } from 'node:fs';
 import { dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,8 +16,14 @@ const MARKER = '.manifestack.json';
 const HELP = `manifestack ${VERSION}: choose the stack that fits, know when it stops fitting
 
 Usage:
-  npx manifestack install [--agent <id>] [--skill <name>] [--dir <path>] [--yes] [--dry-run] [--force]
+  npx manifestack [install] [--agent <id>] [--skill <name>] [--dir <path>] [--yes] [--dry-run] [--force]
+  npx manifestack hook [--agent claude-code|cursor] [--dir <path>] [--yes] [--dry-run]
   npx manifestack uninstall [--agent <id>] [--dir <path>] [--yes] [--dry-run]
+
+Commands:
+  install        Skills and, for Claude Code and Cursor, the new-vendor hook. The default command.
+  hook           Only the new-vendor hook, for skills installed another way (npx skills add, a copy).
+  uninstall      Skills and hook. .manifestack/ (STACK.md) is kept.
 
 Options:
   --agent <id>   ${AGENTS.map((a) => a.id).join(', ')}
@@ -27,7 +34,7 @@ Options:
   --dry-run      Show what would change and stop.
   --force        Replace a skill folder that manifestack did not install.
 
-STACK.md is never touched. https://manifestack.com`;
+The .manifestack/ folder with STACK.md is never touched. https://manifestack.com`;
 
 class UserError extends Error {}
 
@@ -102,29 +109,43 @@ async function ask(question) {
 	}
 }
 
-async function chooseAgents(opts, project, { forUninstall = false } = {}) {
+/** `pool` limits the choice: `hook` offers only the agents that have a hook. */
+async function chooseAgents(opts, project, { forUninstall = false, pool = AGENTS } = {}) {
+	const ids = pool.map((a) => a.id).join(', ');
 	if (opts.agent.length) {
 		const unknown = opts.agent.filter((id) => !findAgent(id));
 		if (unknown.length) throw new UserError(`unknown agent ${unknown.join(', ')}. Known agents: ${AGENTS.map((a) => a.id).join(', ')}`);
+		const outside = opts.agent.filter((id) => !pool.some((a) => a.id === id));
+		if (outside.length) throw new UserError(`${outside.join(', ')} has no hook support. Hooks work in: ${ids}`);
 		return opts.agent.map(findAgent);
 	}
-	if (forUninstall) return AGENTS;
-	const detected = detectAgents(project);
+	if (forUninstall) return pool;
+	const detected = detectAgents(project).filter((a) => pool.includes(a));
 	if (!process.stdin.isTTY || opts.yes) {
-		if (!detected.length) throw new UserError(`no agent folders found in ${project}. Pass --agent <id> (${AGENTS.map((a) => a.id).join(', ')}).`);
+		if (!detected.length) throw new UserError(`no agent folders found in ${project}. Pass --agent <id> (${ids}).`);
 		console.log(`Detected: ${detected.map((a) => a.name).join(', ')}`);
 		return detected;
 	}
-	console.log('Install for which agents?');
-	AGENTS.forEach((a, i) => console.log(`  ${i + 1}. ${a.name}${detected.includes(a) ? '  (detected)' : ''}`));
-	const answer = await ask(detected.length ? `Numbers, comma-separated [Enter = ${detected.map((a) => AGENTS.indexOf(a) + 1).join(',')}]: ` : 'Numbers, comma-separated: ');
+	console.log(pool === AGENTS ? 'Install for which agents?' : 'Add the hook for which agents?');
+	pool.forEach((a, i) => console.log(`  ${i + 1}. ${a.name}${detected.includes(a) ? '  (detected)' : ''}`));
+	const answer = await ask(detected.length ? `Numbers, comma-separated [Enter = ${detected.map((a) => pool.indexOf(a) + 1).join(',')}]: ` : 'Numbers, comma-separated: ');
 	if (!answer) {
 		if (!detected.length) throw new UserError('no agent selected');
 		return detected;
 	}
-	const picked = answer.split(',').map((s) => AGENTS[Number(s.trim()) - 1]);
-	if (picked.some((a) => !a)) throw new UserError(`pick numbers from 1 to ${AGENTS.length}`);
+	const picked = answer.split(',').map((s) => pool[Number(s.trim()) - 1]);
+	if (picked.some((a) => !a)) throw new UserError(`pick numbers from 1 to ${pool.length}`);
 	return [...new Set(picked)];
+}
+
+/** The same skill put there by another tool (npx skills add, a manual copy), as opposed to an unrelated folder. */
+function sameSkill(skillDir, name) {
+	try {
+		const head = readFileSync(join(skillDir, 'SKILL.md'), 'utf8').split(/^---\s*$/m)[1] ?? '';
+		return new RegExp(`^name:\\s*["']?${name}["']?\\s*$`, 'm').test(head);
+	} catch {
+		return false;
+	}
 }
 
 function planInstall(project, agents, skills, root, opts) {
@@ -136,7 +157,7 @@ function planInstall(project, agents, skills, root, opts) {
 			seenDirs.add(dir);
 			for (const skill of skills) {
 				const to = join(dir, skill);
-				const status = !existsSync(to) ? 'new' : ours(to) ? 'update' : opts.force ? 'replace' : 'skip';
+				const status = !existsSync(to) ? 'new' : ours(to) ? 'update' : opts.force ? 'replace' : sameSkill(to, skill) ? 'kept' : 'skip';
 				actions.push({ agent, kind: 'skill', from: join(root, 'skills', skill), to, status });
 			}
 		}
@@ -186,6 +207,7 @@ const LABEL = {
 	merge: '~ ',
 	present: '= ',
 	skip: '- ',
+	kept: '= ',
 	remove: '- ',
 	unmerge: '~ ',
 };
@@ -196,7 +218,14 @@ function describe(a, project) {
 		const what = { new: `create with ${a.describe}`, merge: `add ${a.describe}`, present: 'hook already registered, no change', unmerge: `remove ${a.describe}, keep the rest`, remove: `remove ${a.describe} (file becomes empty, deleted)` }[a.status];
 		return `${LABEL[a.status]}${path}: ${what}`;
 	}
-	const note = { new: '', update: ' (update)', replace: ' (replace, --force)', skip: ' (exists and was not installed by manifestack: skipped, use --force to replace)', remove: '' }[a.status];
+	const note = {
+		new: '',
+		update: ' (update)',
+		replace: ' (replace, --force)',
+		kept: ' (installed by another tool, kept; --force replaces it with this version)',
+		skip: ' (exists and was not installed by manifestack: skipped, use --force to replace)',
+		remove: '',
+	}[a.status];
 	return `${LABEL[a.status]}${path}${note}`;
 }
 
@@ -220,7 +249,7 @@ function writeConfig(file, config) {
 function apply(actions) {
 	for (const a of actions) {
 		try {
-			if (a.status === 'skip' || a.status === 'present') continue;
+			if (a.status === 'skip' || a.status === 'kept' || a.status === 'present') continue;
 			if (a.kind === 'skill' && a.status === 'remove') rmSync(a.to, { recursive: true, force: true });
 			else if (a.kind === 'skill') {
 				rmSync(a.to, { recursive: true, force: true });
@@ -265,25 +294,39 @@ async function install(opts) {
 	for (const agent of agents) console.log(`  ${agent.name}: ${agent.next.replace(/`/g, '')}`);
 }
 
+async function hook(opts) {
+	const project = resolve(opts.dir ?? '.');
+	if (!isDir(project)) throw new UserError(`project folder not found: ${project}`);
+	const root = assetsRoot();
+	const agents = await chooseAgents(opts, project, { pool: AGENTS.filter((a) => a.hook) });
+	const actions = planInstall(project, agents, [], root, opts);
+	printPlan(`manifestack ${VERSION}: new-vendor hook`, project, actions);
+	if (opts.dryRun) return console.log('Dry run: nothing changed.');
+	if (!(await confirm(opts))) return console.log('Cancelled: nothing changed.');
+	apply(actions);
+	console.log('Done. After each file edit the hook flags vendor SDKs that are new to the project.');
+}
+
 async function uninstall(opts) {
 	const project = resolve(opts.dir ?? '.');
 	if (!isDir(project)) throw new UserError(`project folder not found: ${project}`);
 	const agents = await chooseAgents(opts, project, { forUninstall: true });
 	const actions = planUninstall(project, agents);
 	if (!actions.length) return console.log(`Nothing to remove in ${project}.`);
-	printPlan(`manifestack ${VERSION}: uninstall (STACK.md is kept)`, project, actions);
+	printPlan(`manifestack ${VERSION}: uninstall (.manifestack/ is kept)`, project, actions);
 	if (opts.dryRun) return console.log('Dry run: nothing changed.');
 	if (!(await confirm(opts))) return console.log('Cancelled: nothing changed.');
 	apply(actions);
-	console.log('Done. STACK.md was not touched.');
+	console.log('Done. .manifestack/ was not touched.');
 }
 
 async function main(argv) {
 	const opts = parseCli(argv);
 	if (opts.version) return console.log(VERSION);
 	const cmd = opts._[0];
-	if (opts.help || !cmd) return console.log(HELP);
-	if (cmd === 'install') return install(opts);
+	if (opts.help) return console.log(HELP);
+	if (!cmd || cmd === 'install') return install(opts);
+	if (cmd === 'hook') return hook(opts);
 	if (cmd === 'uninstall') return uninstall(opts);
 	throw new UserError(`unknown command "${cmd}". Run: npx manifestack --help`);
 }

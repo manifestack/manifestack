@@ -7,7 +7,8 @@ Names only: never put secret values, keys, tokens or connection strings in this 
 budget: 
 users: 
 requires: 
-team_knows: 
+prefer: 
+avoid: 
 
 <!--
 One section per service, "## <Role>: <Vendor>". Roles: Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Other.

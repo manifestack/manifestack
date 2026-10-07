@@ -35,7 +35,15 @@ Only if the user already connected it. Never ask the user to connect one with wr
 | --- | --- | --- |
 | Supabase | `read_only=true` in the server URL (and `project_ref=<ref>`), or `--read-only` for the local server | `execute_sql` runs as a read-only role; metadata queries only |
 | Neon | `readonly=true` in the server URL, or "Allow writes" unchecked at OAuth consent | `run_sql` accepts read-only queries; metadata only |
-| Vercel, Resend | none | Do not use in this version: they have write tools (deploy, send email, keys) without a read-only mode |
+| PostHog | `readonly=true` in the server URL (or header `x-posthog-read-only: true`) with the `tools=` allowlist from the map | Billing tools return usage and spend directly |
+| Sentry | only the Inspect skill granted (`?skills=inspect`, or `--skills=inspect` locally) | No usage data; use it only to confirm the data region |
+| Auth0 | `--read-only` on the local server, initialized with `--scopes 'read:*'` | No active-user counts; ask for MAU |
+| Paddle | `--tools=read-only` on the local `@paddle/paddle-mcp` server only | Catalog and report metadata only; never transactions or customers |
+| Upstash | started with a read-only Management API key | Database list and statistics only; never commands, logs or message bodies |
+| Convex | `npx convex mcp start` with the `--disable-tools` list from the map, no production flags | Tables, function specs and insights; no data or env tools |
+| PlanetScale | the insights-only server URL with read-only database scope | Databases, branches, regions and invoices; no query tools |
+| MongoDB Atlas | local server with `--readOnly` and `--disabledTools create,update,delete,read` | Database and collection sizes and indexes; never `find`, `aggregate` or the remote server |
+| Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
 
 Rules:
 

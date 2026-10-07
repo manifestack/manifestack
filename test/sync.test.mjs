@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, runNode } from './helpers.mjs';
 import { plan } from '../tools/sync.mjs';
@@ -24,10 +24,11 @@ test('bundled scripts import only node: built-ins', async () => {
 
 test('the hook embeds vendor signatures', () => {
 	const hook = readFileSync(join(ROOT, 'hooks/new-vendor.mjs'), 'utf8');
-	assert.match(hook, /let EMBEDDED_SIGNATURES = \[\{"id":"clerk"/);
+	const embedded = JSON.parse(/let EMBEDDED_SIGNATURES = (\[.*\]);/.exec(hook)[1]);
+	assert.deepEqual(embedded.map((s) => s.id), readdirSync(join(ROOT, 'catalog/vendors')).filter((f) => f.endsWith('.md') && !f.startsWith('_')).map((f) => f.slice(0, -3)).sort());
 });
 
 test('vendor copies still parse as vendor maps', async () => {
 	const { loadCatalog } = await import('../packages/core/src/catalog.mjs');
-	assert.equal(loadCatalog(join(ROOT, 'skills/manifestack/vendors')).length, 5);
+	assert.equal(loadCatalog(join(ROOT, 'skills/manifestack/vendors')).length, loadCatalog(join(ROOT, 'catalog/vendors')).length);
 });

@@ -5,6 +5,7 @@ name: Vercel
 roles: [hosting, storage]
 detect:
   packages: ["vercel", "@vercel/"]
+  pypi: ["vercel", "vercel-sandbox", "vercel-queue", "vercel-workflow", "vercel-cache", "vercel-oidc", "vercel-headers", "vercel-connect"]
   imports: ["@vercel/"]
   env_prefixes: ["VERCEL_", "NEXT_PUBLIC_VERCEL_", "BLOB_READ_WRITE_TOKEN"]
   config_files: ["vercel.json", "vercel.ts", "vercel.toml"]

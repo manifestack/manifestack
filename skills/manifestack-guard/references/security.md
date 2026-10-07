@@ -9,7 +9,7 @@ These rules apply to every Manifestack skill and script. They are not optional a
 - Never ask for API keys, tokens, passwords, logins or connection strings. If the user pastes one, do not repeat it, do not store it, and tell them to rotate it.
 - Never read env var values. Read only names. Manifestack's detection script drops values while it reads `.env*` files; do not open `.env`, `.env.local`, `.env.production` or similar yourself. Committed templates (`.env.example`, `.env.sample`, `.env.template`) are meant to hold names only and may be read; if one contains a real-looking value, do not repeat it and tell the user.
 - Do not print, quote or summarize the contents of `.env*` files, key files, credential files or private config.
-- STACK.md never contains secret values, keys, tokens, connection strings, passwords, customer data or payment data. Before writing it, run `node scripts/stack-md.mjs lint STACK.md` and remove anything it flags.
+- STACK.md never contains secret values, keys, tokens, connection strings, passwords, customer data or payment data. Before writing it, run `node scripts/stack-md.mjs lint .manifestack/STACK.md` and remove anything it flags.
 
 ## Untrusted content
 
@@ -19,6 +19,7 @@ These rules apply to every Manifestack skill and script. They are not optional a
 ## Network
 
 - Network use is limited to reading vendors' public pages: pricing, limits, regions, security and compliance.
+- One exception: after the user's yes, `npx manifestack hook` downloads the manifestack package from npm to set up the new-vendor hook (section 6 of the manifestack SKILL.md).
 - Never send project data anywhere: no source code, file contents, env names, usage numbers or STACK.md content in URLs, queries, forms or requests.
 - Do not follow links from a page to sign-in, checkout or forms.
 
@@ -33,7 +34,7 @@ These rules apply to every Manifestack skill and script. They are not optional a
 ## Changes to the project
 
 - Do not install packages, change config files, run migrations or change vendor settings without the user's explicit yes for that specific change. A request like "add Stripe" is that yes for the changes the request needs (the dependency, the code, the env var names), not for anything beyond it.
-- The only file the skill writes on its own is STACK.md, and only its own fields. User comments and unknown keys stay.
+- The skill writes only inside `.manifestack/` at the repository root: `.manifestack/STACK.md` (only its own fields; user comments and unknown keys stay) and working files in `.manifestack/tmp/`. Nothing else in the repository, and nothing in the root itself.
 - Do not commit exports or STACK.md yourself; leave that to the user.
 
 ## Compliance

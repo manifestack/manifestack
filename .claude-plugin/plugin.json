@@ -1,11 +1,27 @@
 {
   "name": "manifestack",
   "displayName": "Manifestack",
-  "version": "0.1.0",
-  "description": "Choose the stack that fits your project and know when it stops fitting: costs, limits, requirements.",
-  "author": { "name": "Manifestack" },
+  "version": "0.2.0",
+  "description": "Fits your stack to your project's budget, users, data rules and team, then keeps it fitting: audits requirement gaps, duplicate services, overbuilt setups, plan limits and bills, and checks every vendor the agent adds. Read-only, no API keys.",
+  "author": {
+    "name": "Manifestack"
+  },
   "homepage": "https://manifestack.com",
   "repository": "https://github.com/manifestack/manifestack",
   "license": "MIT",
-  "keywords": ["stack", "pricing", "limits", "costs", "vercel", "supabase"]
+  "keywords": [
+    "stack",
+    "architecture",
+    "audit",
+    "pricing",
+    "limits",
+    "costs",
+    "compliance",
+    "vendors",
+    "vercel",
+    "supabase",
+    "firebase",
+    "stripe",
+    "openai"
+  ]
 }

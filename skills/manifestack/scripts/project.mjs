@@ -1,5 +1,6 @@
 // generated, edit catalog/ or packages/core/ (then run: node tools/sync.mjs)
-import { readFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // ---- packages/core/src/cli-util.mjs
@@ -53,6 +54,25 @@ function fail(message, code = 1) {
 
 function todayIso() {
 	return new Date().toISOString().slice(0, 10);
+}
+
+// ---- packages/core/src/workdir.mjs
+// Everything Manifestack writes in a project lives in one folder, .manifestack/ at the repository root:
+//   .manifestack/STACK.md   decisions, committed with the code
+//   .manifestack/tmp/       working files such as cost models, ignored by git
+
+const WORK_DIR = '.manifestack';
+const STACK_FILE = `${WORK_DIR}/STACK.md`;
+const TMP_DIR = `${WORK_DIR}/tmp`;
+
+/** Creates the folder a file goes into. Inside .manifestack/tmp it also adds a .gitignore that ignores the folder. */
+function ensureWorkDir(file) {
+	const dir = dirname(file);
+	mkdirSync(dir, { recursive: true });
+	if (basename(dir) === 'tmp' && basename(dirname(dir)) === WORK_DIR) {
+		const ignore = join(dir, '.gitignore');
+		if (!existsSync(ignore)) writeFileSync(ignore, '*\n');
+	}
 }
 
 // ---- packages/core/src/project.mjs
@@ -217,7 +237,7 @@ const USAGE = `usage:
   node project.mjs eta --current 41200 --limit 50000 --growth "18%/mo"
   node project.mjs eta --points "2026-09-06=280 MB,2026-10-06=312 MB" --limit "500 MB"
   node project.mjs overage --used "3.4 TB" --included "1 TB" --price 0.15 --per GB
-  node project.mjs cost <model.json | ->
+  node project.mjs cost <.manifestack/tmp/model.json | ->
 Prints JSON. Prices are inputs: read them from the vendor page first.`;
 
 export function projectMain(argv) {
@@ -258,7 +278,10 @@ export function projectMain(argv) {
 		} else if (cmd === 'cost') {
 			const file = args._[1];
 			if (!file) throw new Error('pass a model file or - for stdin');
-			printJson(costAt(JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'))));
+			const model = JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'));
+			// The model is a working file: in .manifestack/tmp it stays out of git.
+			if (file !== '-') ensureWorkDir(file);
+			printJson(costAt(model));
 		} else {
 			process.stdout.write(USAGE + '\n');
 			if (cmd && cmd !== 'help') process.exitCode = 1;

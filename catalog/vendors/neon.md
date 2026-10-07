@@ -4,7 +4,8 @@ id: neon
 name: Neon
 roles: [database, auth]
 detect:
-  packages: ["@neondatabase/serverless", "@neondatabase/neon-js", "@neondatabase/auth", "neonctl"]
+  packages: ["@neondatabase/serverless", "@neondatabase/neon-js", "@neondatabase/auth", "@neondatabase/api-client", "@neon/sdk", "neonctl"]
+  pypi: ["neon-api"]
   imports: ["@neondatabase/"]
   env_prefixes: ["NEON_"]
   config_files: []

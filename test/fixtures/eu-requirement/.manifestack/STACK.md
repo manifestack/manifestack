@@ -2,7 +2,7 @@
 budget: ~$100/mo
 users: 2k now, 10k by Q3
 requires: EU database, GDPR DPA
-team_knows: Postgres, Vue
+prefer: Postgres, Vue
 
 ## Database: Supabase
 plan: Pro

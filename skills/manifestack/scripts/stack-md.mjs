@@ -1,5 +1,6 @@
 // generated, edit catalog/ or packages/core/ (then run: node tools/sync.mjs)
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // ---- packages/core/src/cli-util.mjs
@@ -53,6 +54,25 @@ function fail(message, code = 1) {
 
 function todayIso() {
 	return new Date().toISOString().slice(0, 10);
+}
+
+// ---- packages/core/src/workdir.mjs
+// Everything Manifestack writes in a project lives in one folder, .manifestack/ at the repository root:
+//   .manifestack/STACK.md   decisions, committed with the code
+//   .manifestack/tmp/       working files such as cost models, ignored by git
+
+const WORK_DIR = '.manifestack';
+const STACK_FILE = `${WORK_DIR}/STACK.md`;
+const TMP_DIR = `${WORK_DIR}/tmp`;
+
+/** Creates the folder a file goes into. Inside .manifestack/tmp it also adds a .gitignore that ignores the folder. */
+function ensureWorkDir(file) {
+	const dir = dirname(file);
+	mkdirSync(dir, { recursive: true });
+	if (basename(dir) === 'tmp' && basename(dirname(dir)) === WORK_DIR) {
+		const ignore = join(dir, '.gitignore');
+		if (!existsSync(ignore)) writeFileSync(ignore, '*\n');
+	}
 }
 
 // ---- packages/core/src/project.mjs
@@ -217,7 +237,7 @@ const USAGE = `usage:
   node project.mjs eta --current 41200 --limit 50000 --growth "18%/mo"
   node project.mjs eta --points "2026-09-06=280 MB,2026-10-06=312 MB" --limit "500 MB"
   node project.mjs overage --used "3.4 TB" --included "1 TB" --price 0.15 --per GB
-  node project.mjs cost <model.json | ->
+  node project.mjs cost <.manifestack/tmp/model.json | ->
 Prints JSON. Prices are inputs: read them from the vendor page first.`;
 
 function projectMain(argv) {
@@ -258,7 +278,10 @@ function projectMain(argv) {
 		} else if (cmd === 'cost') {
 			const file = args._[1];
 			if (!file) throw new Error('pass a model file or - for stdin');
-			printJson(costAt(JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'))));
+			const model = JSON.parse(readFileSync(file === '-' ? 0 : file, 'utf8'));
+			// The model is a working file: in .manifestack/tmp it stays out of git.
+			if (file !== '-') ensureWorkDir(file);
+			printJson(costAt(model));
 		} else {
 			process.stdout.write(USAGE + '\n');
 			if (cmd && cmd !== 'help') process.exitCode = 1;
@@ -269,12 +292,12 @@ function projectMain(argv) {
 }
 
 // ---- packages/core/src/stack-md.mjs
-// Reads and updates STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
+// Reads and updates .manifestack/STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
 // Updates touch only the named fields: other lines, unknown keys and user comments stay as they are.
 
-export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'Other'];
+export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'AI', 'Other'];
 export const STACK_KEYS = ['plan', 'limit', 'source', 'usage', 'decided', 'revisit_when', 'next', 'env'];
-export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'team_knows'];
+export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid'];
 export const REVISIT_METRICS = ['db_size', 'monthly_sent', 'daily_peak', 'transfer_tb', 'mau', 'users', 'monthly_bill', 'date'];
 
 const SECRET_PATTERNS = [
@@ -640,11 +663,11 @@ export function lintStackMd(text) {
 }
 
 const STACK_USAGE = `usage:
-  node stack-md.mjs parse [STACK.md]
-  node stack-md.mjs check [STACK.md] [--today YYYY-MM-DD] [--metric db_size="420 MB"]...
-  node stack-md.mjs lint [STACK.md]
-  node stack-md.mjs set [STACK.md] --section "Database: Supabase" --set "plan=free" [--set ...] [--comment "source=read 2026-10-06"]
-Prints JSON. set refuses values that look like secrets and keeps every other line as it is.`;
+  node stack-md.mjs parse [file]
+  node stack-md.mjs check [file] [--today YYYY-MM-DD] [--metric db_size="420 MB"]...
+  node stack-md.mjs lint [file]
+  node stack-md.mjs set [file] --section "Database: Supabase" --set "plan=free" [--set ...] [--comment "source=read 2026-10-06"]
+file defaults to .manifestack/STACK.md. Prints JSON. set refuses values that look like secrets and keeps every other line as it is.`;
 
 function keyValues(list) {
 	const out = {};
@@ -659,7 +682,7 @@ function keyValues(list) {
 export function stackMdMain(argv) {
 	const args = parseArgs(argv);
 	const cmd = args._[0];
-	const file = args._[1] ?? 'STACK.md';
+	const file = args._[1] ?? STACK_FILE;
 	try {
 		if (!['parse', 'check', 'lint', 'set'].includes(cmd)) {
 			process.stdout.write(STACK_USAGE + '\n');
@@ -692,6 +715,7 @@ export function stackMdMain(argv) {
 				process.exitCode = 2;
 				throw new Error(`refusing to write: lines ${secrets.map((s) => s.line).join(', ')} look like secrets`);
 			}
+			ensureWorkDir(file);
 			writeFileSync(file, out);
 			printJson({ file, written: true, section: args.section });
 		}

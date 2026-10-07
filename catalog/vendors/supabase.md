@@ -5,6 +5,8 @@ name: Supabase
 roles: [database, auth, storage]
 detect:
   packages: ["@supabase/supabase-js", "@supabase/ssr", "@supabase/auth-helpers-nextjs", "@supabase/auth-helpers-react", "@supabase/auth-ui-react", "supabase"]
+  pypi: ["supabase", "supabase-auth", "supabase-functions", "storage3", "realtime", "gotrue", "supafunc"]
+  go: ["github.com/supabase/supabase-go", "github.com/supabase-community/supabase-go"]
   imports: ["@supabase/"]
   env_prefixes: ["SUPABASE_", "NEXT_PUBLIC_SUPABASE_", "VITE_SUPABASE_", "EXPO_PUBLIC_SUPABASE_"]
   config_files: ["supabase/config.toml"]

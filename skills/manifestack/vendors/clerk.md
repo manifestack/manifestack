@@ -6,6 +6,8 @@ name: Clerk
 roles: [auth]
 detect:
   packages: ["@clerk/"]
+  pypi: ["clerk-backend-api"]
+  go: ["github.com/clerk/clerk-sdk-go"]
   imports: ["@clerk/"]
   env_prefixes: ["CLERK_", "NEXT_PUBLIC_CLERK_", "VITE_CLERK_", "EXPO_PUBLIC_CLERK_", "PUBLIC_CLERK_"]
   config_files: []

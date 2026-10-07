@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write # npm trusted publishing (OIDC), no tokens
+  id-token: write # npm trusted publishing (OIDC) and provenance
 
 jobs:
   publish:
@@ -26,9 +26,13 @@ jobs:
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != v$version"; exit 1; }
       - run: node tools/sync.mjs --check
       - run: npm test
+      # Trusted publishing (OIDC) is the normal path. NPM_TOKEN is only for the very first publish,
+      # before the package exists on npm and a trusted publisher can be set up; delete the secret after.
       - name: Publish to npm
-        run: npm publish -w packages/cli --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish -w packages/cli --access public --provenance
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-from-tag --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # Generated copies in skills/ and hooks/ must match catalog/ and packages/core/.
+      - run: node tools/sync.mjs --check
+      - run: npm test
+
+  validate:
+    name: Skills, plugin and packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Agent Skills spec (skills-ref)
+        run: |
+          pip install skills-ref
+          for dir in skills/*/; do agentskills validate "$dir"; done
+      - name: Claude Code plugin
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate . --strict
+      - name: skills CLI finds both skills
+        run: |
+          npx -y skills add ./ --list | tee skills-list.txt
+          grep -q 'manifestack-guard' skills-list.txt
+      - name: npm package contents
+        run: |
+          npm pack --dry-run -w packages/cli 2>&1 | tee pack.txt
+          grep -q 'skills/manifestack/SKILL.md' pack.txt
+          grep -q 'hooks/new-vendor.mjs' pack.txt

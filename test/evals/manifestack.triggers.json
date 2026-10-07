@@ -1,0 +1,22 @@
+[
+  { "query": "we're about to launch relaylog (next.js on vercel pro, supabase free, resend for digests). can you go through the repo and tell me which plan limits we're going to hit first and roughly when? ~9k MAU now", "should_trigger": true },
+  { "query": "Our Vercel invoice went from $20 to $1,370 last month and nobody knows why. The app is in this repo, most traffic is /og images and /api/feed. What's driving it and what should we change before next month?", "should_trigger": true },
+  { "query": "starting a new side project, B2B dashboard for EU logistics cos, ~300 users at launch, 5k in a year, $150/mo budget, contracts need EU data residency + SOC 2 vendors. team is 2 TS devs, no ops. what stack should we use, hosting through email?", "should_trigger": true },
+  { "query": "How much will Supabase + Clerk + Resend cost us at 10k and 50k monthly users? I need a number for the investor deck by friday", "should_trigger": true },
+  { "query": "/manifestack audit", "should_trigger": true },
+  { "query": "we have both @clerk/nextjs and supabase.auth in src/ — someone added clerk last year and nobody removed the old auth. is that costing us anything and which one should stay?", "should_trigger": true },
+  { "query": "Is running EKS + Helm + Terraform for our internal tool with 40 users overkill? The AWS bill is ~$400/mo and our budget is $50. Repo is here", "should_trigger": true },
+  { "query": "our customer's security questionnaire asks if all our vendors are SOC 2 and keep data in the EU. can you check our current stack against that?", "should_trigger": true },
+  { "query": "we're sending the launch announcement to 8,000 signups next tuesday through resend, we're on the free plan. anything that will break?", "should_trigger": true },
+  { "query": "update STACK.md with this month's numbers: db is 340 MB now, sent 44k emails in september", "should_trigger": true },
+  { "query": "do we still fit on the free tiers or should we plan upgrades this quarter? check the repo", "should_trigger": true },
+  { "query": "Neon vs staying on Supabase free for a 2k-user app — which plan limits matter and what would it cost us either way?", "should_trigger": true },
+  { "query": "deploy the current branch to vercel production and give me the preview url", "should_trigger": false },
+  { "query": "write a supabase RLS policy so users can only read rows in the projects table where owner_id = auth.uid()", "should_trigger": false },
+  { "query": "the next.js build fails on vercel with 'Module not found: Can't resolve @/lib/supabase' but works locally. here's the log", "should_trigger": false },
+  { "query": "migrate our prisma schema: add a nullable column trial_ends_at to the subscriptions table and generate the migration", "should_trigger": false },
+  { "query": "set up a github actions workflow that runs vitest and deploys to vercel on merge to main", "should_trigger": false },
+  { "query": "our clerk sign-in page shows a CORS error in production after the domain change, how do I fix it?", "should_trigger": false },
+  { "query": "write a resend email template in react-email for the password reset flow, with our logo and a button", "should_trigger": false },
+  { "query": "what's the difference between kubernetes deployments and statefulsets? explain with an example", "should_trigger": false }
+]

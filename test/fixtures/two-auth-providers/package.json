@@ -1,0 +1,9 @@
+{
+  "name": "two-auth",
+  "private": true,
+  "dependencies": {
+    "next": "15.5.0",
+    "@clerk/nextjs": "^6.30.0",
+    "@supabase/supabase-js": "^2.58.0"
+  }
+}

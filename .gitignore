@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+.idea/
+*.tgz
+# Copied in by `prepack` (tools/sync.mjs --into packages/cli); the sources live in the repo root.
+packages/cli/skills/
+packages/cli/hooks/
+packages/cli/README.md
+packages/cli/LICENSE
+test/evals/workspace/

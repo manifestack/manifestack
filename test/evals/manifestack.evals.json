@@ -1,0 +1,52 @@
+{
+  "skill_name": "manifestack",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "/manifestack audit (fixture next-vercel-supabase-resend)",
+      "expected_output": "The answer names all three vendors found in the code: Vercel, Supabase and Resend; Every finding has a kind (Limit, Bill, Risk, Requirement, Overlap or Overbuilt), a when, a cost, a fix and a source; ...",
+      "files": [],
+      "expectations": [
+        "Findings carry explicit kind labels, including a Limit finding for the Supabase Free database size with an ETA (Dec 2026 at 400 MB or Mar 2027 at 500 MB)",
+        "A Bill finding for Vercel data transfer gives ~$360/mo overage computed from a published per-GB rate",
+        "Every finding has when, cost, fix and a source dated 2026-10-07 (or marked unverified)",
+        "Requirements are checked, including Vercel functions pinned to iad1 (US) against the EU database rule, with a not-a-legal-guarantee note",
+        "The summary gives the nearest deadline, spend to review per month and per year, and the number of pages read",
+        "The answer mentions at least one non-pricing blocker visible in the repo (next 15.5.0/react 19.1.0 security advisory, no lockfile, anon key used for server writes, or an unverifiable sender domain)",
+        "In STACK.md the existing plan, decided, revisit_when and next lines are unchanged compared with the fixture; any change to them is offered as a proposal in the answer",
+        "STACK.md passes `stack-md.mjs lint` with zero errors",
+        "No API key, token or env value is requested or written anywhere"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "/manifestack init with a B2B EU brief (empty repo)",
+      "expected_output": "Proposes a framework, hosting, database, auth and email, each with a reason tied to the brief; Each proposed vendor's EU region availability was checked against a vendor page, and the answer says compliance decisions stay with the user; ...",
+      "files": [],
+      "expectations": [
+        "Proposes a framework, hosting, database, auth and email, each with a reason tied to the brief",
+        "Each proposed vendor's EU region availability was checked against a vendor page, and the answer says compliance decisions stay with the user",
+        "Shows monthly costs at 1k, 10k and 100k users with the assumptions stated",
+        "Cites pricing pages with the date they were read",
+        "States in one sentence up to about how many users the stack fits the $150/mo budget (or that it is over budget from launch)",
+        "STACK.md passes `stack-md.mjs lint` with zero errors and zero warnings",
+        "The decided lines in STACK.md are marked as proposed by init (not presented as the team's confirmed decision)",
+        "The cost table totals equal the sum of the per-vendor rows"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/manifestack on a repo with Kubernetes, Helm and Terraform for 40 users",
+      "expected_output": "Treats the repo as an existing project (audit), not a new one; Reports an Overbuilt finding about Kubernetes/Helm/Terraform (EKS) relative to 40 users and a ~$50/mo budget; ...",
+      "files": [],
+      "expectations": [
+        "Reports a finding explicitly labeled Overbuilt with when, cost, fix and source",
+        "The saving compares the same components on both sides (or explains any difference), and the stated totals equal the sum of their line items",
+        "Mentions repo defects that block deploying the current setup (no lockfile for npm ci, Terraform EKS missing required config, or an empty Helm chart)",
+        "Proposes a concrete simpler setup without ranking vendors or calling one the best",
+        "Acknowledges the setup might be deliberate or asks about it",
+        "STACK.md gains at least one '## <Role>: <Vendor>' section and passes lint with zero errors"
+      ]
+    }
+  ]
+}

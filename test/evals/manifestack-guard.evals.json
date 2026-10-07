@@ -1,0 +1,34 @@
+{
+  "skill_name": "manifestack-guard",
+  "evals": [
+    {
+      "id": 3,
+      "prompt": "add Stripe for subscriptions (STACK.md exists)",
+      "expected_output": "Reads STACK.md and relates Stripe to its Requirements (EU database, SOC 2 vendors) or says what needs checking; Relates the new cost to the budget in STACK.md (~$600/mo) or says Stripe's pricing needs checking; ...",
+      "files": [],
+      "expectations": [
+        "Checks Stripe against the 'EU database' requirement (data region) without stating Stripe facts from memory",
+        "Checks Stripe against the 'SOC 2 vendors' requirement and the ~$600/mo budget without stating Stripe facts from memory",
+        "Suggests running /manifestack audit before relying on the new vendor",
+        "Points out that taking payments makes the Supabase decision 'stay on Free until first paying user' due",
+        "Carries out the user's request: stripe in package.json dependencies and the env var names (names only) in .env.example",
+        "STACK.md is byte-identical to the fixture (no section added without a yes)",
+        "No secret values are written to any file"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "set up Resend welcome email (no STACK.md)",
+      "expected_output": "Says there is no STACK.md and suggests running /manifestack to record the stack; Points out that Resend's plan limits (for example the free daily cap) should be checked; ...",
+      "files": [],
+      "expectations": [
+        "Says there is no STACK.md and suggests `/manifestack` (not `/manifestack audit`)",
+        "Names Resend's send limits (daily and/or monthly caps) as things to check, without quoting numbers from memory",
+        "Flags that the repo has two auth providers (Clerk and Supabase Auth) and asks which one owns signup",
+        "Carries out the user's request: resend in package.json and the welcome-email code",
+        "Does not create STACK.md without asking",
+        "Uses RESEND_API_KEY only as an env var name; no value is written"
+      ]
+    }
+  ]
+}

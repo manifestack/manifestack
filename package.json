@@ -1,0 +1,13 @@
+{
+  "name": "manifestack-repo",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "sync": "node tools/sync.mjs",
+    "sync:check": "node tools/sync.mjs --check",
+    "test": "node --test test/*.test.mjs",
+    "check": "node tools/sync.mjs --check && node --test test/*.test.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

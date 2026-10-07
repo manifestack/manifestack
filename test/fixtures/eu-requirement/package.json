@@ -1,0 +1,5 @@
+{
+  "name": "eu-app",
+  "private": true,
+  "dependencies": { "@supabase/supabase-js": "^2.58.0", "vite": "^7.1.0" }
+}

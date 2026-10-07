@@ -1,0 +1,16 @@
+{
+  "name": "@manifestack/core",
+  "version": "0.1.0",
+  "description": "Detection, projections and STACK.md logic shared by Manifestack skills, hooks and (later) the MCP server.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./catalog": "./src/catalog.mjs",
+    "./detect": "./src/detect.mjs",
+    "./project": "./src/project.mjs",
+    "./stack-md": "./src/stack-md.mjs",
+    "./hook": "./src/hook.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,102 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { ROOT, runNode, tempDir } from './helpers.mjs';
+
+const HOOK = join(ROOT, 'hooks/new-vendor.mjs');
+const pkg = (deps) => JSON.stringify({ name: 'app', dependencies: deps }, null, 2) + '\n';
+
+function project(t, deps, stackMd) {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.git'));
+	writeFileSync(join(dir, 'package.json'), pkg(deps));
+	if (stackMd) writeFileSync(join(dir, 'STACK.md'), stackMd);
+	return dir;
+}
+
+const run = (input) => runNode(HOOK, [], { input: JSON.stringify(input) });
+
+test('Claude Code Edit that adds resend returns context', (t) => {
+	const dir = project(t, { next: '15', resend: '^6' });
+	const r = run({
+		hook_event_name: 'PostToolUse',
+		cwd: dir,
+		tool_name: 'Edit',
+		tool_input: { file_path: join(dir, 'package.json'), old_string: '"next": "15"', new_string: '"next": "15",\n    "resend": "^6"' },
+	});
+	assert.equal(r.code, 0);
+	const out = JSON.parse(r.stdout);
+	assert.equal(out.hookSpecificOutput.hookEventName, 'PostToolUse');
+	assert.match(out.hookSpecificOutput.additionalContext, /Resend \(email\) was added/);
+	assert.match(out.hookSpecificOutput.additionalContext, /Do not quote prices or limits from memory/);
+	assert.match(out.hookSpecificOutput.additionalContext, /suggest running \/manifestack/);
+	assert.match(out.hookSpecificOutput.additionalContext, /send caps/);
+});
+
+test('nothing new: empty output', (t) => {
+	const dir = project(t, { next: '15', resend: '^6' });
+	const r = run({ cwd: dir, tool_name: 'Edit', tool_input: { file_path: join(dir, 'package.json'), old_string: '"next": "14"', new_string: '"next": "15"' } });
+	assert.equal(r.code, 0);
+	assert.equal(r.stdout, '');
+});
+
+test('vendor already in STACK.md: empty output', (t) => {
+	const dir = project(t, { resend: '^6' }, '## Email: Resend\nplan: Free\n');
+	const r = run({ cwd: dir, tool_name: 'Write', tool_input: { file_path: join(dir, 'package.json'), content: '' } });
+	assert.equal(r.stdout, '');
+});
+
+test('Write compares with the committed version when there is one', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), pkg({ '@supabase/supabase-js': '2' }));
+	const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: 'ignore' });
+	git('init', '-q');
+	git('-c', 'user.email=t@example.test', '-c', 'user.name=t', 'add', '.');
+	git('-c', 'user.email=t@example.test', '-c', 'user.name=t', 'commit', '-qm', 'init');
+	writeFileSync(join(dir, 'package.json'), pkg({ '@supabase/supabase-js': '2', stripe: '18' }));
+	const r = run({ cwd: dir, tool_name: 'Write', tool_input: { file_path: 'package.json', content: '' } });
+	const msg = JSON.parse(r.stdout).hookSpecificOutput.additionalContext;
+	assert.match(msg, /Stripe \(payments\) was added/);
+	assert.ok(!/Supabase/.test(msg), 'Supabase was already committed');
+	assert.match(msg, /no page map for Stripe/);
+});
+
+test('Cursor afterFileEdit payload', (t) => {
+	const dir = project(t, { '@clerk/nextjs': '6' }, '## Requirements\nbudget: $50\n');
+	const r = run({ hook_event_name: 'afterFileEdit', file_path: join(dir, 'package.json'), edits: [{ old_string: '"dependencies": {}', new_string: '"dependencies": {\n    "@clerk/nextjs": "6"\n  }' }], workspace_roots: [dir] });
+	const out = JSON.parse(r.stdout);
+	assert.match(out.additional_context, /Clerk \(auth\) was added/);
+	assert.match(out.additional_context, /requires/);
+	assert.ok(!/suggest running \/manifestack/.test(out.additional_context));
+});
+
+test('other files, other tools and bad input are ignored silently', (t) => {
+	const dir = project(t, { resend: '^6' });
+	writeFileSync(join(dir, 'styles.css'), 'a{}');
+	assert.equal(run({ cwd: dir, tool_name: 'Edit', tool_input: { file_path: join(dir, 'styles.css'), old_string: 'a', new_string: 'b' } }).stdout, '');
+	assert.equal(run({ cwd: dir, tool_name: 'Bash', tool_input: { command: 'npm i resend' } }).stdout, '');
+	const bad = runNode(HOOK, [], { input: 'not json' });
+	assert.equal(bad.code, 0);
+	assert.equal(bad.stdout, '');
+	assert.equal(runNode(HOOK, [], { input: '' }).code, 0);
+});
+
+test('hook is fast', (t) => {
+	const dir = project(t, { resend: '^6' });
+	const input = { cwd: dir, tool_name: 'Edit', tool_input: { file_path: join(dir, 'package.json'), old_string: 'x', new_string: 'y' } };
+	run(input); // warm the file cache
+	const start = process.hrtime.bigint();
+	run(input);
+	const ms = Number(process.hrtime.bigint() - start) / 1e6;
+	assert.ok(ms < 500, `took ${ms} ms including node startup`);
+});
+
+test('plugin hooks.json runs the hook through CLAUDE_PLUGIN_ROOT', async () => {
+	const { readFileSync } = await import('node:fs');
+	const cfg = JSON.parse(readFileSync(join(ROOT, 'hooks/hooks.json'), 'utf8'));
+	const group = cfg.hooks.PostToolUse[0];
+	assert.equal(group.matcher, 'Write|Edit');
+	assert.equal(group.hooks[0].command, 'node "${CLAUDE_PLUGIN_ROOT}/hooks/new-vendor.mjs"');
+});

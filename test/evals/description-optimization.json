@@ -1,0 +1,134 @@
+{
+  "manifestack-guard": {
+    "best_score": "4/8",
+    "best_is_original": true,
+    "iterations": [
+      {
+        "set": "Train",
+        "correct": "19/36",
+        "precision": 100,
+        "recall": 6
+      },
+      {
+        "set": "Test",
+        "correct": "12/24",
+        "precision": 100,
+        "recall": 0
+      },
+      {
+        "set": "Train",
+        "correct": "19/36",
+        "precision": 100,
+        "recall": 6
+      },
+      {
+        "set": "Test",
+        "correct": "13/24",
+        "precision": 100,
+        "recall": 8
+      },
+      {
+        "set": "Train",
+        "correct": "19/36",
+        "precision": 100,
+        "recall": 6
+      },
+      {
+        "set": "Test",
+        "correct": "14/24",
+        "precision": 100,
+        "recall": 17
+      },
+      {
+        "set": "Train",
+        "correct": "20/36",
+        "precision": 100,
+        "recall": 11
+      },
+      {
+        "set": "Test",
+        "correct": "13/24",
+        "precision": 100,
+        "recall": 8
+      },
+      {
+        "set": "Train",
+        "correct": "20/36",
+        "precision": 100,
+        "recall": 11
+      },
+      {
+        "set": "Test",
+        "correct": "13/24",
+        "precision": 100,
+        "recall": 8
+      }
+    ]
+  },
+  "manifestack": {
+    "best_score": "3/7",
+    "best_is_original": true,
+    "iterations": [
+      {
+        "set": "Train",
+        "correct": "16/39",
+        "precision": 100,
+        "recall": 4
+      },
+      {
+        "set": "Test",
+        "correct": "11/21",
+        "precision": 100,
+        "recall": 17
+      },
+      {
+        "set": "Train",
+        "correct": "18/39",
+        "precision": 100,
+        "recall": 12
+      },
+      {
+        "set": "Test",
+        "correct": "12/21",
+        "precision": 100,
+        "recall": 25
+      },
+      {
+        "set": "Train",
+        "correct": "18/39",
+        "precision": 100,
+        "recall": 12
+      },
+      {
+        "set": "Test",
+        "correct": "10/21",
+        "precision": 100,
+        "recall": 8
+      },
+      {
+        "set": "Train",
+        "correct": "18/39",
+        "precision": 100,
+        "recall": 12
+      },
+      {
+        "set": "Test",
+        "correct": "10/21",
+        "precision": 100,
+        "recall": 8
+      },
+      {
+        "set": "Train",
+        "correct": "16/39",
+        "precision": 100,
+        "recall": 4
+      },
+      {
+        "set": "Test",
+        "correct": "12/21",
+        "precision": 100,
+        "recall": 25
+      }
+    ]
+  }
+}

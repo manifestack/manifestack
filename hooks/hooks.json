@@ -1,0 +1,17 @@
+{
+  "description": "Manifestack: after package.json changes, flag vendors that are new to the project",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/new-vendor.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "manifestack",
+  "displayName": "Manifestack",
+  "version": "0.1.0",
+  "description": "Choose the stack that fits your project and know when it stops fitting: costs, limits, requirements.",
+  "author": { "name": "Manifestack" },
+  "homepage": "https://manifestack.com",
+  "repository": "https://github.com/manifestack/manifestack",
+  "license": "MIT",
+  "keywords": ["stack", "pricing", "limits", "costs", "vercel", "supabase"]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "env-app",
+  "private": true,
+  "dependencies": { "resend": "^6.1.0", "@clerk/nextjs": "^6.30.0" }
+}

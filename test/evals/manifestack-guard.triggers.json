@@ -1,0 +1,22 @@
+[
+  { "query": "add Stripe so customers can pay for the Pro plan monthly — checkout session + webhook to mark the subscription active", "should_trigger": true },
+  { "query": "set up Resend for the welcome email after signup, the template can be simple", "should_trigger": true },
+  { "query": "npm install @supabase/supabase-js and create a client in src/lib/db.ts, we're moving off the local sqlite file", "should_trigger": true },
+  { "query": "let's move auth from supabase to clerk, can you swap the middleware and the sign-in pages", "should_trigger": true },
+  { "query": "replace sendgrid with postmark for transactional emails, same templates", "should_trigger": true },
+  { "query": "add sentry to the next.js app so we see production errors", "should_trigger": true },
+  { "query": "store user uploads in S3 instead of the bytea column in postgres", "should_trigger": true },
+  { "query": "Manifestack: added Resend (email) in package.json. Check its limits and the STACK.md requirements with manifestack-guard before relying on it.", "should_trigger": true },
+  { "query": "hook up the openai api to summarize each support ticket when it comes in", "should_trigger": true },
+  { "query": "we don't need upstash anymore, rip out the redis rate limiter and use an in-memory one", "should_trigger": true },
+  { "query": "fix the button color on the pricing page, it should be our brand blue #2f6bff", "should_trigger": false },
+  { "query": "the stripe webhook handler throws 'No signatures found matching the expected signature' in prod, fix it", "should_trigger": false },
+  { "query": "rename getUser to fetchCurrentUser everywhere and update the imports", "should_trigger": false },
+  { "query": "bump next from 15.4 to 15.5 and fix whatever breaks", "should_trigger": false },
+  { "query": "add a unit test for the resend email sending function, mock the client", "should_trigger": false },
+  { "query": "write a SQL query against our supabase db that lists the top 10 customers by revenue last month", "should_trigger": false },
+  { "query": "the clerk <UserButton/> overlaps the logo on mobile, fix the header layout", "should_trigger": false },
+  { "query": "audit our whole stack for cost and plan limits before launch", "should_trigger": false },
+  { "query": "add zod validation to the signup form fields", "should_trigger": false },
+  { "query": "move the supabase client from src/lib/db.ts to src/server/db.ts and fix imports", "should_trigger": false }
+]

@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: team-tracker
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: team-tracker }
+  template:
+    metadata:
+      labels: { app: team-tracker }
+    spec:
+      containers:
+        - name: app
+          image: team-tracker:latest

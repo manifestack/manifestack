@@ -1,0 +1,14 @@
+{
+  "name": "manifestack",
+  "owner": {
+    "name": "Manifestack"
+  },
+  "description": "Manifestack: an Agent Skill that chooses the stack that fits your project and tells you when it stops fitting.",
+  "plugins": [
+    {
+      "name": "manifestack",
+      "source": "./",
+      "description": "Choose the stack that fits. Know when it stops fitting."
+    }
+  ]
+}

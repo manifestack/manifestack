@@ -1,5 +1,7 @@
 <div align="center">
 
+<img width="72" height="72" alt="Manifestack logo" src="https://github.com/user-attachments/assets/9c9a39a8-b500-404f-a941-7d63219c173b" />
+
 # Manifestack
 
 **A stack that fits your project, and keeps fitting as it changes.**

@@ -19,7 +19,8 @@ test('CHANGELOG.md follows Keep a Changelog and has a section for the current ve
 	const version = JSON.parse(readFileSync(join(ROOT, 'packages/cli/package.json'), 'utf8')).version;
 	assert.match(CHANGELOG, /^## \[Unreleased\]$/m);
 	assert.ok(changelogSection(CHANGELOG, version), `no notes for ${version}`);
-	for (const [, v] of CHANGELOG.matchAll(/^## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}$/gm)) assert.match(CHANGELOG, new RegExp(`^\\[${v.replace(/\./g, '\\.')}\\]: https://`, 'm'), `link for ${v}`);
+	const lines = CHANGELOG.split(/\r?\n/);
+	for (const [, v] of CHANGELOG.matchAll(/^## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}$/gm)) assert.ok(lines.some((l) => l.startsWith(`[${v}]: https://`)), `link for ${v}`);
 	const r = runNode(join(ROOT, 'tools/changelog-notes.mjs'), ['0.0.1'], { cwd: ROOT });
 	assert.equal(r.code, 1);
 	assert.match(r.stderr, /no "## \[0\.0\.1\]" section/);

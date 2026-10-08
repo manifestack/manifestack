@@ -4,7 +4,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT, runNode, tempDir } from './helpers.mjs';
-import { readHookEvent, newVendorMessage, parsePackageCommands } from '../packages/core/src/hook.mjs';
+import { readHookEvent, newVendorMessage, parsePackageCommands, shellCommands } from '../packages/core/src/hook.mjs';
 import { loadCatalog, vendorSignatures } from '../packages/core/src/catalog.mjs';
 
 const HOOK = join(ROOT, 'hooks/new-vendor.mjs');
@@ -306,4 +306,88 @@ test('STACK.md vendor names match by prefix, from 3 characters', (t) => {
 	}
 	const dir = project(t, {}, '## Payments: St\n');
 	assert.match(run({ cwd: dir, tool_name: 'Bash', tool_input: { command: 'npm i stripe' } }).stdout, /Stripe/, 'two letters are not a match');
+});
+
+test('shellCommands keeps quoted text, heredoc bodies and redirections out of the commands', () => {
+	assert.deepEqual(shellCommands(`git commit -m "deps; npm install resend" && echo 'a | b'`), [['git', 'commit', '-m', 'deps; npm install resend'], ['echo', 'a | b']]);
+	assert.deepEqual(shellCommands("cat > README.md <<'EOF'\nnpm install @sentry/nextjs\nEOF\nnpm i stripe"), [['cat'], ['npm', 'i', 'stripe']]);
+	assert.deepEqual(shellCommands('cat <<-END\n\tpip install openai\n\tEND\nls'), [['cat'], ['ls']]);
+	assert.deepEqual(shellCommands('npm install stripe>/dev/null 2>&1 | tail -5 & wait'), [['npm', 'install', 'stripe'], ['tail', '-5'], ['wait']]);
+	assert.deepEqual(shellCommands('npm i \\\n  resend # the email SDK'), [['npm', 'i', 'resend']]);
+});
+
+test('parsePackageCommands: quotes, heredocs, prefixes, Windows names, aliases and dry runs', () => {
+	const names = (command) => parsePackageCommands(command).map((c) => `${c.kind}:${c.names.join(',')}`);
+	for (const quiet of [
+		'git commit -m "deps; npm install resend"',
+		"cat > NOTES.md <<'EOF'\nnpm install @sentry/nextjs\nEOF",
+		'npm install --dry-run stripe',
+		'pip install --dry-run openai',
+		'npm install --location=global vercel',
+		'npm install --location global vercel',
+	]) {
+		assert.deepEqual(parsePackageCommands(quiet), [], quiet);
+	}
+	assert.deepEqual(names('sudo -E npm i stripe'), ['npm:stripe']);
+	assert.deepEqual(names('corepack pnpm add resend'), ['npm:resend']);
+	assert.deepEqual(names('npm.cmd install stripe'), ['npm:stripe']);
+	assert.deepEqual(names('C:\\tools\\nodejs\\npm.cmd i openai'), ['npm:openai']);
+	assert.deepEqual(names('py -3.12 -m pip install anthropic'), ['pypi:anthropic']);
+	assert.deepEqual(names('npm i pay@npm:stripe@14'), ['npm:stripe']);
+	assert.deepEqual(names('npm install stripe>/dev/null && npm install resend&'), ['npm:stripe', 'npm:resend']);
+});
+
+test('installing a package the project already has is an upgrade, not a new vendor', (t) => {
+	const dir = gitRepo(t, { 'package.json': pkg({ stripe: '14' }), 'api/requirements.txt': 'openai==1.0\n' });
+	const bash = (command, cwd = dir) => run({ cwd, tool_name: 'Bash', tool_input: { command } }).stdout;
+	// npm has already written the new version to package.json; the committed one says what was there.
+	writeFileSync(join(dir, 'package.json'), pkg({ stripe: '15' }));
+	assert.equal(bash('npm install stripe@latest'), '');
+	const msg = JSON.parse(bash('npm install stripe resend')).hookSpecificOutput.additionalContext;
+	assert.match(msg, /Resend \(email\) was added/);
+	assert.doesNotMatch(msg, /Stripe/);
+	assert.equal(bash('pip install -U openai', join(dir, 'api')), '', 'nearest manifest, from a subfolder');
+});
+
+test('git missing or refusing the repository: a Write stays quiet instead of reporting every vendor', (t) => {
+	const dir = gitRepo(t, { 'package.json': pkg({ stripe: '14', '@sentry/nextjs': '8' }) });
+	writeFileSync(join(dir, 'package.json'), pkg({ stripe: '14', '@sentry/nextjs': '8', lodash: '4' }));
+	const event = readHookEvent({ cwd: dir, tool_name: 'Write', tool_input: { file_path: 'package.json', content: '' } });
+	const signatures = vendorSignatures(loadCatalog(join(ROOT, 'catalog/vendors')));
+	assert.equal(newVendorMessage(event, { signatures }), null, 'with git: nothing new');
+	const path = process.env.PATH;
+	t.after(() => (process.env.PATH = path));
+	process.env.PATH = tempDir(t);
+	assert.equal(newVendorMessage(event, { signatures }), null, 'no git on PATH');
+	if (process.platform !== 'win32') {
+		const bin = tempDir(t);
+		writeFileSync(join(bin, 'git'), "#!/bin/sh\necho \"fatal: detected dubious ownership in repository at '$PWD'\" >&2\nexit 128\n", { mode: 0o755 });
+		process.env.PATH = bin;
+		assert.equal(newVendorMessage(event, { signatures }), null, 'git refuses the repository');
+	}
+});
+
+test('each vendor is announced once per session', (t) => {
+	const cache = tempDir(t);
+	const before = process.env.MANIFESTACK_CACHE_DIR;
+	t.after(() => (before === undefined ? delete process.env.MANIFESTACK_CACHE_DIR : (process.env.MANIFESTACK_CACHE_DIR = before)));
+	process.env.MANIFESTACK_CACHE_DIR = cache;
+	const dir = project(t, {});
+	const bash = (command, session_id) => run({ session_id, cwd: dir, tool_name: 'Bash', tool_input: { command } }).stdout;
+	assert.match(bash('npm i resend', 's1'), /Resend/);
+	assert.equal(bash('npm i resend', 's1'), '', 'retried install');
+	const both = JSON.parse(bash('npm i resend stripe', 's1')).hookSpecificOutput.additionalContext;
+	assert.match(both, /^Manifestack: Stripe \(payments\) was added/, 'only the vendor not announced yet');
+	assert.match(bash('npm i resend', 's2'), /Resend/, 'a new session hears it again');
+	assert.match(bash('npm i resend'), /Resend/, 'without a session id nothing is remembered');
+});
+
+test('the plugin copy stays quiet when the project registers its own hook', (t) => {
+	const dir = project(t, {});
+	const bash = () => run({ cwd: dir, tool_name: 'Bash', tool_input: { command: 'npm i resend' } }).stdout;
+	mkdirSync(join(dir, '.claude/hooks'), { recursive: true });
+	writeFileSync(join(dir, '.claude/hooks/manifestack-new-vendor.mjs'), '');
+	assert.match(bash(), /Resend/, 'a script alone, not registered: the plugin still reports');
+	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node "${CLAUDE_PROJECT_DIR}/.claude/hooks/manifestack-new-vendor.mjs"' }] }] } }));
+	assert.equal(bash(), '', 'the project hook reports instead');
 });

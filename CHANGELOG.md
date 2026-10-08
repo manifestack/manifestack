@@ -4,6 +4,11 @@ All notable changes are listed here. Versions follow [semver](https://semver.org
 
 ## Unreleased
 
+- Hook: fewer false alarms. It no longer reports every vendor when git is missing or refuses the repository, treats an install of a package the project already has as an upgrade, reads commands with quotes and heredocs correctly (a commit message is not an install), and names each vendor once per session.
+- Hook: with both the Claude Code plugin and a project hook, only the project hook reports.
+- Hook: the Claude Code command uses `${CLAUDE_PROJECT_DIR}`, which also works on Windows without Git Bash. `detect.mjs` reports older entries as `outdated`; run `npx manifestack hook` to update.
+- Hook: also recognizes `sudo -E npm`, `corepack pnpm`, `npm.cmd`, `py -m pip` and `npm i alias@npm:pkg`; ignores `--dry-run` and `--location=global`.
+- CLI: `uninstall` without a terminal needs `--yes` or `--agent`, like `install`. An agent named twice is set up once; an empty `--dir=` and a folder in place of a config file are clear errors.
 - New mode `compare` (`/manifestack compare neon supabase`): two or three vendors for the same job, side by side for your workload: requirements, the plan and cost at your size, the first limit, the features you use and what it takes to leave. When one is already in use, it also sizes the switch.
 - Audit: findings get a severity (`Critical`, `High`, `Medium`, `Low`), and the report opens with a verdict (what was found, the budget now and at your target size) and a "Do today" list of quick fixes.
 - Both modes ask what the code cannot show (plans, regions, credits, what customers require) with options and stated defaults, and remember the answers in STACK.md.

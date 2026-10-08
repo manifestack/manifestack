@@ -290,3 +290,51 @@ test('detect.mjs reports the hook the CLI installs as on, not outdated', (t) => 
 	assert.equal(cli(dir, 'install', '--agent', 'claude-code', '--agent', 'cursor').code, 0);
 	assert.deepEqual(hookStatus(dir), { 'claude-code': 'on', cursor: 'on' });
 });
+
+test('claude-code: the hook command uses ${CLAUDE_PROJECT_DIR}; an older $CLAUDE_PROJECT_DIR entry is outdated and replaced', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.claude/hooks'), { recursive: true });
+	writeFileSync(join(dir, '.claude/hooks/manifestack-new-vendor.mjs'), '');
+	const old = { matcher: 'Write|Edit|MultiEdit|Bash', hooks: [{ type: 'command', command: 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/manifestack-new-vendor.mjs"', timeout: 10 }] };
+	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [old] } }));
+	assert.equal(hookStatus(dir)['claude-code'], 'outdated', 'PowerShell does not expand $CLAUDE_PROJECT_DIR');
+	const r = cli(dir, 'hook', '--agent', 'claude-code');
+	assert.equal(r.code, 0, r.stderr);
+	assert.doesNotMatch(r.stdout, /already registered/);
+	const groups = json(join(dir, '.claude/settings.json')).hooks.PostToolUse;
+	assert.equal(groups.length, 1);
+	assert.equal(groups[0].hooks[0].command, 'node "${CLAUDE_PROJECT_DIR}/.claude/hooks/manifestack-new-vendor.mjs"');
+	assert.equal(hookStatus(dir)['claude-code'], 'on');
+	assert.match(cli(dir, 'hook', '--agent', 'claude-code').stdout, /hook already registered/);
+});
+
+test('uninstall without a terminal needs --yes or --agent', (t) => {
+	const dir = tempDir(t);
+	assert.equal(cli(dir, 'install', '--agent', 'cursor').code, 0);
+	const r = runNode(CLI, ['uninstall', '--dir', dir], { input: '' });
+	assert.equal(r.code, 1);
+	assert.match(r.stderr, /no terminal to confirm the removal/);
+	assert.ok(existsSync(join(dir, '.cursor/hooks.json')), 'nothing removed');
+	assert.equal(runNode(CLI, ['uninstall', '--dir', dir, '--agent', 'cursor'], { input: '' }).code, 0);
+	assert.ok(!existsSync(join(dir, '.cursor/hooks.json')));
+});
+
+test('an agent named twice is installed once', (t) => {
+	const dir = tempDir(t);
+	const r = cli(dir, 'install', '--agent', 'claude-code,claude-code');
+	assert.equal(r.code, 0, r.stderr);
+	assert.equal(r.stdout.match(/settings\.json: create/g).length, 1);
+	assert.equal(json(join(dir, '.claude/settings.json')).hooks.PostToolUse.length, 1);
+});
+
+test('an empty --dir= and a folder where a config file belongs are clear errors', (t) => {
+	const empty = runNode(CLI, ['install', '--dir=', '--agent', 'codex', '--yes']);
+	assert.equal(empty.code, 1);
+	assert.match(empty.stderr, /--dir needs a value/);
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.claude/settings.json'), { recursive: true });
+	const r = cli(dir, 'hook', '--agent', 'claude-code');
+	assert.equal(r.code, 1);
+	assert.match(r.stderr, /settings\.json is a folder/);
+	assert.doesNotMatch(r.stderr, /\n\s+at /, 'no stack trace');
+});

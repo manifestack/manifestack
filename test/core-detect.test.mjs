@@ -97,6 +97,8 @@ test('hookStatus: off, on once config and script are both there, plugin for Clau
 	assert.equal(hookStatus(dir)['claude-code'], 'outdated', 'an entry without Bash misses package-manager installs');
 	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Write|Edit|MultiEdit|Bash', hooks: [{ type: 'command', command: 'node .claude/hooks/manifestack-new-vendor.mjs' }] }] } }));
 	assert.equal(hookStatus(dir)['claude-code'], 'on');
+	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Write|Edit|MultiEdit|Bash', hooks: [{ type: 'command', command: 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/manifestack-new-vendor.mjs"' }] }] } }));
+	assert.equal(hookStatus(dir)['claude-code'], 'outdated', '$CLAUDE_PROJECT_DIR does not expand in PowerShell');
 	mkdirSync(join(dir, '.cursor/hooks'), { recursive: true });
 	writeFileSync(join(dir, '.cursor/hooks.json'), JSON.stringify({ version: 1, hooks: { afterFileEdit: [{ command: 'node .cursor/hooks/manifestack-new-vendor.mjs' }] } }));
 	writeFileSync(join(dir, '.cursor/hooks/manifestack-new-vendor.mjs'), '');

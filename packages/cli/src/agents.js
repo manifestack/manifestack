@@ -81,6 +81,10 @@ function checkList(value, where) {
 }
 
 const CLAUDE_MATCHER = 'Write|Edit|MultiEdit|Bash';
+// ${CLAUDE_PROJECT_DIR} is replaced by Claude Code itself, so the command also works when hooks run in
+// PowerShell (Windows without Git Bash), where $CLAUDE_PROJECT_DIR would not expand.
+export const CLAUDE_COMMAND = `node "\${CLAUDE_PROJECT_DIR}/.claude/hooks/${HOOK_SCRIPT}"`;
+const HOOK_TIMEOUT = 10;
 // Cursor reads additional_context only from postToolUse; earlier versions registered afterFileEdit.
 const CURSOR_EVENTS = ['postToolUse', 'afterFileEdit'];
 const CURSOR_MATCHER = 'Write|Shell';
@@ -103,13 +107,13 @@ export const HOOKS = {
 		},
 		add(config) {
 			const groups = this.groups(config);
-			const ours = groups.filter((g) => (g.hooks ?? []).some((h) => isOurs(h?.command)));
-			if (ours.length === 1 && ours[0].matcher === CLAUDE_MATCHER) return false;
+			const ours = groups.flatMap((g) => (g.hooks ?? []).filter((h) => isOurs(h?.command)).map((h) => ({ matcher: g.matcher, ...h })));
+			// Current only when the whole entry is: an older command or matcher is replaced.
+			if (ours.length === 1 && ours[0].matcher === CLAUDE_MATCHER && ours[0].command === CLAUDE_COMMAND && ours[0].timeout === HOOK_TIMEOUT) return false;
 			this.remove(config);
-			const command = `node "$CLAUDE_PROJECT_DIR/.claude/hooks/${HOOK_SCRIPT}"`;
 			config.hooks ??= {};
 			config.hooks.PostToolUse ??= [];
-			config.hooks.PostToolUse.push({ matcher: CLAUDE_MATCHER, hooks: [{ type: 'command', command, timeout: 10 }] });
+			config.hooks.PostToolUse.push({ matcher: CLAUDE_MATCHER, hooks: [{ type: 'command', command: CLAUDE_COMMAND, timeout: HOOK_TIMEOUT }] });
 			return true;
 		},
 		remove(config) {
@@ -147,7 +151,7 @@ export const HOOKS = {
 			config.version ??= 1;
 			config.hooks ??= {};
 			config.hooks.postToolUse ??= [];
-			config.hooks.postToolUse.push({ command: `node .cursor/hooks/${HOOK_SCRIPT}`, matcher: CURSOR_MATCHER, timeout: 10 });
+			config.hooks.postToolUse.push({ command: `node .cursor/hooks/${HOOK_SCRIPT}`, matcher: CURSOR_MATCHER, timeout: HOOK_TIMEOUT });
 			return true;
 		},
 		remove(config) {

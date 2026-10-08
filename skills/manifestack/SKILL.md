@@ -76,9 +76,9 @@ In Claude Code and Cursor a hook runs after edits to dependency manifests and af
 At the end of every `init` and `audit` run in Claude Code or Cursor, look at `hook` in the output of `detect.mjs` (run it now if you have not in this run) and take the entry for the agent you are running in: `claude-code` or `cursor`.
 
 - `on` or `plugin`: say nothing.
-- `off`: after the report, never before it, add one short offer, for example: "The new-service check is off in this project. Turn it on? It runs `npx manifestack hook --agent claude-code`, which downloads manifestack from npm and adds a hook to `.claude/settings.json` (Cursor: `--agent cursor`, `.cursor/hooks.json`)."
+- `off`: after the report, never before it, add one short offer, for example: "The new-service check is off in this project. Turn it on? It runs `npx manifestack@0.3.0 hook --agent claude-code`, which downloads manifestack 0.3.0 from npm and adds a hook to `.claude/settings.json` (Cursor: `--agent cursor`, `.cursor/hooks.json`)."
   - Run the command only after a clear yes, from the repository root, and show its output.
   - On a no, or no answer, drop it for the rest of this conversation. Ask again in the next run; do not record the answer in STACK.md or anywhere else.
-- `outdated`: an older manifestack set the hook up, and it misses package-manager installs (in Cursor it does not reach you at all). Offer the same command as for `off`, worded as an update, with the same rules.
+- `outdated`: an older manifestack set the hook up: it misses package-manager installs, fails on Windows without Git Bash, or (in Cursor) does not reach you at all. Offer the same command as for `off`, worded as an update, with the same rules.
 
 Other agents have no hook: skip this section.

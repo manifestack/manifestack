@@ -4,11 +4,11 @@ The skill cannot see vendor dashboards. Use these sources, in this order of pref
 
 ## 1. Ask the user (default)
 
-- At most 4–6 questions per run, in one message, numbered.
+- Ask in the same round as the other questions (`references/interview.md`): with options where they fit, numbered otherwise.
 - Ask only for numbers that change a finding. Take the questions from `vendors/<id>.md` → `usage_questions`.
 - Every question says where to find the number: the dashboard path from the map (`where`). For vendors without a map, give your best path and say it may differ.
 - Growth needs two points in time ("now and a month ago", or "this month and last month"). If the user has only one, say the ETA is a range or needs a second reading.
-- Accept approximate answers and ranges. Label them as user-provided in the evidence.
+- Accept approximate answers and ranges, and screenshots or CSV exports of the usage page; say which numbers you read from them. Label them as user-provided in the evidence.
 - If the user does not answer a question, continue and mark that finding as based on an assumption, or skip it.
 
 Example:

@@ -2,6 +2,14 @@
 
 All notable changes are listed here. Versions follow [semver](https://semver.org); 0.x until the formats settle. Each new vendor map gets its own line.
 
+## Unreleased
+
+- Audit: findings get a severity (`Critical`, `High`, `Medium`, `Low`), and the report opens with a verdict (what was found, the budget now and at your target size) and a "Do today" list of quick fixes.
+- Both modes ask what the code cannot show (plans, regions, credits, what customers require) with options and stated defaults, and remember the answers in STACK.md.
+- New `priority` in STACK.md (`lowest cost`, `balanced`, `least ops`, `control`): init builds the stack for it with up to two alternatives, and audits and the guard follow it.
+- Init answers your own idea first, and lists what you do not need and what cannot be changed later.
+- Before reporting a bill, the audit checks the vendor's flat-rate tiers; the Vercel map now covers Flat Rate CDN and Spend Management.
+
 ## 0.3.0
 
 - Breaking: Node.js 22 or newer is required (18 and 20 are past end of life).

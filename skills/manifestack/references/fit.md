@@ -13,6 +13,7 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 | Team preferences (`prefer`) | What the team knows or wants to use. A stack the team knows beats a theoretically better one. Unknown tech costs weeks. |
 | Things to avoid (`avoid`) | Vendors, clouds or setups the team rules out. A filter like requirements, but set by the team. |
 | Operations | Who gets paged. A team without ops time needs managed services, not clusters. |
+| Priority (`priority`) | What the team gives up when options trade off: money, upkeep time or control. |
 
 ## Rules of thumb
 
@@ -80,12 +81,23 @@ Report an `Overbuilt` finding when the scan shows these against small usage or a
 
 Give the saving in money per month and in upkeep time, and the simpler setup. Price both setups line by line with the same components (compute, database, load balancer, NAT, storage, egress), so the saving is not inflated by leaving something out of the proposed side. Be respectful: the setup may be deliberate (a client requirement, a learning goal). Ask when in doubt.
 
+## Priority
+
+The same project fits several stacks; `priority` says which one to lead with.
+
+- **lowest cost**: free and flat-rate tiers, fewer paid seats, parts the team can run itself; state the upkeep in hours a month.
+- **balanced** (the default): managed services where they save real time, free tiers where they are safe.
+- **least ops**: managed services and fewer vendors, backups and support included; pay more to be paged less.
+- **control**: open standards and portable data (Postgres, S3-compatible storage, OpenTelemetry), exports that work, no proprietary APIs at the core.
+
+Lead with the stack for the team's priority and show at most two alternatives for other priorities, with totals at the same user counts. In an audit, when a fix trades money for work (a migration to save money), follow the priority and show the other path in one line with its cost and effort.
+
 ## Picking among fitting options
 
 1. Drop options that fail a hard requirement or match `avoid`. If nothing fits without breaking `avoid`, say so and ask; do not quietly propose it.
 2. Prefer what is in `prefer`.
 3. Prefer fewer vendors when one really covers two jobs.
-4. Compare cost at the expected size and at 10× (use `scripts/project.mjs cost`).
+4. Compare cost at the expected size and at 10× (use `scripts/project.mjs cost`), with the vendor's flat-rate, committed or annual tiers next to on-demand rates.
 5. Note lock-in and the cost of leaving (data export, proprietary APIs).
 
 Say which constraint made the choice; if it changes, the choice may change.

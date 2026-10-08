@@ -9,6 +9,7 @@ users:
 requires: 
 prefer: 
 avoid: 
+priority: 
 
 <!--
 One section per service, "## <Role>: <Vendor>". Roles: Hosting, Database, Auth, Email, Storage, Payments, Monitoring, AI, Other.

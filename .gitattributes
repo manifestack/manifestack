@@ -1,0 +1,2 @@
+# Keep LF everywhere: tools/sync.mjs and the tests expect it, and Git for Windows checks out CRLF by default.
+* text=auto eol=lf

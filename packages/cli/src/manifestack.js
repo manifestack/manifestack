@@ -213,7 +213,7 @@ const LABEL = {
 };
 
 function describe(a, project) {
-	const path = relative(project, a.to) || '.';
+	const path = relative(project, a.to).split('\\').join('/') || '.';
 	if (a.kind === 'hook-config') {
 		const what = { new: `create with ${a.describe}`, merge: `add ${a.describe}`, present: 'hook already registered, no change', unmerge: `remove ${a.describe}, keep the rest`, remove: `remove ${a.describe} (file becomes empty, deleted)` }[a.status];
 		return `${LABEL[a.status]}${path}: ${what}`;

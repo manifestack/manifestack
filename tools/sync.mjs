@@ -8,8 +8,8 @@
 //   node tools/sync.mjs --check              fail if a copy differs from its source (CI)
 //   node tools/sync.mjs --into packages/cli  also copy skills/, hooks/, README and LICENSE into a package (prepack)
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, rmSync, cpSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORE = join(ROOT, 'packages/core/src');
@@ -37,7 +37,7 @@ export function bundle(entryFile, embeds = {}) {
 	function visit(file, isEntry) {
 		if (seen.has(file)) return;
 		seen.add(file);
-		const rel = relative(ROOT, file);
+		const rel = relative(ROOT, file).split('\\').join('/');
 		const deps = [];
 		const body = [];
 		for (const line of readFileSync(file, 'utf8').split('\n')) {
@@ -70,7 +70,7 @@ export function bundle(entryFile, embeds = {}) {
 			else body.push(line.replace(/^export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)/, ''));
 		}
 		for (const dep of deps) visit(dep, false);
-		parts.push(`// ---- ${relative(ROOT, file)}\n${body.join('\n').trim()}\n`);
+		parts.push(`// ---- ${rel}\n${body.join('\n').trim()}\n`);
 	}
 
 	visit(entryFile, true);
@@ -85,7 +85,7 @@ function vendorCopy(text, srcRel) {
 }
 
 async function signatures() {
-	const { loadCatalog, vendorSignatures } = await import(join(CORE, 'catalog.mjs'));
+	const { loadCatalog, vendorSignatures } = await import(pathToFileURL(join(CORE, 'catalog.mjs')).href);
 	return vendorSignatures(loadCatalog(VENDORS));
 }
 
@@ -149,7 +149,7 @@ async function main(argv) {
 	const into = argv.indexOf('--into');
 	if (into !== -1) {
 		const target = resolve(ROOT, argv[into + 1] ?? '');
-		if (!target.startsWith(join(ROOT, 'packages') + '/')) throw new Error('--into must point to a folder in packages/');
+		if (!target.startsWith(join(ROOT, 'packages') + sep)) throw new Error('--into must point to a folder in packages/');
 		for (const dir of ['skills', 'hooks']) {
 			rmSync(join(target, dir), { recursive: true, force: true });
 			cpSync(join(ROOT, dir), join(target, dir), { recursive: true });

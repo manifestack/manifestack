@@ -17,6 +17,7 @@ Thanks for helping. Two rules shape everything here:
 | `packages/cli/` | The `manifestack` npm package |
 | `hooks/` | Claude Code plugin hook and the generated hook script |
 | `tools/sync.mjs` | Copies `catalog/` and `packages/core/` into `skills/` and `hooks/` |
+| `tools/bench.mjs`, `bench/budgets.json` | Token and speed benchmarks and their budgets |
 | `.claude-plugin/` | Plugin manifest and marketplace |
 
 Generated: `skills/*/vendors/`, `skills/*/scripts/`, `skills/*/references/security.md`, `hooks/new-vendor.mjs`.
@@ -26,7 +27,17 @@ node tools/sync.mjs          # regenerate copies after editing catalog/ or packa
 npm test                     # unit, CLI, hook and format tests (Node.js 22+)
 node tools/sync.mjs --check  # what CI runs to catch stale copies
 npm run smoke                # packs the npm package and runs it in an empty project
+npm run bench                # tokens per mode and script speed against bench/budgets.json
 ```
+
+## Budgets
+
+Every run costs the user tokens and time, so both have budgets in `bench/budgets.json`:
+
+- **Tokens**: the text each mode must read before it starts (SKILL.md plus the references in its row of the mode table), the guard, the vendor maps and the hook's message. `npm test` fails when one grows past its budget.
+- **Speed**: detection on a fixture and on a 20,000-file repository, STACK.md parse, check, lint and set, the cost model, and the hook's latency (median and p95; it runs after every agent edit). The Benchmarks job in CI checks them and, on a pull request, shows the change against the base branch in the job summary.
+
+When a change needs more, raise the budget in the same pull request and say why. `node tools/bench.mjs tokens` runs the fast part only.
 
 ## Add a vendor map
 

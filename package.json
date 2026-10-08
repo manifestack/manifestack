@@ -8,7 +8,8 @@
     "sync:check": "node tools/sync.mjs --check",
     "test": "node --test test/*.test.mjs",
     "check": "node tools/sync.mjs --check && node --test test/*.test.mjs",
-    "smoke": "node tools/smoke-pack.mjs"
+    "smoke": "node tools/smoke-pack.mjs",
+    "bench": "node tools/bench.mjs"
   },
   "engines": { "node": ">=22" }
 }

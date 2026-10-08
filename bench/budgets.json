@@ -1,0 +1,29 @@
+{
+  "tokens": {
+    "mode:init": 14200,
+    "mode:audit": 17200,
+    "mode:compare": 14300,
+    "mode:guard": 1450,
+    "vendor-map:avg": 1450,
+    "vendor-map:max": 2200,
+    "hook:without-stack": 150,
+    "hook:with-stack": 200
+  },
+  "speed": {
+    "detect:fixture": 50,
+    "detect:20k-files": 5000,
+    "stack-md:parse-300": 50,
+    "stack-md:check-300": 200,
+    "stack-md:lint-300": 150,
+    "stack-md:set-300": 50,
+    "project:cost-20-vendors": 50,
+    "hook:edit-css:median": 150,
+    "hook:edit-css:p95": 300,
+    "hook:bash-ls:median": 150,
+    "hook:bash-ls:p95": 300,
+    "hook:npm-install:median": 200,
+    "hook:npm-install:p95": 400,
+    "hook:write-manifest:median": 200,
+    "hook:write-manifest:p95": 400
+  }
+}

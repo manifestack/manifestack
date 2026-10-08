@@ -23,8 +23,9 @@ Generated: `skills/*/vendors/`, `skills/*/scripts/`, `skills/*/references/securi
 
 ```bash
 node tools/sync.mjs          # regenerate copies after editing catalog/ or packages/core/
-npm test                     # unit, CLI, hook and format tests (Node.js 18+)
+npm test                     # unit, CLI, hook and format tests (Node.js 22+)
 node tools/sync.mjs --check  # what CI runs to catch stale copies
+npm run smoke                # packs the npm package and runs it in an empty project
 ```
 
 ## Add a vendor map

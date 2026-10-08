@@ -2,6 +2,11 @@
 
 All notable changes are listed here. Versions follow [semver](https://semver.org); 0.x until the formats settle. Each new vendor map gets its own line.
 
+## Unreleased
+
+- Node.js 22 or newer is required (was 18; 18 and 20 are past end of life).
+- Windows: the new-vendor hook no longer reports already committed vendors as added when git is slow, paths in its message and in `--dry-run` output use `/`, and the repository checks out with LF.
+
 ## 0.2.0
 
 - CLI: `npx manifestack hook` registers only the new-vendor hook, for skills installed with `npx skills add` or by hand.

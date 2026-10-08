@@ -6,16 +6,27 @@ on:
   push:
     tags: ['v*.*.*']
 
-permissions:
-  contents: write
-  id-token: write # npm trusted publishing (OIDC) and provenance
+permissions: {}
 
 jobs:
+  # The full CI (every Node version, Windows, plugin and package checks) must pass before anything is published.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   publish:
+    needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: npm
+    permissions:
+      contents: write # GitHub release
+      id-token: write # npm trusted publishing (OIDC) and provenance
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -24,8 +35,6 @@ jobs:
         run: |
           version=$(node -p "require('./packages/cli/package.json').version")
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != v$version"; exit 1; }
-      - run: node tools/sync.mjs --check
-      - run: npm test
       # Trusted publishing (OIDC): no tokens. Set up on npmjs.com for release.yml, environment npm.
       - name: Publish to npm
         run: npm publish -w packages/cli --access public --provenance

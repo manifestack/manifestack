@@ -2,7 +2,7 @@
 name: manifestack
 description: Choose a stack that fits a project and check that it still fits. Use when the user wants to pick, review or audit their stack across frontend, backend and infrastructure (framework, hosting, database, auth, email, storage, payments, monitoring, AI APIs, mobile subscriptions); asks what Vercel, Supabase, Firebase, Clerk, Stripe, OpenAI or any other service will cost at 1k, 10k or 50k users; worries about plan limits, free-tier caps, rate limits, pricing, surprise bills, overage or budget; needs data region, SOC 2, data retention or other compliance requirements checked against vendors; has two services doing the same job; or suspects the setup is overbuilt (Kubernetes, SSR or a big cloud for a small app). Modes - init for a new project, audit for an existing repo. Reads current vendor pages, never asks for API keys, and keeps decisions in .manifestack/STACK.md.
 license: MIT
-compatibility: Needs web access to read vendor pricing pages and Node.js 18+ to run the bundled scripts.
+compatibility: Needs web access to read vendor pricing pages and Node.js 22+ to run the bundled scripts.
 metadata:
   version: "0.2.0"
   homepage: https://manifestack.com
@@ -12,7 +12,7 @@ metadata:
 
 Helps choose a stack that fits a project (budget, users, requirements, team experience) and keeps checking that it still fits: limits, bills, risks, requirement gaps, overlapping services and overbuilt infrastructure. There is no Manifestack server. Everything runs here, in this session.
 
-`<skill-dir>` below is the folder that contains this file. Run scripts as `node <skill-dir>/scripts/<name>.mjs …` from the user's repository root. They need Node.js 18+, no packages, no network.
+`<skill-dir>` below is the folder that contains this file. Run scripts as `node <skill-dir>/scripts/<name>.mjs …` from the user's repository root. They need Node.js 22+, no packages, no network.
 
 If tools named `manifestack_*` are available in this session, use them instead of the scripts; they run the same logic and return the same results.
 

@@ -7,7 +7,7 @@
   "bin": { "manifestack": "src/manifestack.js" },
   "files": ["src", "skills", "hooks"],
   "scripts": { "prepack": "node ../../tools/sync.mjs --into packages/cli" },
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=22" },
   "keywords": ["agent-skills", "skill", "claude-code", "cursor", "codex", "stack", "architecture", "audit", "pricing", "limits", "costs", "compliance", "vendors", "vercel", "supabase", "firebase", "stripe", "openai"],
   "repository": { "type": "git", "url": "git+https://github.com/manifestack/manifestack.git", "directory": "packages/cli" },
   "homepage": "https://manifestack.com",

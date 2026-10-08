@@ -2,7 +2,7 @@
 name: manifestack-guard
 description: Use before adding, removing or replacing an infrastructure dependency or vendor SDK - hosting, database, auth, email, storage, payments, monitoring, queues or AI APIs (for example "add Stripe", "set up Resend for emails", "install @supabase/supabase-js", "move auth to Clerk"), and when a hook reports that a new vendor was added. Checks the change against STACK.md requirements, the team's avoid list, budget, services already in the stack and revisit_when, and points to a full manifestack audit when limits need a look. Not for UI, styling, copy, tests or ordinary code changes.
 license: MIT
-compatibility: Node.js 18+ to run the bundled script. No network needed.
+compatibility: Node.js 22+ to run the bundled script. No network needed.
 metadata:
   version: "0.2.0"
   homepage: https://manifestack.com

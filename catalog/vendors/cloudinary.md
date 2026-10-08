@@ -56,11 +56,11 @@ common_fixes:
   - put a CDN or long cache headers in front of delivery URLs so repeat views do not count again at the origin
   - cap upload size and dimensions in the upload widget or preset so huge originals do not fill storage
   - look at Delivery Reports before upgrading: a one-off spike ages out of the rolling 30-day window
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - One credit pool covers transformations, storage and bandwidth, so a traffic spike or a deploy that changes transformation URLs eats the same credits as stored files. Ask for the credit breakdown, not just storage, before calling the plan sufficient.
 - Limits are soft: Cloudinary warns and asks for an upgrade, and the account can eventually be disabled, which stops image delivery for the whole site. For a commercial site on Free this is a Risk finding.
 - EU or AP storage is Enterprise-only and fixed at account creation. If the requirements ask for EU data, a self-service plan does not meet them. The DPA attaches to a subscription agreement and order form; confirm it covers a self-service account.
-- Official MCP servers exist (`@cloudinary/asset-management-mcp`, `environment-config`, `structured-metadata`, `analysis`, remote at `*.mcp.cloudinary.com`). They take the API key and secret and can upload, delete and change presets and webhooks; `--tool` and `--scope` filters exist but there is no documented read-only mode. Do not use them in the MVP; ask the user for numbers instead.
+- Official MCP servers exist (`@cloudinary/asset-management-mcp`, `environment-config`, `structured-metadata`, `analysis`, remote at `*.mcp.cloudinary.com`). They take the API key and secret and can upload, delete and change presets and webhooks; `--tool` and `--scope` filters exist but there is no documented read-only mode. Do not use them; ask the user for numbers instead.
 - Overlap: Cloudinary and another file store (Supabase Storage, S3, R2, UploadThing) holding the same user files. Cloudinary can also fetch from an existing bucket (auto-upload mapping), which keeps a copy in both places.

@@ -8,7 +8,7 @@ detect:
   pypi: ["cloudflare", "workers-py", "langchain-cloudflare"]
   go: ["github.com/cloudflare/cloudflare-go"]
   imports: ["cloudflare:", "@cloudflare/", "@opennextjs/cloudflare"]
-  env_prefixes: ["CLOUDFLARE_", "CF_"]
+  env_prefixes: ["CLOUDFLARE_", "CF_API_TOKEN", "CF_API_KEY", "CF_ACCOUNT_ID", "CF_ZONE_ID", "CF_PAGES"]
   config_files: ["wrangler.toml", "wrangler.json", "wrangler.jsonc"]
   role_signals:
     storage: ["R2Bucket", "KVNamespace", "r2.cloudflarestorage.com"]
@@ -64,10 +64,10 @@ common_fixes:
   - set the route failure mode on purpose (fail open or fail closed) for the Free daily limit
   - create a budget alert on the account, and move a production Worker to Workers Paid before it reaches the Free daily limit
   - create R2 buckets and D1 databases in the required jurisdiction while data is small
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
-- Cloudflare has several official MCP servers. The Cloudflare API server (`mcp.cloudflare.com`) exposes an `execute` tool that can call any API endpoint, including writes; the product servers (Workers Bindings, Builds, Observability and others) also act on the account. None has a server-side read-only mode; access is limited only by the scopes of the token or OAuth grant. Do not use them in the MVP; ask the user for numbers instead.
+- Cloudflare has several official MCP servers. The Cloudflare API server (`mcp.cloudflare.com`) exposes an `execute` tool that can call any API endpoint, including writes; the product servers (Workers Bindings, Builds, Observability and others) also act on the account. None has a server-side read-only mode; access is limited only by the scopes of the token or OAuth grant. Do not use them; ask the user for numbers instead.
 - R2 egress has no charge. For a project that serves large files to many users, compare it with S3-style storage on egress as a Fit note, not as a ranking.
 - Hosting has no code signal: any Cloudflare signature (wrangler config, `CF_` env var) counts as hosting. If the project only uses R2 through the S3 SDK, say so and drop hosting from the findings.
 - Free-plan limits are per day (reset daily), while Paid quotas are per month. Use the matching window when you compare usage with a limit.

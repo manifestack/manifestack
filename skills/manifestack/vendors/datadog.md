@@ -25,7 +25,7 @@ pages:
   log_best_practices: https://docs.datadoghq.com/logs/guide/best-practices-for-log-management/
   apm_ingestion: https://docs.datadoghq.com/tracing/trace_pipeline/ingestion_controls/
   regions: https://docs.datadoghq.com/getting_started/site/
-  security: https://trust.datadoghq.com/
+  security: https://docs.datadoghq.com/data_security/
   hipaa: https://docs.datadoghq.com/data_security/hipaa_compliance/
   dpa: https://www.datadoghq.com/legal/data-processing-addendum/
 read:
@@ -64,7 +64,7 @@ common_fixes:
   - set monitors on datadog.estimated_usage metrics so spikes alert before the invoice
   - turn off products or integrations nobody looks at (RUM, profiling, unused cloud integrations)
   - choose the Datadog site the data-region requirement asks for before sending data
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Datadog bills many meters at once and keeps ingesting past what is included, charging on-demand rates. It has no global spend cap. Logs (ingested GB plus indexed events), custom metrics (tag cardinality) and APM (hosts plus ingested and indexed spans) are the usual surprise lines. Read each meter the project uses, not only the per-host price.

@@ -12,14 +12,13 @@ detect:
   config_files: []
 pages:
   pricing: https://posthog.com/pricing
-  billing: https://posthog.com/docs/billing
+  billing: https://posthog.com/docs/billing/estimating-usage-costs
   limits: https://posthog.com/docs/billing/limits-alerts
   replay_retention: https://posthog.com/docs/session-replay/recording-retention
   flag_costs: https://posthog.com/docs/feature-flags/cutting-costs
   regions: https://posthog.com/docs/privacy/data-storage
   projects: https://posthog.com/docs/settings/projects
   security: https://posthog.com/handbook/company/security
-  trust: https://trust.posthog.com/
   hipaa: https://posthog.com/docs/privacy/hipaa-compliance
   dpa: https://posthog.com/dpa
 read:
@@ -55,7 +54,7 @@ common_fixes:
   - cut flag requests with local evaluation on servers, bootstrapping, and advanced_disable_feature_flags_on_first_load where flags are not needed at load
   - drop noisy exceptions and test traffic before they are sent
   - create the organization in the region the requirements ask for while data is small
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - At the free allowance or a billing limit, extra events are dropped for good and feature flags return a quota-limited response, so the app falls back to flag defaults. Treat a limit hit mid-month as both a blind spot and a product behavior change.

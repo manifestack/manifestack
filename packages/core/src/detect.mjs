@@ -88,12 +88,21 @@ export function extractImports(source) {
 	return [...specs];
 }
 
-/** Which mapped vendors and unmapped SDKs a list of dependencies of one ecosystem (npm, pypi, go) contains. */
+// A pattern that is a whole package name, not a scope or prefix ("@vercel/kv", not "@vercel/").
+const exactPattern = (p) => !/[/*]$/.test(p);
+
+/**
+ * Which mapped vendors and unmapped SDKs a list of dependencies of one ecosystem (npm, pypi, go) contains.
+ * When one map names a package exactly and another only matches it by prefix, the exact one owns it:
+ * @vercel/kv is Upstash's, even though Vercel's map claims the whole @vercel/ scope.
+ */
 export function matchDependencies(deps, signatures, kind = 'npm') {
 	const field = ECOSYSTEM_FIELDS[kind];
+	const exactOwner = new Map();
+	for (const d of deps) for (const sig of signatures) if ((sig[field] ?? []).some((p) => exactPattern(p) && dependencyMatches(kind, d, [p]) && (kind !== 'npm' || d === p))) exactOwner.set(d, [...(exactOwner.get(d) ?? []), sig.id]);
 	const vendors = [];
 	for (const sig of signatures) {
-		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]) && (!exactOwner.has(d) || exactOwner.get(d).includes(sig.id)));
 		if (hits.length) vendors.push({ id: sig.id, name: sig.name, roles: sig.roles, packages: hits });
 	}
 	const unmapped = [];
@@ -335,8 +344,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		// Python and Go imports name the package itself, so they match like dependencies.
 		const native = name.endsWith('.py') ? ['pypi', extractPythonModules(src)] : name.endsWith('.go') ? ['go', extractGoImports(src)] : null;
 		if (native) for (const v of matchDependencies(native[1], sigs, native[0]).vendors) for (const p of v.packages) hit(sigs.find((x) => x.id === v.id), 'import', rel, p);
+		// As for dependencies, a map that names the package beats one that only claims its scope (@vercel/kv is Upstash).
+		const owners = new Map(specs.map(([, pkg]) => [pkg, sigs.filter((sig) => sig.imports.some((p) => !/[/:]$/.test(p) && (pkg === p || pkg.startsWith(p + '/')))).map((sig) => sig.id)]));
 		for (const sig of sigs) {
-			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports)) hit(sig, 'import', rel, spec);
+			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports) && (!owners.get(pkg).length || owners.get(pkg).includes(sig.id))) hit(sig, 'import', rel, spec);
 			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
 				const needle = needles.find((n) => src.includes(n));
 				if (needle) hit(sig, 'code', rel, needle, role);

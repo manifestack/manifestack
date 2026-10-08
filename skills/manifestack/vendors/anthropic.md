@@ -18,7 +18,7 @@ pages:
   deprecations: https://platform.claude.com/docs/en/about-claude/model-deprecations
   data_retention: https://platform.claude.com/docs/en/manage-claude/api-and-data-retention
   regions: https://platform.claude.com/docs/en/manage-claude/data-residency
-  security: https://trust.anthropic.com/
+  security: https://support.claude.com/en/articles/10015870-what-certifications-has-anthropic-obtained
   dpa: https://www.anthropic.com/legal/data-processing-addendum
   status: https://status.claude.com/
 read:
@@ -56,7 +56,7 @@ common_fixes:
   - set an organization spend limit and per-workspace spend and rate limits
   - request a higher tier from the Limits page before launch, and ramp traffic gradually
   - pin a model version and track its retirement date
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Claude through Amazon Bedrock (`@anthropic-ai/bedrock-sdk`) or Google Cloud (`@anthropic-ai/vertex-sdk`) is billed and rate-limited by that cloud, not by this map; read the cloud's pricing instead.

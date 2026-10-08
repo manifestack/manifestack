@@ -5,10 +5,10 @@ id: auth0
 name: Auth0
 roles: [auth]
 detect:
-  packages: ["@auth0/", "auth0", "express-openid-connect"]
+  packages: ["@auth0/", "auth0", "express-openid-connect", "react-native-auth0", "auth0-js", "auth0-lock"]
   pypi: ["auth0-python", "auth0-server-python", "auth0-fastapi", "auth0-api-python"]
   go: ["github.com/auth0/go-auth0", "github.com/auth0/go-jwt-middleware"]
-  imports: ["@auth0/", "auth0", "express-openid-connect"]
+  imports: ["@auth0/", "auth0", "express-openid-connect", "react-native-auth0", "auth0-js", "auth0-lock"]
   env_prefixes: ["AUTH0_", "NEXT_PUBLIC_AUTH0_"]
   config_files: []
 pages:
@@ -16,7 +16,6 @@ pages:
   billing: https://auth0.com/docs/troubleshoot/customer-support/operational-policies/billing-policy
   rate_limits: https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy
   regions: https://auth0.com/docs/get-started/auth0-overview/create-tenants
-  security: https://security.okta.com/
   dpa: https://www.okta.com/legal/trustandcompliance/
 read:
   - plan names (Free, Essentials, Professional, Enterprise) and the monthly active users included on each, separately for the B2C and B2B tracks
@@ -47,7 +46,7 @@ common_fixes:
   - cache Management API tokens and user lookups instead of calling the Management API on every request, to stay under its rate limit
   - pick the tenant region against the data residency requirement before launch, since it cannot be changed later
   - remove a second auth provider from the code if Auth0 is the one you keep (or the other way round)
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Auth0 bills by monthly active users per tenant, in brackets. Moving up one bracket, or crossing from the top self-service bracket to Enterprise, can raise the bill much more than the user growth itself. Price the next two brackets from the page and put the bracket edge in revisit_when.

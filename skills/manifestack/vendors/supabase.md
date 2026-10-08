@@ -5,7 +5,7 @@ id: supabase
 name: Supabase
 roles: [database, auth, storage]
 detect:
-  packages: ["@supabase/supabase-js", "@supabase/ssr", "@supabase/auth-helpers-nextjs", "@supabase/auth-helpers-react", "@supabase/auth-ui-react", "supabase"]
+  packages: ["@supabase/", "@supabase/supabase-js", "@supabase/ssr", "@supabase/auth-helpers-nextjs", "@supabase/auth-helpers-react", "@supabase/auth-ui-react", "supabase"]
   pypi: ["supabase", "supabase-auth", "supabase-functions", "storage3", "realtime", "gotrue", "supafunc"]
   go: ["github.com/supabase/supabase-go", "github.com/supabase-community/supabase-go"]
   imports: ["@supabase/"]
@@ -20,12 +20,16 @@ pages:
   billing: https://supabase.com/docs/guides/platform/billing-on-supabase
   regions: https://supabase.com/docs/guides/platform/regions
   security: https://supabase.com/security
-  dpa: https://supabase.com/legal/dpa
+  auth_smtp: https://supabase.com/docs/guides/auth/auth-smtp
+  auth_rate_limits: https://supabase.com/docs/guides/auth/rate-limits
+  dpa: https://supabase.com/legal/customer-resources/data-processing-addendum
 read:
   - Free database size per project and what happens at the limit (read-only mode)
   - Free project pausing after inactivity, and the number of active Free projects
   - Free egress, cached egress, file storage, MAU and Edge Function invocations
   - Realtime peak connections and messages included
+  - Auth emails: who the built-in email service delivers to, its hourly send limit and whether it is meant for production; when the app sends sign-up or reset emails, a custom SMTP provider is needed before launch
+  - Auth rate limits per hour (emails, OTP, sign-ups) and where they are changed
   - Pro price, included quotas, compute credits and overage rates per unit
   - spend cap default on Pro and what it blocks
   - regions available for a project (a project region cannot be changed later)
@@ -35,7 +39,7 @@ usage_questions:
     ask: Database size today, and a month ago if you can see it?
     where: Dashboard → Organization → Usage → Disk Size (or Project → Database → Usage)
   - metric: egress_gb
-    ask: Egress this billing cycle?
+    ask: Egress in the last full billing cycle?
     where: Dashboard → Organization → Usage → Egress
   - metric: mau
     ask: Monthly active users for Auth?
@@ -56,7 +60,7 @@ common_fixes:
   - keep a Free project awake only if pausing is acceptable; otherwise plan Pro before launch
   - turn the Pro spend cap on or off on purpose and know what it blocks
   - create the production project in the region the requirements ask for while data is small
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Only use MCP when it is connected with read-only mode on. With `read_only=true` the server hides write tools; `execute_sql` still exists but runs as a read-only Postgres role. Use it only for metadata queries such as `select pg_size_pretty(pg_database_size(current_database()))` or `pg_total_relation_size`, never to select rows from user tables.

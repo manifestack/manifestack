@@ -15,7 +15,7 @@ pages:
   pricing_faq: https://www.convex.dev/pricing/faq
   limits: https://docs.convex.dev/production/state/limits
   usage_limits: https://docs.convex.dev/production/usage-limits
-  spending_limits: https://docs.convex.dev/dashboard/teams
+  spending_limits: https://docs.convex.dev/dashboard/teams/teams
   regions: https://docs.convex.dev/production/regions
   security: https://www.convex.dev/security
   dpa: https://www.convex.dev/legal/dpa
@@ -52,7 +52,7 @@ common_fixes:
   - store large blobs in file storage instead of in documents
   - set usage limits on dev and preview deployments, and a team spending limit with a warning threshold
   - create the production deployment in the region the requirements ask for while data is small
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Usage counts per team, not per project: one busy prototype uses the same Free quota as production. Reactive queries rerun when the data they read changes, so database I/O and function calls grow with active sessions and write rate, not only with user count.

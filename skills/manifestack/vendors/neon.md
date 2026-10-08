@@ -5,9 +5,9 @@ id: neon
 name: Neon
 roles: [database, auth]
 detect:
-  packages: ["@neondatabase/serverless", "@neondatabase/neon-js", "@neondatabase/auth", "@neondatabase/api-client", "@neon/sdk", "neonctl"]
+  packages: ["@neondatabase/serverless", "@prisma/adapter-neon", "@vercel/postgres", "@neondatabase/neon-js", "@neondatabase/auth", "@neondatabase/api-client", "@neon/sdk", "neonctl"]
   pypi: ["neon-api"]
-  imports: ["@neondatabase/"]
+  imports: ["@neondatabase/", "@prisma/adapter-neon", "@vercel/postgres"]
   env_prefixes: ["NEON_"]
   config_files: []
   role_signals:
@@ -17,10 +17,10 @@ pages:
   limits: https://neon.com/docs/introduction/plans
   regions: https://neon.com/docs/introduction/regions
   security: https://neon.com/docs/security/compliance
-  trust: https://trust.neon.com
 read:
   - Free storage per project and per account
   - Free compute (CU-hours) per project and maximum autoscaling size
+  - what happens when a Free allowance runs out (compute or transfer): whether the project is suspended until the next billing period
   - scale-to-zero behaviour on Free (cold starts) and whether it can be turned off
   - network egress included
   - branches per project and the restore (history) window
@@ -50,7 +50,7 @@ common_fixes:
   - cap autoscaling at the size the load needs
   - use the pooled connection string for serverless functions
   - create the project in the region the requirements ask for while data is small
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Usage shows in the Console with up to an hour of delay.

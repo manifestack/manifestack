@@ -10,7 +10,7 @@ detect:
   config_files: ["render.yaml"]
 pages:
   pricing: https://render.com/pricing
-  plans: https://render.com/docs/new-workspace-plans
+  plans: https://render.com/docs/platform-features-by-plan
   free: https://render.com/docs/free
   bandwidth: https://render.com/docs/outbound-bandwidth
   build_spend_limit: https://render.com/docs/build-pipeline
@@ -53,7 +53,7 @@ common_fixes:
   - keep services and databases in one region and talk over the private network to avoid billed bandwidth
   - choose the region near the database and users at creation time, since it cannot be changed later
   - serve static assets from a static site or CDN with caching instead of a web service
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Render has no app SDK in `package.json`. It is detected from `render.yaml` (Blueprint; the path can be customized at setup) and `RENDER_*` names in `.env` files. A service created in the dashboard leaves no trace in the repo: ask the user where the app runs.

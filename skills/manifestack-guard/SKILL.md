@@ -4,7 +4,7 @@ description: Use before adding, removing or replacing an infrastructure dependen
 license: MIT
 compatibility: Node.js 22+ to run the bundled script. No network needed.
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   homepage: https://manifestack.com
 ---
 

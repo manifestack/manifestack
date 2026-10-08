@@ -1,6 +1,6 @@
 {
   "name": "@manifestack/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Vendor detection (JavaScript, Python, Go), projections and STACK.md logic shared by Manifestack skills, hooks and (later) the MCP server.",
   "private": true,
   "type": "module",

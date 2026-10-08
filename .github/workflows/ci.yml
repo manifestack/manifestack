@@ -4,25 +4,35 @@ on:
   push:
     branches: [main]
   pull_request:
+  # release.yml runs the whole CI before it publishes.
+  workflow_call:
 
 permissions:
   contents: read
+
+# A new push to a pull request cancels the run for the previous one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     name: Tests (Node ${{ matrix.node }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        node: [18, 20, 22, 24]
+        node: [22, 24, 26]
         include:
           - os: windows-latest
             node: 24
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
       # Generated copies in skills/ and hooks/ must match catalog/ and packages/core/.
@@ -32,8 +42,11 @@ jobs:
   validate:
     name: Skills, plugin and packaging
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -52,8 +65,6 @@ jobs:
         run: |
           npx -y skills add ./ --list | tee skills-list.txt
           grep -q 'manifestack-guard' skills-list.txt
-      - name: npm package contents
-        run: |
-          npm pack --dry-run -w packages/cli 2>&1 | tee pack.txt
-          grep -q 'skills/manifestack/SKILL.md' pack.txt
-          grep -q 'hooks/new-vendor.mjs' pack.txt
+      # Packs the CLI as `npm publish` would and runs the tarball in an empty project.
+      - name: npm package installs and works
+        run: npm run smoke

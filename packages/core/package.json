@@ -13,5 +13,5 @@
     "./hook": "./src/hook.mjs",
     "./workdir": "./src/workdir.mjs"
   },
-  "engines": { "node": ">=18" }
+  "engines": { "node": ">=22" }
 }

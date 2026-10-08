@@ -6,7 +6,7 @@
     "prompt": "/manifestack",
     "expected": [
       "chooses init because detect.mjs reports empty: true",
-      "asks about product type, users now and in 6-12 months, budget, requirements and team in one message",
+      "asks about product type, users now and in 6-12 months, budget, requirements and team in one round (one or two question batches)",
       "does not ask for API keys"
     ]
   },

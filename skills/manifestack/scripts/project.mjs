@@ -268,7 +268,8 @@ export function eta({ current, limit, ratePerDay, growthPerMonth, points, from =
  * Prices a stack at several user counts. Model (all prices come from vendor pages read at run time):
  * { users: [1000, 10000, 100000],
  *   vendors: [{ id, per_user: { transfer_gb: 0.05 }, fixed: { seats: 1 },
- *     plans: [{ name, base, eligible?, metrics: { transfer_gb: { included, price?, per?, hard? } } }] }] }
+ *     plans: [{ name, base, credit?, eligible?, metrics: { transfer_gb: { included, price?, per?, hard? } } }] }] }
+ * `credit` is usage credit included in the plan each month: it pays for overage, never for `base`.
  * Numbers are in the metric's unit (transfer_gb in GB); strings may carry one ("100 GB", "$0.15", "50k").
  * For each count the cheapest eligible plan whose hard limits hold is picked.
  */
@@ -315,7 +316,9 @@ function normalizeModel(model) {
 				const price = r.price == null ? null : modelNumber(r.price, null, `${pat} ${m}.price`);
 				metrics[m] = { ...r, included, price, per };
 			}
-			return { ...p, base: p.base == null ? 0 : modelNumber(p.base, null, `${pat} base`), metrics };
+			const credit = p.credit == null ? 0 : modelNumber(p.credit, null, `${pat} credit`);
+			if (credit < 0) throw new Error(`${pat} credit must not be negative`);
+			return { ...p, base: p.base == null ? 0 : modelNumber(p.base, null, `${pat} base`), credit, metrics };
 		});
 		return { ...v, per_user: perMetric(v.per_user, `${at} per_user`), fixed: perMetric(v.fixed, `${at} fixed`), plans };
 	});
@@ -329,7 +332,7 @@ function priceVendor(v, users) {
 	const options = [];
 	for (const plan of v.plans) {
 		if (plan.eligible === false) continue;
-		let cost = plan.base;
+		let over = 0;
 		let fits = true;
 		const lines = [];
 		for (const [metric, rule] of Object.entries(plan.metrics)) {
@@ -341,11 +344,12 @@ function priceVendor(v, users) {
 			}
 			if (rule.price != null && used > included) {
 				const o = overage({ used, included, price: rule.price, per: rule.per });
-				cost += o.cost;
+				over += o.cost;
 				lines.push({ metric, used: round(used, 2), included, over: round(o.over, 2), cost: o.cost });
 			}
 		}
-		if (fits) options.push({ plan: plan.name, cost: round(cost, 2), overage: lines });
+		const credit = Math.min(plan.credit, over);
+		if (fits) options.push({ plan: plan.name, cost: round(plan.base + over - credit, 2), overage: lines, ...(credit ? { credit_used: round(credit, 2) } : {}) });
 	}
 	options.sort((a, b) => a.cost - b.cost);
 	const usageRounded = Object.fromEntries(Object.entries(usage).map(([k, x]) => [k, round(x, 2)]));

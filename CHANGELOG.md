@@ -4,6 +4,12 @@ All notable changes are listed here. Versions follow [semver](https://semver.org
 
 ## Unreleased
 
+- Accuracy: the references' examples use a made-up vendor, so no real price or limit sits in the agent's context to stand in for a page it could not read. The guard no longer writes a `limit` or a read date for a page it never opened.
+- Vendor pages: one set of rules for every mode (`references/vendor-pages.md`). The skill checks that pages load before asking anything and offers a pasted table or screenshot when they do not; it opens the pricing and limit pages first and the security pages only when requirements need them, which cuts fetches; numbers are quoted as the page states them.
+- Init asks about traffic, paid seats, environments, where users are, an uptime promise, payment revenue and the AI model class, with stated defaults. The cost model takes seats and environments in `fixed`, a plan's included usage credit (`credit`), annual plans and currencies (`references/cost-model.md`), and the budget sentence names any vendor left out of the total.
+- Audit: severity rules cover a large new bill without a budget, "before launch" without a date and unverified findings; advisories come from `npm audit` and similar, never from memory. The nine-field details table is shown only on request; each finding carries the fields on its own lines.
+- Writing STACK.md: the JSON goes to a file in `.manifestack/tmp/` (works in PowerShell too), which `set` keeps out of git. `lint` knows the usage metrics of the vendor maps and accepts `source: user` and `source: unverified`.
+- Token use: each mode reads only its own questions; MCP rules load only when a vendor MCP is connected.
 - Projections: a percentage growth compounds when converted between periods (+10%/week is about +51% a month, not +43%). `eta` rejects a `--rate` without a period or in the wrong unit, `--points` in a different unit from `--limit`, and a `--growth` without `%`.
 - `usage` in STACK.md: also reads `312 MB; +1.1 MB/day`, `312 MB,+1.1 MB/day`, `(as of 2026-10-6)` and `41,200 emails`, and `lint` warns about what it cannot read instead of letting `check` report `ok`.
 - Secrets: also catches AWS secret keys, `redis://:password@host`, `db_password: …` and `"apiKey": "…"`. A commit hash or UUID in a URL path, and Stripe object ids, are not secrets. `set` refuses only the lines it writes, writes atomically and never echoes a rejected value.

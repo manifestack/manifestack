@@ -22,7 +22,7 @@ A quick check before the stack changes. It reads `.manifestack/STACK.md` only; i
 3. Check it against STACK.md:
    - **Requirements**: go through every item in `requires` one by one (data region, certifications such as SOC 2, SSO) and say for each whether this vendor meets it or needs checking. A payments, email or auth vendor holds customer data, so a data-region rule applies to it as much as to the database. Do not guess the answer; do not skip an item.
    - **Avoid**: does the vendor, its cloud or the setup it needs match anything in `avoid`? Quote the line.
-   - **Budget**: does a paid plan of this service fit `budget`?
+   - **Budget**: quote the `budget` line and say the paid plan's price needs checking against it; the guard reads no prices.
    - **Limits**: name the plan limits that matter for how this service will be used, as things to check (by name, without numbers): daily and monthly send caps for email, billed users for auth, storage and egress for databases and files, API rate limits for payments or AI. A welcome email that works in testing and stops at the free daily cap on launch day is exactly what this check is for.
    - **Overlap**: is there already a section with the same role (a second auth provider, a second email sender)?
    - **Priority**: if `priority` is set, does the change go against it? A service the team must run itself under `least ops`, a proprietary API at the core under `control`, a paid convenience add-on under `lowest cost`. One line, no verdict.
@@ -31,13 +31,14 @@ A quick check before the stack changes. It reads `.manifestack/STACK.md` only; i
 4. Report in two to four lines:
    - nothing to flag → say so in one line and continue;
    - a conflict or a new vendor → say what it is and suggest checking it before relying on it: `/manifestack audit` when STACK.md exists, `/manifestack` when it does not (it records the stack first). When the change replaces one vendor with another (auth from Clerk to Auth0), suggest `/manifestack compare clerk auth0` instead. Do not block the user's task.
-5. If the user confirms the change, offer to add a section for the new service to STACK.md. Write it only on a yes, passing the fields as JSON in a heredoc with a quoted delimiter (`<<'EOF'`), so the shell does not expand `$(…)`, backticks or `$VAR` in text copied from a page:
-   ```bash
-   node <skill-dir>/scripts/stack-md.mjs set --section "Email: Resend" --json - <<'EOF'
-   {"plan": "Free", "limit": "3,000 emails/mo"}
-   EOF
+5. If the user confirms the change, offer to add a section for the new service to STACK.md. Write it only on a yes, and only what is known without reading pages: `plan` as the user named it, `env` names, and `source: unverified`. Never `limit` or a price: those come from the audit, which reads the vendor's page. Write the JSON with your file tool to `.manifestack/tmp/set.json`, then run the script (the file works in every shell and nothing in it is expanded):
+   ```json
+   {"plan": {"value": "Free", "comment": "user 2026-10-08"}, "env": "ACME_API_KEY", "source": {"value": "unverified", "comment": "added by guard 2026-10-08; run /manifestack audit"}}
    ```
-   A field can carry a comment: `{"source": {"value": "resend.com/pricing", "comment": "read 2026-10-06"}}`. Then run `node <skill-dir>/scripts/stack-md.mjs lint .manifestack/STACK.md`.
+   ```bash
+   node <skill-dir>/scripts/stack-md.mjs set --section "Email: Acme Mail" --json .manifestack/tmp/set.json
+   node <skill-dir>/scripts/stack-md.mjs lint .manifestack/STACK.md
+   ```
 
 ## Rules
 

@@ -27,7 +27,7 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 ### Hosting
 
 - Managed platforms (Vercel, Netlify, Cloudflare, Render, Fly.io) for small teams and up to hundreds of thousands of users; watch data transfer and function usage.
-- A commercial product must not run on a non-commercial plan (Vercel Hobby is personal use only).
+- A commercial product must not run on a non-commercial plan: some hosts' free tiers are for personal use only. Check the plan's terms on the vendor's page.
 - Containers on a managed service when there is a long-running process or a special runtime.
 - Kubernetes, Terraform-managed multi-region clusters, service meshes: when several teams run many services, or contractual uptime and scale demand it. Not for one app, not for a few thousand users.
 

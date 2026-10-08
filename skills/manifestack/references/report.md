@@ -6,11 +6,11 @@
 | --- | --- |
 | `kind` | `Limit`, `Bill`, `Risk`, `Requirement`, `Overlap` or `Overbuilt` |
 | `severity` | `Critical`, `High`, `Medium` or `Low` (see Severity) |
-| `title` | What happens, then the vendor fact: `Site goes offline mid-month: Vercel pauses production at $200` |
+| `title` | What happens, then the vendor fact: `Site goes offline mid-month: <host> pauses production at its spend limit` |
 | `evidence` | Numbers or a fact from the code, and where it came from: code, user, export, MCP |
 | `when` | `ETA ~Mar 2027`, `Every month, growing`, `Before launch`, `Now` |
-| `cost` | Money or time: `~$360/mo overage`, `$25/mo on Pro`, `~1 day of migration` |
-| `fix` | One concrete action and where to do it (a dashboard path, a file, a plan): `Billing > Flat Rate CDN: the $20/mo tier covers 50 TB` |
+| `cost` | Money or time: `~$360/mo overage`, `$49/mo on Team`, `~1 day of migration` |
+| `fix` | One concrete action and where to do it (a dashboard path, a file, a plan): `Billing > <flat-rate tier>, which covers your transfer` |
 | `effort` | `minutes` (a setting or a plan change), `hours` (a code change) or `days` (a migration) |
 | `source` | Vendor page and the date it was read; `unverified` if the page could not be read |
 
@@ -30,25 +30,27 @@ One level per finding, from what happens and how soon. Count days from today.
 | Level | Use it when |
 | --- | --- |
 | `Critical` | The product or one of its features stops, data is at risk, or a `requires` line in STACK.md is broken: now or within 30 days |
-| `High` | Something stops within 90 days, or spend is over the STACK.md budget now |
-| `Medium` | Something stops later than 90 days, or a bill or a forced plan change comes within 90 days |
+| `High` | Something stops within 90 days; spend is over the STACK.md budget now; or a new or growing bill adds more than half of today's monthly total within 90 days |
+| `Medium` | Something stops later than 90 days, or a smaller bill or a forced plan change comes within 90 days |
 | `Low` | Everything else: later bills, upkeep, an `Overlap` or `Overbuilt` that costs time rather than money |
 
-Between two levels, take the higher one and say why in `evidence`. An `unverified` finding keeps the level it would have if confirmed.
+Count days from today. `Before launch` counts from the launch date the user gave; with no date, take it as within 30 days. Between two levels, take the higher one and say why in `evidence`. An `unverified` finding takes the level its verified facts support and says what would raise it ("High if the cap is under 10,000 a day").
 
 ## Example
+
+A made-up vendor, to show the fields:
 
 | | |
 | --- | --- |
 | kind | Limit |
 | severity | Medium |
-| title | Writes stop in March: Supabase Free goes read-only at 500 MB |
-| evidence | 312 / 500 MB, +1.1 MB/day (user, 2026-10-06) |
+| title | Writes stop in March: Acme DB Starter goes read-only at its size limit |
+| evidence | 312 / 500 MB, +1.1 MB/day (user, 2026-10-06); read-only above the limit (pricing page) |
 | when | ETA ~Mar 2027 |
-| cost | $25/mo on Pro |
+| cost | the Team plan's monthly price |
 | fix | Archive `events` rows older than 90 days, or schedule the upgrade for February. |
 | effort | hours |
-| source | supabase.com/pricing, read 2026-10-06 |
+| source | acme.example/pricing, read 2026-10-06 |
 
 ## Layout
 
@@ -57,10 +59,10 @@ The user reads the first screen and decides whether to act. Put the answer there
 1. **Verdict**, at most four lines:
    - what was checked and where the numbers come from: vendors found, usage from STACK.md or the user, how many vendor pages were read today;
    - the count in plain words: `Found 10: 3 outage risks, 2 compliance gaps, 2 bills, 2 limits, 1 duplicate.` (`Risk` = outage risks, `Requirement` = compliance gaps, `Bill` = bills, `Limit` = limits, `Overlap` = duplicates, `Overbuilt` = oversized setups);
-   - the budget: monthly cost now and at the user target from `Requirements`, against `budget`, and the one change that matters most (`Over budget: ~$4,580/mo at 50k users against ~$600/mo. One Vercel setting brings it to ~$1,920/mo.`). If usage is missing for some paid vendors, give the total for the ones you have and name the rest (`~$380/mo for Vercel and Resend; Supabase and OpenAI need your numbers`); never fill the gap with a guess.
+   - the budget: monthly cost now and at the user target from `Requirements`, against `budget`, and the one change that matters most (`Over budget: ~$4,580/mo at 50k users against ~$600/mo. One hosting setting brings it to ~$1,920/mo.`). If usage is missing for some paid vendors, give the total for the ones you have and name the rest (`~$380/mo for hosting and email; the database and AI need your numbers`); never fill the gap with a guess.
 2. **Do today** (when any fix has `effort: minutes`): those fixes in one short list, with what they save or prevent in total (`3 settings, ~15 min: saves ~$340/mo, keeps the site up`).
-3. **Findings**, grouped by severity, `Critical` first; within a level, nearest `when` first, then by cost. Two lines each: `<kind> <title>`, then the `fix`. `Medium` and `Low` findings may take one line each. When one fix also resolves another finding, say so at both (`Flat Rate CDN (4) also ends this`).
-4. **Details**: one table with all nine fields for every finding.
+3. **Findings**, grouped by severity, `Critical` first; within a level, nearest `when` first, then by cost. Three lines each: `<kind> <title>`; the evidence and the `fix`; then `when · cost · effort · source`. `Medium` and `Low` findings may fold the last two lines into one. When one fix also resolves another finding, say so at both (`the flat-rate tier (4) also ends this`).
+4. **Details**: a table with all nine fields, only when the user asks for it or wants a report to share; the findings above already carry every field.
 5. **Summary**:
    - **Next deadline**: the nearest `when` with a date.
    - **Spend to review**: total monthly cost of all `Bill` findings plus upgrades the `Limit` and `Risk` findings make necessary, and ×12 per year. Say what is included.

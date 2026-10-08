@@ -222,3 +222,18 @@ test('parseQuantity stays fast on long input and rounds money half up', () => {
 	assert.equal(parseQuantity('5    MB').value, 5);
 	assert.equal(overage({ used: 1.005, price: 1 }).cost, 1.01);
 });
+
+test('costAt: plan credit pays for overage, never for the base price; seats go in fixed', () => {
+	const model = (credit) => ({
+		users: [1000],
+		vendors: [{ id: 'x', per_user: { transfer_gb: 1 }, fixed: { seats: 3 }, plans: [{ name: 'Pro', base: 20, credit, metrics: { transfer_gb: { included: 900, price: 0.1 }, seats: { included: 1, price: 20 } } }] }],
+	});
+	const [none] = costAt(model(0));
+	assert.equal(none.monthly, 20 + 10 + 40);
+	const [some] = costAt(model(25));
+	assert.equal(some.monthly, 20 + 25, 'overage $50, of which $25 is covered');
+	assert.equal(some.vendors[0].credit_used, 25);
+	const [more] = costAt(model(500));
+	assert.equal(more.monthly, 20, 'credit never brings the base price down');
+	assert.throws(() => costAt(model(-1)), /credit must not be negative/);
+});

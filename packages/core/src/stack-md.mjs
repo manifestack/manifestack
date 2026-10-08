@@ -111,10 +111,35 @@ function dominantEol(text) {
 }
 
 // A comment starts at two or more spaces and "#": in "use plan #2 for now" the # is part of the value.
+// Scanned by hand: a regex for "two blanks, then #" backtracks quadratically over a long run of spaces.
+const isBlank = (c) => c === ' ' || c === '\t';
 function splitComment(raw) {
-	const m = /[ \t]{2,}#[ \t]?/.exec(raw);
-	if (!m) return { value: raw.trim(), comment: null, commentRaw: '' };
-	return { value: raw.slice(0, m.index).trim(), comment: raw.slice(m.index + m[0].length).trim(), commentRaw: raw.slice(m.index).trimEnd() };
+	for (let i = raw.indexOf('#'); i !== -1; i = raw.indexOf('#', i + 1)) {
+		let start = i;
+		while (start > 0 && isBlank(raw[start - 1])) start--;
+		if (i - start < 2) continue;
+		const text = raw.slice(isBlank(raw[i + 1]) ? i + 2 : i + 1);
+		return { value: raw.slice(0, start).trim(), comment: text.trim(), commentRaw: raw.slice(start).trimEnd() };
+	}
+	return { value: raw.trim(), comment: null, commentRaw: '' };
+}
+
+/** "## Database: Supabase ##" → "Database: Supabase". A closing run of # needs a blank before it: "## Other: C#" names C#. */
+function headingText(line) {
+	if (!line.startsWith('##') || !isBlank(line[2] ?? '')) return null;
+	const text = line.slice(3).trim();
+	let end = text.length;
+	while (end > 0 && text[end - 1] === '#') end--;
+	return end < text.length && end > 0 && isBlank(text[end - 1]) ? text.slice(0, end).trimEnd() : text || null;
+}
+
+/** "Database: Supabase" → role and vendor, or null when the heading is not "<Role>: <Vendor>". */
+function roleAndVendor(heading) {
+	const colon = heading.indexOf(':');
+	if (colon < 1) return null;
+	const role = heading.slice(0, colon).trim();
+	const vendor = heading.slice(colon + 1).trim();
+	return /^[A-Za-z][A-Za-z ]*$/.test(role) && vendor ? { role, vendor } : null;
 }
 
 function scanSections(lines) {
@@ -144,17 +169,15 @@ function scanSections(lines) {
 			if (!line.includes('-->', line.indexOf('<!--') + 4)) comment = true;
 			return;
 		}
-		// A closing run of # needs a space before it: "## Other: C#" names C#.
-		const h = /^##\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
-		if (h) {
-			const heading = h[1];
-			const rv = /^([A-Za-z][A-Za-z ]*?)\s*:\s*(.+)$/.exec(heading);
+		const heading = headingText(line);
+		if (heading) {
+			const rv = roleAndVendor(heading);
 			current = {
 				heading,
 				headingLine: idx,
 				kind: /^requirements$/i.test(heading) ? 'requirements' : rv ? 'service' : 'other',
-				role: rv ? rv[1] : null,
-				vendor: rv ? rv[2] : null,
+				role: rv?.role ?? null,
+				vendor: rv?.vendor ?? null,
 				fields: {},
 			};
 			sections.push(current);
@@ -182,7 +205,11 @@ export function parseStackMd(text) {
 }
 
 // "Database:Supabase", "database :  supabase" and "Database: Supabase" name the same section.
-const normalizeHeading = (h) => String(h).trim().replace(/^#+\s*/, '').replace(/\s+/g, ' ').replace(/\s*:\s*/, ': ');
+const normalizeHeading = (h) => {
+	const s = String(h).trim().replace(/^#+/, '').trim().replace(/\s+/g, ' ');
+	const colon = s.indexOf(':');
+	return colon === -1 ? s : `${s.slice(0, colon).trimEnd()}: ${s.slice(colon + 1).trimStart()}`.trimEnd();
+};
 const sameHeading = (a, b) => normalizeHeading(a).toLowerCase() === normalizeHeading(b).toLowerCase();
 
 /**
@@ -267,14 +294,18 @@ const USAGE_DATE = /\(([^()]*?)\b(\d{4})-(\d{1,2})-(\d{1,2})\b([^()]*)\)/;
 // "41,200" groups thousands; "312 MB,+1.1 MB/day" separates parts.
 const USAGE_PARTS = /,(?!\d{3}(?!\d))\s*/;
 
-/** A quantity with an optional word after it: "41,200 emails", "+300 emails/day", "9k users". */
+/** A quantity with words after it: "41,200 emails", "+300 emails/day", "3.4 TB of transfer", "9k users". */
 function usageQuantity(text) {
 	try {
 		return parseQuantity(text);
 	} catch {
-		const m = /^(.*?\d[^A-Za-z/]*(?:\s?[KMGT]?B\b|[kKmM]\b)?)\s*[A-Za-z][A-Za-z ]*?\s*(\/\s*[A-Za-z]+)?$/.exec(text.trim());
-		if (!m) throw new Error(`cannot read "${text}"`);
-		return parseQuantity(`${m[1]}${m[2] ?? ''}`);
+		// Keep a trailing "/period", drop the plain words before it (but not a size unit such as MB).
+		const t = String(text).trim();
+		const slash = t.lastIndexOf('/');
+		const per = slash !== -1 && /^\/ ?[A-Za-z]+$/.test(t.slice(slash)) ? t.slice(slash) : '';
+		const words = (per ? t.slice(0, slash) : t).split(/\s+/).filter(Boolean);
+		while (words.length > 1 && /^[A-Za-z]+$/.test(words.at(-1)) && !/^[KMGT]?B$/i.test(words.at(-1))) words.pop();
+		return parseQuantity(words.join(' ') + per);
 	}
 }
 

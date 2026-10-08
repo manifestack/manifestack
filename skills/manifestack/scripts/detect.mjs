@@ -671,11 +671,12 @@ export function readEnvNames(text) {
 			if (closesQuote(line, open, 0)) open = null;
 			continue;
 		}
-		const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+		const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/.exec(line);
 		if (!m) continue;
 		names.push(m[1]);
-		const q = m[2][0];
-		if ((q === '"' || q === "'" || q === '`') && !closesQuote(m[2], q, 1)) open = q;
+		const value = m[2].trimStart();
+		const q = value[0];
+		if ((q === '"' || q === "'" || q === '`') && !closesQuote(value, q, 1)) open = q;
 	}
 	return names;
 }

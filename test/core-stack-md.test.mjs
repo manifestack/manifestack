@@ -466,3 +466,14 @@ test('fences close only on the same marker; headings keep a trailing # and drop 
 	assert.match(setFields('', '## Database: Neon', { plan: 'x' }), /^## Database: Neon\n/);
 	assert.throws(() => setFields('', 'Database:', { plan: 'x' }), /names no vendor/);
 });
+
+test('long runs of spaces stay linear: headings, comments and usage', () => {
+	const sp = ' '.repeat(50000);
+	const t = Date.now();
+	parseStackMd(`## a${sp}b${sp}#x\nplan: x${sp}y\n`);
+	readUsage(`9A${sp}x`);
+	setFields('', `a${sp}b: c`, { plan: 'x' });
+	assert.ok(Date.now() - t < 300, `took ${Date.now() - t} ms`);
+	assert.deepEqual(parseStackMd('## Database: Supabase ##\nplan: free  # since May\n').sections[0], { heading: 'Database: Supabase', kind: 'service', role: 'Database', vendor: 'Supabase', line: 1, values: { plan: 'free' }, comments: { plan: 'since May' } });
+	assert.equal(parseUsage('3.4 TB of transfer, +0.3 TB/mo (2026-10-01)')._.value, 3.4e6);
+});

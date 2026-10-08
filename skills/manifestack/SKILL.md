@@ -4,7 +4,7 @@ description: Choose a stack that fits a project and check that it still fits. Us
 license: MIT
 compatibility: Needs web access to read vendor pricing pages and Node.js 22+ to run the bundled scripts.
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
   homepage: https://manifestack.com
 ---
 

@@ -2,7 +2,7 @@
 
 All notable changes are listed here. Versions follow [semver](https://semver.org); 0.x until the formats settle. Each new vendor map gets its own line.
 
-## Unreleased
+## 0.3.0
 
 - Breaking: Node.js 22 or newer is required (18 and 20 are past end of life).
 - Hook: also runs after package-manager installs (`npm install`, `pip install`, `go get` and similar). In Cursor it is now a `postToolUse` hook, because Cursor ignored the output of the old `afterFileEdit` one. Run `npx manifestack hook` to update; `detect.mjs` reports old setups as `outdated`.

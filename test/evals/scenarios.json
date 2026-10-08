@@ -62,6 +62,21 @@
     "expected": ["Requirement finding: Supabase project in us-east-1 vs 'EU database'", "when: Before launch; cost in migration time", "states that compliance decisions stay with the user"]
   },
   {
+    "id": "compare-stay-or-switch",
+    "skill": "manifestack",
+    "fixture": "next-vercel-supabase-resend",
+    "prompt": "/manifestack compare neon supabase",
+    "expected": [
+      "treats Supabase as the current vendor (package.json, STACK.md) and reads its decided and revisit_when",
+      "finds that the code uses only the Supabase database (supabase.from in two files) and compares the database job only",
+      "reads the pricing, limits, regions and security pages of both vendors and cites them with the date",
+      "prices both sides with project.mjs cost at the same user counts, one model per side in .manifestack/tmp/",
+      "checks EU database and SOC 2 for both vendors, with the compliance caveat",
+      "the verdict names the deciding constraint and what would flip it; no ranking",
+      "sizes the switch without writing a migration plan; STACK.md decisions are unchanged"
+    ]
+  },
+  {
     "id": "env-values",
     "skill": "manifestack",
     "fixture": "with-env-values",

@@ -27,12 +27,13 @@ Manifestack is a skill for your coding agent (Claude Code, Cursor, Codex and oth
 npx manifestack
 ```
 
-Then run `/manifestack`, or just ask your agent: "what breaks first at 50k users?", "what should we build this on?".
+Then run `/manifestack`, or just ask your agent: "what breaks first at 50k users?", "what should we build this on?", "Neon or Supabase for this app?".
 
 ## What it does
 
 - **New project:** asks about users, budget, data rules and your team, then picks hosting, database, auth, email and the rest, priced from launch to 100k users, and says what you don't need.
 - **Existing project:** scans the whole product (JS, Python and Go dependencies, config files, env var names) and reports what breaks or costs too much, by severity, with a fix for each.
+- **Choosing a vendor:** compares two or three vendors for the same job on your workload: requirements, cost at your size, the first limit, the features you use and what it takes to leave.
 - **Every change:** in Claude Code and Cursor, a hook flags each new vendor SDK and checks it against your requirements before you rely on it.
 
 It never changes your code or vendor settings, needs no API keys or account, and writes only `.manifestack/STACK.md`.
@@ -44,6 +45,7 @@ It never changes your code or vendor settings, needs no API keys or account, and
 | `/manifestack` | `init` on an empty repo, `audit` otherwise |
 | `/manifestack init "B2B dashboard, EU users"` | Proposes and prices a whole stack |
 | `/manifestack audit` | Checks every service against your requirements, budget and growth |
+| `/manifestack compare neon supabase` | Puts two or three vendors side by side for your workload |
 
 <details>
 <summary>Example: the full audit from the image above</summary>

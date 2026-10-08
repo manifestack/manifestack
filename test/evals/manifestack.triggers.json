@@ -11,6 +11,8 @@
   { "query": "update STACK.md with this month's numbers: db is 340 MB now, sent 44k emails in september", "should_trigger": true },
   { "query": "do we still fit on the free tiers or should we plan upgrades this quarter? check the repo", "should_trigger": true },
   { "query": "Neon vs staying on Supabase free for a 2k-user app — which plan limits matter and what would it cost us either way?", "should_trigger": true },
+  { "query": "/manifestack compare resend postmark", "should_trigger": true },
+  { "query": "thinking of moving auth from clerk to auth0, we have ~12k MAU and need SSO for two enterprise customers. which one makes more sense for us?", "should_trigger": true },
   { "query": "deploy the current branch to vercel production and give me the preview url", "should_trigger": false },
   { "query": "write a supabase RLS policy so users can only read rows in the projects table where owner_id = auth.uid()", "should_trigger": false },
   { "query": "the next.js build fails on vercel with 'Module not found: Can't resolve @/lib/supabase' but works locally. here's the log", "should_trigger": false },
@@ -18,5 +20,6 @@
   { "query": "set up a github actions workflow that runs vitest and deploys to vercel on merge to main", "should_trigger": false },
   { "query": "our clerk sign-in page shows a CORS error in production after the domain change, how do I fix it?", "should_trigger": false },
   { "query": "write a resend email template in react-email for the password reset flow, with our logo and a button", "should_trigger": false },
-  { "query": "what's the difference between kubernetes deployments and statefulsets? explain with an example", "should_trigger": false }
+  { "query": "what's the difference between kubernetes deployments and statefulsets? explain with an example", "should_trigger": false },
+  { "query": "write a function that compares two json files and prints the keys that differ", "should_trigger": false }
 ]

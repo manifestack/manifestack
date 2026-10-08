@@ -9,7 +9,7 @@ Thanks for helping. Two rules shape everything here:
 
 | Path | What |
 | --- | --- |
-| `skills/manifestack/` | Main skill: `init` and `audit` |
+| `skills/manifestack/` | Main skill: `init`, `audit` and `compare` |
 | `skills/manifestack-guard/` | Small skill the agent calls on its own before adding or changing a vendor |
 | `catalog/vendors/` | Vendor maps (source of truth) |
 | `catalog/shared/` | Rules shared by all skills (source of truth) |

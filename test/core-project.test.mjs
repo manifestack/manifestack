@@ -237,3 +237,14 @@ test('costAt: plan credit pays for overage, never for the base price; seats go i
 	assert.equal(more.monthly, 20, 'credit never brings the base price down');
 	assert.throws(() => costAt(model(-1)), /credit must not be negative/);
 });
+
+test('--points: commas in numbers, ; or , between points, and no slow split on long input', () => {
+	const P = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	const eta = (...a) => runNode(P, ['eta', ...a]);
+	const r = eta('--points', '2026-09-06=41,200, 2026-10-06=43,000', '--limit', '50000');
+	assert.equal(r.code, 0, r.stderr);
+	assert.equal(JSON.parse(r.stdout).current, 43000);
+	const t = Date.now();
+	assert.equal(eta('--points', `2026-09-06=1${' ;'.repeat(20000)}x`, '--limit', '5').code, 1);
+	assert.ok(Date.now() - t < 2000);
+});

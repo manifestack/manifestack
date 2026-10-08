@@ -204,3 +204,18 @@ test('dependencyMatches follows each ecosystem naming rule', () => {
 	assert.ok(dependencyMatches('npm', '@stripe/stripe-js', ['@stripe/']));
 	assert.ok(!dependencyMatches('npm', 'stripe', []));
 });
+
+test('manifest parsers stay linear on long lines and keep their results', () => {
+	const sp = ' '.repeat(30000);
+	const t = Date.now();
+	manifestDependencies('pypi', `[${sp}\n[a${sp}b\n`, 'pyproject.toml');
+	manifestDependencies('go', `${'// '.repeat(10000)}\n//${sp}x\n`, 'go.mod');
+	manifestDependencies('pypi', `a${sp}b\n${'x \t'.repeat(10000)}\n`, 'requirements.txt');
+	manifestKind(`${'requirements'.repeat(3000)}x`);
+	assert.ok(Date.now() - t < 300, `took ${Date.now() - t} ms`);
+	assert.deepEqual(manifestDependencies('pypi', '[ tool.poetry.dependencies ]  # main\nstripe = "^7"\n[[tool.uv.index]]\nname = "x"\n', 'pyproject.toml'), ['stripe']);
+	assert.deepEqual(manifestDependencies('go', 'module m\n\nrequire (\n\tgithub.com/a/b v1 // indirect\n\tgithub.com/c/d v2 // keep\n)\n', 'go.mod'), ['github.com/c/d']);
+	assert.deepEqual(manifestDependencies('pypi', 'stripe==7  # pinned\n# openai\ngit+https://x/y.git#egg=resend\n', 'requirements.txt'), ['stripe', 'resend']);
+	for (const name of ['requirements.txt', 'dev-requirements.in', 'requirements-test.txt']) assert.equal(manifestKind(name), 'pypi', name);
+	for (const name of ['requirements.md', 'notes.txt', 'my requirements.txt']) assert.equal(manifestKind(name), null, name);
+});

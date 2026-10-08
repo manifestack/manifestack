@@ -364,8 +364,22 @@ function q(args, key) {
 }
 
 // "2026-09-06=41,200;2026-10-06=43,000": a comma separates points only when a date follows it.
+function splitPoints(s) {
+	const parts = String(s).split(/([;,])/); // pieces and separators, alternating
+	const out = [];
+	let current = parts[0];
+	for (let i = 1; i < parts.length; i += 2) {
+		if (/^\s*\d{4}-\d{2}-\d{2}\s*=/.test(parts[i + 1])) {
+			out.push(current.trim());
+			current = parts[i + 1];
+		} else current += parts[i] + parts[i + 1];
+	}
+	out.push(current.trim());
+	return out;
+}
+
 function readPoints(list) {
-	return [].concat(list).flatMap((s) => String(s).split(/\s*[;,]\s*(?=\d{4}-\d{2}-\d{2}\s*=)/)).map((p) => {
+	return [].concat(list).flatMap(splitPoints).map((p) => {
 		const eq = p.indexOf('=');
 		const date = p.slice(0, Math.max(eq, 0)).trim();
 		if (eq < 1 || !isIsoDate(date)) throw new Error(`--points expects YYYY-MM-DD=value, got "${p}"`);

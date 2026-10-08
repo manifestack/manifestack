@@ -495,3 +495,11 @@ test('set --json from a file in .manifestack/tmp keeps that folder out of git', 
 	assert.equal(readFileSync(join(dir, '.manifestack/tmp/.gitignore'), 'utf8'), '*\n');
 	assert.match(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), /plan: Starter  # user 2026-10-08\nnote: costs \$\(echo x\) or `y`/);
 });
+
+test('revisit_when stays linear and still reads blanks and tabs around the operator', () => {
+	const t = Date.now();
+	assert.throws(() => parseRevisit(`a${' '.repeat(30000)}x`));
+	assert.throws(() => parseRevisit(`a>${' '.repeat(30000)}`), /cannot read/);
+	assert.ok(Date.now() - t < 200);
+	assert.deepEqual(parseRevisit('db_size\t>  400 MB'), { type: 'cmp', metric: 'db_size', op: '>', value: 400, dim: 'size', raw: '400 MB' });
+});

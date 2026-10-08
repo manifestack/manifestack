@@ -31,7 +31,7 @@ Lean to what is in `prefer` when it fits. Prefer one vendor covering two layers 
 
 ## Step 3. Read the pages and price it
 
-1. For each vendor, open the pages listed in `vendors/<id>.md` (or find the pricing page for an unmapped vendor). Read the free-tier limits, the next plan's price and included quotas, overage rates, regions and certifications. Note each page and today's date.
+1. For each vendor, open the pages listed in `vendors/<id>.md` (or find the pricing page for an unmapped vendor). Read the free-tier limits, the next plan's price and included quotas, overage rates, regions and certifications. Note each page and today's date. If a page cannot be read (blocked, rendered only by JavaScript, no web tool in this session), mark its numbers `unverified` and tell the user which URL to open. Never fall back to search snippets, third-party blogs, comparison sites or memory; only the vendor's own domain counts.
 2. Check requirements now: if a vendor's published regions or certifications do not meet them, change the pick or say so explicitly.
 3. Write a cost model to `.manifestack/tmp/model.json` (a working file; the script keeps that folder out of git) and run `node <skill-dir>/scripts/project.mjs cost .manifestack/tmp/model.json`:
 
@@ -51,7 +51,7 @@ Lean to what is in `prefer` when it fits. Prefer one vendor covering two layers 
 }
 ```
 
-Every `base`, `included` and `price` comes from a page you read in this run; the numbers above only show the shape. `per_user` values are assumptions: state them in the answer (for example "0.05 MB of data per user, every user active monthly") so the user can correct them. Mark a plan `"eligible": false` when it cannot be used (for example a non-commercial tier for a commercial product).
+Every `base`, `included` and `price` comes from a page you read in this run; the numbers above only show the shape. Leave a vendor with `unverified` numbers out of the model and say so below the table; if no model can be built, say so and continue with Step 4. `per_user` values are assumptions: state them in the answer (for example "0.05 MB of data per user, every user active monthly") so the user can correct them. Mark a plan `"eligible": false` when it cannot be used (for example a non-commercial tier for a commercial product).
 
 4. Show a table: users × monthly cost per vendor and total, with the plan each count lands on. Add the user counts from the brief (launch, 6–12 months) to `users` so they appear too. Below it list the free-tier limits that will be hit first and at roughly what user count.
 5. Compare the totals with the budget in one plain sentence: "fits the $150/mo budget up to about N users" (find N by adding user counts between the two rows where the total crosses the budget), or "over budget from launch". The budget is the user's main constraint, so the crossing point is the number they will look for first.
@@ -62,6 +62,14 @@ Copy `assets/STACK.template.md` to `.manifestack/STACK.md` if it does not exist 
 
 - `## Requirements` with `budget`, `users`, `requires`, `prefer`, `avoid` (leave `prefer` or `avoid` empty if the team named nothing).
 - One `## <Role>: <Vendor>` section per chosen service with `plan`, `limit`, `source` (page and `# read YYYY-MM-DD`), `decided` (why this plan now), `revisit_when` (the condition that should trigger a new look), `next` (the next plan and its price), `env` (variable names the service will need, names only).
+
+Pass values taken from a page through `--json` with a single-quoted heredoc, never inside `--set "…"`, where the shell expands `$(…)` and backticks:
+
+```bash
+node <skill-dir>/scripts/stack-md.mjs set --section "Email: Resend" --json - <<'EOF'
+{"plan": "Free", "limit": "3,000 emails/mo", "source": {"value": "resend.com/pricing", "comment": "read 2026-10-08"}}
+EOF
+```
 
 Run `node <skill-dir>/scripts/stack-md.mjs lint .manifestack/STACK.md` and fix what it reports. Tell the user what was written and that `/manifestack audit` will check it again once the code exists.
 

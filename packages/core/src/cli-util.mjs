@@ -48,6 +48,23 @@ export function fail(message, code = 1) {
 	process.exit(code);
 }
 
+/** Today in the local time zone: a UTC date is a day off for half the world around midnight. */
 export function todayIso() {
-	return new Date().toISOString().slice(0, 10);
+	const d = new Date();
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** YYYY-MM-DD that names a real day: 2026-13-01 and 2027-02-30 are rejected. */
+export function isIsoDate(s) {
+	if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+	const t = Date.parse(s + 'T00:00:00Z');
+	return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === s;
+}
+
+/** Reads a date option such as --today or --from; a bare flag or an impossible date is an error. */
+export function dateArg(args, key, fallback) {
+	const v = args[key];
+	if (v == null) return fallback;
+	if (!isIsoDate(v)) throw new Error(`--${key} needs a date as YYYY-MM-DD${v === true ? '' : `, got "${v}"`}`);
+	return v;
 }

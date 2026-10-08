@@ -3,6 +3,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseFrontmatter } from './yaml.mjs';
+import { normalizePypi } from './manifests.mjs';
 
 export const VENDOR_SCHEMA = 1;
 export const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'ai', 'other'];
@@ -46,6 +47,9 @@ export function parseVendorMap(text, file = '<vendor map>') {
 	};
 }
 
+const DETECT_LISTS = ['packages', 'pypi', 'go', 'imports', 'env_prefixes', 'config_files'];
+const isStringList = (x) => Array.isArray(x) && x.every((s) => typeof s === 'string' && s.trim() !== '');
+
 export function validateVendorMap(v) {
 	const errors = [];
 	if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(v.id ?? ''))) errors.push('id must be lowercase a-z, 0-9 and single hyphens');
@@ -53,8 +57,17 @@ export function validateVendorMap(v) {
 	if (!Array.isArray(v.roles) || !v.roles.length) errors.push('roles must be a non-empty list');
 	for (const r of v.roles ?? []) if (!VENDOR_ROLES.includes(r)) errors.push(`unknown role "${r}"`);
 	const d = v.detect ?? {};
-	if (![d.packages, d.pypi, d.go, d.imports, d.env_prefixes, d.config_files].some((x) => x?.length)) errors.push('detect needs at least one signature');
-	for (const role of Object.keys(d.role_signals ?? {})) if (!(v.roles ?? []).includes(role)) errors.push(`role_signals.${role} is not in roles`);
+	// Detection calls .some() on these and an empty pattern matches everything, so the shape is checked here.
+	for (const field of DETECT_LISTS) if (!isStringList(d[field])) errors.push(`detect.${field} must be a list of non-empty strings`);
+	if (!DETECT_LISTS.some((field) => Array.isArray(d[field]) && d[field].length)) errors.push('detect needs at least one signature');
+	const signals = d.role_signals ?? {};
+	if (typeof signals !== 'object' || Array.isArray(signals)) errors.push('detect.role_signals must map roles to lists');
+	else {
+		for (const [role, needles] of Object.entries(signals)) {
+			if (!(v.roles ?? []).includes(role)) errors.push(`role_signals.${role} is not in roles`);
+			if (!isStringList(needles) || !needles.length) errors.push(`role_signals.${role} must be a list of non-empty strings`);
+		}
+	}
 	if (!/^https:\/\//.test(String(v.pages?.pricing ?? ''))) errors.push('pages.pricing must be an https URL');
 	for (const [k, url] of Object.entries(v.pages ?? {})) if (!/^https:\/\//.test(String(url))) errors.push(`pages.${k} must be an https URL`);
 	if (!v.read?.length) errors.push('read must list what to extract from the pages');
@@ -76,7 +89,26 @@ export function loadCatalog(dir) {
 		if (`${v.id}.md` !== name) throw new Error(`${name}: id "${v.id}" must match the file name`);
 		vendors.push(v);
 	}
+	const clash = packageClashes(vendors)[0];
+	if (clash) throw new Error(clash);
 	return vendors;
+}
+
+/** Package patterns that two maps both claim: the dependency would be reported as two vendors. */
+export function packageClashes(vendors) {
+	const owner = new Map();
+	const clashes = [];
+	for (const v of vendors) {
+		for (const field of ['packages', 'pypi', 'go']) {
+			for (const p of v.detect?.[field] ?? []) {
+				const key = `${field}:${field === 'pypi' ? normalizePypi(p) : p}`;
+				const other = owner.get(key);
+				if (other && other !== v.id) clashes.push(`${other}.md and ${v.id}.md both claim detect.${field} "${p}"`);
+				else owner.set(key, v.id);
+			}
+		}
+	}
+	return clashes;
 }
 
 /** The part of a map that detection needs; embedded into the hook so it runs without the catalog. */

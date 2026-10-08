@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, symlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, runNode, tempDir } from './helpers.mjs';
 import { parseQuantity, overage, eta, linearRate, costAt, approxMonth } from '../packages/core/src/project.mjs';
@@ -106,4 +106,89 @@ test('project.mjs cost keeps .manifestack/tmp out of git', (t) => {
 	assert.equal(r.code, 0, r.stderr);
 	assert.equal(JSON.parse(r.stdout)[0].monthly, 0);
 	assert.equal(readFileSync(join(dir, '.manifestack/tmp/.gitignore'), 'utf8'), '*\n');
+});
+
+test('parseQuantity: thousands come in groups of three', () => {
+	assert.throws(() => parseQuantity('1,5 GB'), /cannot read/);
+	assert.throws(() => parseQuantity('12,34'), /cannot read/);
+	assert.equal(parseQuantity('1,500 GB').value, 1.5e6);
+	assert.equal(parseQuantity('9 000').value, 9000);
+	assert.equal(parseQuantity('1_000_000').value, 1e6);
+	assert.equal(parseQuantity('$1,350.50').value, 1350.5);
+});
+
+test('eta: impossible dates are errors, endless trends have no date', () => {
+	assert.throws(() => eta({ current: 1, limit: 2, ratePerDay: 1, from: '2026-13-01' }), /YYYY-MM-DD/);
+	assert.throws(() => eta({ points: [{ date: '2027-02-30', value: 1 }, { date: '2027-03-01', value: 2 }], limit: 5 }), /YYYY-MM-DD/);
+	const zero = eta({ current: 0, limit: 500, growthPerMonth: 0.2, from: '2026-10-01' });
+	assert.deepEqual([zero.date, zero.when], [null, 'Not on current trend']);
+	const slow = eta({ current: 1, limit: 500, ratePerDay: 1e-6, from: '2026-10-01' });
+	assert.deepEqual([slow.date, slow.when], [null, 'Not on current trend']);
+});
+
+test('costAt reads unit strings in the metric unit and names bad fields', () => {
+	const model = (included) => ({ users: ['1,000'], vendors: [{ id: 'cdn', per_user: { transfer_gb: '0.05 GB' }, plans: [{ name: 'Free', metrics: { transfer_gb: { included, hard: true } } }, { name: 'Pro', base: '$20/mo', metrics: { transfer_gb: { included: '1 TB', price: '$0.15' } } }] }] });
+	assert.equal(costAt(model('100 GB'))[0].vendors[0].plan, 'Free');
+	assert.equal(costAt(model('10 GB'))[0].vendors[0].plan, 'Pro');
+	assert.equal(costAt(model(10))[0].vendors[0].plan, 'Pro');
+	assert.throws(() => costAt(model('lots')), /vendor cdn plan Free transfer_gb\.included: cannot read "lots"/);
+	assert.throws(() => costAt({ vendors: [{ id: 'x', plans: [{ name: 'P', metrics: { seats: { included: '10 GB' } } }] }] }), /seats\.included: "10 GB" is a size/);
+	assert.throws(() => costAt({ vendors: [{ id: 'x', plans: [{ name: 'P', base: null, metrics: { seats: { price: [1] } } }] }] }), /seats\.price: expected a number/);
+});
+
+test('project.mjs overage: $ prices, unit checks and clear errors', () => {
+	const script = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	const ok = runNode(script, ['overage', '--used', '3.4 TB', '--included', '1 TB', '--price', '$0.15', '--per', 'GB']);
+	assert.equal(ok.code, 0, ok.stderr);
+	assert.equal(JSON.parse(ok.stdout).monthly, 360);
+	assert.equal(JSON.parse(runNode(script, ['overage', '--used', '60,000', '--included', '50,000', '--price', '$0.90', '--per', '1,000']).stdout).monthly, 9);
+	for (const [args, re] of [
+		[['--used', '3.4 TB', '--included', '1000', '--price', '0.15', '--per', 'GB'], /--included is a count/],
+		[['--used', '3400', '--price', '0.15', '--per', 'GB'], /--used is a count/],
+		[['--used', '3.4 TB', '--price', '0.15'], /--per with a size unit/],
+		[['--used', '3.4 TB', '--price', 'cheap', '--per', 'GB'], /cannot read quantity "cheap"/],
+		[['--used', '3.4 TB', '--price', '15%', '--per', 'GB'], /--price/],
+		[['--used', '3.4 TB', '--price'], /--price needs one value/],
+	]) {
+		const r = runNode(script, ['overage', ...args]);
+		assert.notEqual(r.code, 0, args.join(' '));
+		assert.match(r.stderr, re, args.join(' '));
+		assert.equal(r.stdout, '');
+	}
+});
+
+test('project.mjs eta: --points with thousands, repeated --points, --from and --help', () => {
+	const script = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	const a = runNode(script, ['eta', '--points', '2026-09-06=41,000,2026-10-06=42,000', '--limit', '50,000']);
+	assert.equal(a.code, 0, a.stderr);
+	assert.equal(JSON.parse(a.stdout).current, 42000);
+	const b = runNode(script, ['eta', '--points', '2026-09-06=41,000', '--points', '2026-10-06=42,000', '--limit', '50,000']);
+	assert.equal(JSON.parse(b.stdout).date, JSON.parse(a.stdout).date);
+	assert.match(runNode(script, ['eta', '--points', '2026-02-30=1;2026-03-01=2', '--limit', '5']).stderr, /YYYY-MM-DD=value/);
+	assert.match(runNode(script, ['eta', '--current', '1', '--limit', '5', '--rate', '1/day', '--from']).stderr, /--from needs a date/);
+	assert.match(runNode(script, ['eta', '--current', '1 GB', '--limit', '5', '--rate', '1/day']).stderr, /--current is a size but --limit is a count/);
+	const help = runNode(script, ['overage', '--help']);
+	assert.equal(help.code, 0);
+	assert.match(help.stdout, /usage:/);
+});
+
+test('project.mjs cost ignores .manifestack/tmp before reading, also for stdin and broken JSON', (t) => {
+	const dir = tempDir(t);
+	const script = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	const tmp = join(dir, '.manifestack/tmp');
+	mkdirSync(tmp, { recursive: true });
+	writeFileSync(join(tmp, 'model.json'), '{ broken');
+	const broken = runNode(script, ['cost', '.manifestack/tmp/model.json'], { cwd: dir });
+	assert.notEqual(broken.code, 0);
+	assert.match(broken.stderr, /not valid JSON/);
+	assert.equal(readFileSync(join(tmp, '.gitignore'), 'utf8'), '*\n');
+	rmSync(join(tmp, '.gitignore'));
+	const stdin = runNode(script, ['cost', '-'], { cwd: dir, input: JSON.stringify({ users: [1], vendors: [] }) });
+	assert.equal(stdin.code, 0, stdin.stderr);
+	assert.equal(readFileSync(join(tmp, '.gitignore'), 'utf8'), '*\n');
+	// A symlink in place of .gitignore is left alone: nothing is written where it points.
+	rmSync(join(tmp, '.gitignore'));
+	symlinkSync(join(dir, 'target'), join(tmp, '.gitignore'));
+	assert.equal(runNode(script, ['cost', '-'], { cwd: dir, input: '{}' }).code, 0);
+	assert.ok(!existsSync(join(dir, 'target')));
 });

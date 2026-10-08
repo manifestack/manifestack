@@ -4,8 +4,14 @@ All notable changes are listed here. Versions follow [semver](https://semver.org
 
 ## Unreleased
 
-- Node.js 22 or newer is required (was 18; 18 and 20 are past end of life).
-- Windows: the new-vendor hook no longer reports already committed vendors as added when git is slow, paths in its message and in `--dry-run` output use `/`, and the repository checks out with LF.
+- Breaking: Node.js 22 or newer is required (18 and 20 are past end of life).
+- Hook: also runs after package-manager installs (`npm install`, `pip install`, `go get` and similar). In Cursor it is now a `postToolUse` hook, because Cursor ignored the output of the old `afterFileEdit` one. Run `npx manifestack hook` to update; `detect.mjs` reports old setups as `outdated`.
+- Hook: no false alarms after removing a dependency, when git is slow (Windows), when the session runs in a subfolder, or when STACK.md names the vendor differently ("Stripe Billing").
+- `stack-md.mjs set --json` takes values from a file or stdin, for text copied from vendor pages. `set` no longer cuts values at `#`, and `check` reports a broken section as `error` instead of failing the whole file.
+- Detection: more Python (pyproject extras, uv and PDM groups), Deno imports and `deno.json`, config files in dot-folders. Virtualenvs no longer use up the file limit, and imports in comments, React Email and `mongodb-memory-server` no longer count as vendors.
+- CLI: without a terminal, `install` needs `--agent` or `--yes`; `uninstall` removes only manifestack's own folders.
+- Skill `manifestack`: a pricing page it cannot read is marked `unverified`, never filled from search results or memory.
+- Fixes in cost and usage math (units, `$` amounts, dates), secret detection, Windows paths and line endings.
 
 ## 0.2.0
 

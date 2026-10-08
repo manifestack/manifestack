@@ -52,8 +52,25 @@ function fail(message, code = 1) {
 	process.exit(code);
 }
 
+/** Today in the local time zone: a UTC date is a day off for half the world around midnight. */
 function todayIso() {
-	return new Date().toISOString().slice(0, 10);
+	const d = new Date();
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** YYYY-MM-DD that names a real day: 2026-13-01 and 2027-02-30 are rejected. */
+function isIsoDate(s) {
+	if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+	const t = Date.parse(s + 'T00:00:00Z');
+	return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === s;
+}
+
+/** Reads a date option such as --today or --from; a bare flag or an impossible date is an error. */
+function dateArg(args, key, fallback) {
+	const v = args[key];
+	if (v == null) return fallback;
+	if (!isIsoDate(v)) throw new Error(`--${key} needs a date as YYYY-MM-DD${v === true ? '' : `, got "${v}"`}`);
+	return v;
 }
 
 // ---- packages/core/src/yaml.mjs
@@ -62,7 +79,7 @@ function todayIso() {
 // scalars, numbers, booleans, null and `#` comments. Not a general YAML parser.
 
 function parseFrontmatter(text) {
-	const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/.exec(text);
+	const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/.exec(text);
 	if (!m) return { data: {}, body: text };
 	return { data: parseYaml(m[1]), body: m[2] };
 }
@@ -108,6 +125,7 @@ function parseYaml(src) {
 			if (!kv) throw new Error(`YAML: cannot parse line "${lines[i].text}"`);
 			i++;
 			const [key, value] = kv;
+			if (Object.hasOwn(out, key)) throw new Error(`YAML: duplicate key "${key}"`);
 			if (value !== '') out[key] = parseYamlScalar(value);
 			else if (i < lines.length && (lines[i].indent > indent || (lines[i].indent === indent && isItem(lines[i].text)))) out[key] = parseBlock();
 			else out[key] = null;
@@ -128,8 +146,10 @@ function stripYamlComment(line) {
 		const c = line[k];
 		if (quote) {
 			if (c === '\\' && quote === '"') k++;
+			else if (c === "'" && quote === "'" && line[k + 1] === "'") k++;
 			else if (c === quote) quote = null;
-		} else if (c === '"' || c === "'") {
+		} else if ((c === '"' || c === "'") && /(^|[:\-[{,])\s*$/.test(line.slice(0, k))) {
+			// Only a quote that starts a scalar opens a string; the apostrophe in `What's` does not.
 			quote = c;
 		} else if (c === '#' && (k === 0 || /\s/.test(line[k - 1]))) {
 			return line.slice(0, k);
@@ -158,6 +178,7 @@ function parseYamlScalar(raw) {
 		for (const part of splitInline(s.slice(1, -1))) {
 			const kv = splitYamlKey(part);
 			if (!kv) throw new Error(`YAML: cannot parse map entry ${part}`);
+			if (Object.hasOwn(out, kv[0])) throw new Error(`YAML: duplicate key "${kv[0]}"`);
 			out[kv[0]] = parseYamlScalar(kv[1]);
 		}
 		return out;
@@ -198,90 +219,6 @@ function splitInline(s) {
 	}
 	if (cur.trim()) parts.push(cur);
 	return parts.map((p) => p.trim()).filter(Boolean);
-}
-
-// ---- packages/core/src/catalog.mjs
-// Reads vendor maps (catalog/vendors/<id>.md in the repo, vendors/<id>.md inside a skill).
-// A map says where to look and what to extract, never the prices themselves.
-
-const VENDOR_SCHEMA = 1;
-const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'ai', 'other'];
-
-/** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
-function upgradeVendorMap(data) {
-	switch (data.schema) {
-		case VENDOR_SCHEMA:
-			return data;
-		default:
-			throw new Error(`unsupported vendor map schema ${data.schema} (this version reads schema ${VENDOR_SCHEMA})`);
-	}
-}
-
-function parseVendorMap(text, file = '<vendor map>') {
-	let parsed;
-	try {
-		parsed = parseFrontmatter(text);
-	} catch (e) {
-		throw new Error(`${file}: ${e.message}`);
-	}
-	const data = upgradeVendorMap(parsed.data);
-	const detect = data.detect ?? {};
-	return {
-		...data,
-		roles: data.roles ?? [],
-		detect: {
-			packages: detect.packages ?? [],
-			pypi: detect.pypi ?? [],
-			go: detect.go ?? [],
-			imports: detect.imports ?? [],
-			env_prefixes: detect.env_prefixes ?? [],
-			config_files: detect.config_files ?? [],
-			role_signals: detect.role_signals ?? {},
-		},
-		pages: data.pages ?? {},
-		read: data.read ?? [],
-		usage_questions: data.usage_questions ?? [],
-		common_fixes: data.common_fixes ?? [],
-		notes: parsed.body.trim(),
-	};
-}
-
-function validateVendorMap(v) {
-	const errors = [];
-	if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(v.id ?? ''))) errors.push('id must be lowercase a-z, 0-9 and single hyphens');
-	if (!v.name) errors.push('name is required');
-	if (!Array.isArray(v.roles) || !v.roles.length) errors.push('roles must be a non-empty list');
-	for (const r of v.roles ?? []) if (!VENDOR_ROLES.includes(r)) errors.push(`unknown role "${r}"`);
-	const d = v.detect ?? {};
-	if (![d.packages, d.pypi, d.go, d.imports, d.env_prefixes, d.config_files].some((x) => x?.length)) errors.push('detect needs at least one signature');
-	for (const role of Object.keys(d.role_signals ?? {})) if (!(v.roles ?? []).includes(role)) errors.push(`role_signals.${role} is not in roles`);
-	if (!/^https:\/\//.test(String(v.pages?.pricing ?? ''))) errors.push('pages.pricing must be an https URL');
-	for (const [k, url] of Object.entries(v.pages ?? {})) if (!/^https:\/\//.test(String(url))) errors.push(`pages.${k} must be an https URL`);
-	if (!v.read?.length) errors.push('read must list what to extract from the pages');
-	for (const q of v.usage_questions ?? []) if (!q.metric || !q.ask || !q.where) errors.push('each usage question needs metric, ask and where');
-	if (v.mcp?.official && v.mcp.readonly_flag && !v.mcp.allowed_tools?.length) errors.push('mcp.allowed_tools is required when read-only MCP use is allowed');
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v.verified ?? ''))) errors.push('verified must be a YYYY-MM-DD date');
-	return errors;
-}
-
-/** Loads every map in a directory. Files starting with `_` (the template) are skipped. */
-function loadCatalog(dir) {
-	if (!existsSync(dir)) return [];
-	const vendors = [];
-	for (const name of readdirSync(dir).sort()) {
-		if (!name.endsWith('.md') || name.startsWith('_')) continue;
-		const v = parseVendorMap(readFileSync(join(dir, name), 'utf8'), name);
-		const errors = validateVendorMap(v);
-		if (errors.length) throw new Error(`${name}: ${errors.join('; ')}`);
-		if (`${v.id}.md` !== name) throw new Error(`${name}: id "${v.id}" must match the file name`);
-		vendors.push(v);
-	}
-	return vendors;
-}
-
-/** The part of a map that detection needs; embedded into the hook so it runs without the catalog. */
-function vendorSignatures(vendors) {
-	return vendors.map((v) => ({ id: v.id, name: v.name, roles: v.roles, ...v.detect }));
 }
 
 // ---- packages/core/src/known-sdks.mjs
@@ -339,8 +276,8 @@ function packageMatches(pkg, patterns) {
 }
 
 // ---- packages/core/src/manifests.mjs
-// Dependency names from each ecosystem's manifest: package.json (npm), requirements*.txt, pyproject.toml and
-// Pipfile (PyPI), go.mod (Go). Lightweight line parsers, no TOML library: only the dependency lists are read.
+// Dependency names from each ecosystem's manifest: package.json and deno.json (npm), requirements*.txt, pyproject.toml
+// and Pipfile (PyPI), go.mod (Go). Lightweight line parsers, no TOML library: only the dependency lists are read.
 
 /** Signature field that holds each ecosystem's package names in a vendor map. */
 const ECOSYSTEM_FIELDS = { npm: 'packages', pypi: 'pypi', go: 'go' };
@@ -349,18 +286,84 @@ const ECOSYSTEM_FIELDS = { npm: 'packages', pypi: 'pypi', go: 'go' };
 function manifestKind(path) {
 	const parts = String(path).split(/[\\/]/);
 	const name = parts.at(-1);
-	if (name === 'package.json') return 'npm';
+	if (name === 'package.json' || name === 'deno.json' || name === 'deno.jsonc') return 'npm';
 	if (name === 'go.mod') return 'go';
 	if (name === 'pyproject.toml' || name === 'Pipfile') return 'pypi';
-	if (/^requirements([-._][\w.-]*)?\.(txt|in)$/i.test(name)) return 'pypi';
+	if (/^[\w.-]*requirements[\w.-]*\.(txt|in)$/i.test(name)) return 'pypi';
 	if (parts.at(-2) === 'requirements' && /\.(txt|in)$/.test(name)) return 'pypi';
 	return null;
+}
+
+// Deno and browser CDNs import npm packages by URL or with a registry prefix: npm:stripe@14, https://esm.sh/x@2.
+const REGISTRY_PREFIX = /^(?:npm:|jsr:|https?:\/\/(?:esm\.sh|cdn\.skypack\.dev|esm\.run|cdn\.jsdelivr\.net\/npm|unpkg\.com)\/)\/?/;
+
+/** The package path an import specifier names, without registry prefix or version ("npm:@a/b@2/c" -> "@a/b/c"). */
+function normalizeSpecifier(spec) {
+	const prefix = REGISTRY_PREFIX.exec(spec);
+	if (!prefix) return spec;
+	const m = /^((?:@[^/@?#]+\/)?[^/@?#]+)(?:@[^/?#]*)?([^?#]*)/.exec(spec.slice(prefix[0].length));
+	return m ? m[1] + m[2] : spec;
+}
+
+/** Package name of a specifier without its subpath ("@a/b/c" -> "@a/b"). */
+const packageName = (spec) => /^(?:@[^/]+\/)?[^/]+/.exec(spec)?.[0] ?? spec;
+
+/** Source text with comments blanked out. Strings are kept, so a "//" or "#" inside one stays. */
+function stripComments(src, { hash = false } = {}) {
+	let out = '';
+	let k = 0;
+	while (k < src.length) {
+		const c = src[k];
+		if (c === '"' || c === "'" || (c === '`' && !hash)) {
+			const triple = hash && src.startsWith(c.repeat(3), k) ? c.repeat(3) : '';
+			let end = k + (triple.length || 1);
+			while (end < src.length) {
+				if (src[end] === '\\') end += 2;
+				else if (triple ? src.startsWith(triple, end) : src[end] === c) break;
+				// Only template literals and triple quotes span lines, so a stray quote (JSX text, a regex) ends at the newline.
+				else if (src[end] === '\n' && c !== '`' && !triple) break;
+				else end++;
+			}
+			end = Math.min(src.length, end + (triple.length || 1));
+			out += src.slice(k, end);
+			k = end;
+		} else if (c === '\\') {
+			out += src.slice(k, k + 2);
+			k += 2;
+		} else if (hash ? c === '#' : src.startsWith('//', k)) {
+			while (k < src.length && src[k] !== '\n') k++;
+		} else if (!hash && src.startsWith('/*', k)) {
+			const end = src.indexOf('*/', k + 2);
+			out += ' ';
+			k = end === -1 ? src.length : end + 2;
+		} else {
+			out += c;
+			k++;
+		}
+	}
+	return out;
+}
+
+/** The real package behind an npm alias ("npm:stripe@12" -> "stripe"), else the declared name. */
+function npmName(name, version) {
+	const m = /^npm:((?:@[^/@]+\/)?[^@]+)/.exec(typeof version === 'string' ? version : '');
+	return m ? m[1] : name;
 }
 
 function dependencyNames(pkgJson) {
 	const names = new Set();
 	for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-		for (const name of Object.keys(pkgJson?.[field] ?? {})) names.add(name);
+		for (const [name, version] of Object.entries(pkgJson?.[field] ?? {})) names.add(npmName(name, version));
+	}
+	return [...names];
+}
+
+/** npm and JSR packages from a deno.json(c) import map; URL and path entries are left out. */
+function denoImports(text) {
+	const json = JSON.parse(stripComments(text).replace(/,(\s*[}\]])/g, '$1'));
+	const names = new Set();
+	for (const target of Object.values(json?.imports ?? {})) {
+		if (typeof target === 'string' && /^(npm|jsr):/.test(target)) names.add(packageName(normalizeSpecifier(target)));
 	}
 	return [...names];
 }
@@ -380,6 +383,12 @@ function requirementsTxt(text) {
 	const names = [];
 	for (let line of text.split(/\r?\n/)) {
 		line = line.replace(/(^|\s)#.*$/, '').trim();
+		// A VCS or URL requirement names its package in "#egg=" (also after -e).
+		const egg = /[#&]egg=([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(line);
+		if (egg) {
+			names.push(egg[1]);
+			continue;
+		}
 		if (!line || line.startsWith('-') || /^[./~]/.test(line)) continue;
 		// "name @ https://…" is a direct reference with a name; a bare URL has none.
 		if (line.includes('://') && !/^[A-Za-z0-9][A-Za-z0-9._-]*(\[[^\]]*\])?\s*@/.test(line)) continue;
@@ -389,42 +398,79 @@ function requirementsTxt(text) {
 	return names;
 }
 
-const tomlKey = (line) => /^\s*("?)([A-Za-z0-9_.-]+)\1\s*=/.exec(line)?.[2];
+/**
+ * Scans the value part of one TOML line. Open brackets and multi-line strings carry over to the next line in `st`;
+ * `#` outside a string starts a comment. Each string goes to onString with the brackets it sits in.
+ */
+function scanTomlValue(line, st, onString) {
+	let k = 0;
+	if (st.multiline) {
+		const end = line.indexOf(st.multiline);
+		if (end === -1) return;
+		k = end + 3;
+		st.multiline = null;
+	}
+	for (; k < line.length; k++) {
+		const c = line[k];
+		if (c === '#') return;
+		if (c === '[' || c === '{') st.stack.push(c);
+		else if (c === ']' || c === '}') st.stack.pop();
+		else if (c === '"' || c === "'") {
+			const triple = c.repeat(3);
+			if (line.startsWith(triple, k)) {
+				const end = line.indexOf(triple, k + 3);
+				if (end === -1) {
+					st.multiline = triple;
+					return;
+				}
+				k = end + 2;
+				continue;
+			}
+			let str = '';
+			let j = k + 1;
+			for (; j < line.length && line[j] !== c; j++) {
+				if (c === '"' && line[j] === '\\') j++;
+				str += line[j] ?? '';
+			}
+			onString(str, st.stack);
+			k = j;
+		}
+	}
+}
 
-/** Dependencies from pyproject.toml (PEP 621, PEP 735 groups, Poetry) and Pipfile. */
+// Arrays of PEP 508 requirement strings, and tables whose keys are package names.
+const requirementArray = (table, key) =>
+	(table === 'project' && (key === 'dependencies' || key === 'optional-dependencies')) ||
+	(table === 'tool.uv' && key === 'dev-dependencies') ||
+	['project.optional-dependencies', 'dependency-groups', 'tool.pdm.dev-dependencies'].includes(table);
+const packageKeyTable = (table) => /^tool\.poetry(\.group\.[^.]+)?\.(dev-)?dependencies$/.test(table) || table === 'packages' || table === 'dev-packages';
+
+/** Dependencies from pyproject.toml (PEP 621, PEP 735 groups, uv, PDM, Poetry) and Pipfile. */
 function pythonToml(text) {
 	const names = [];
 	let table = '';
-	let collecting = false;
-	for (const raw of text.split(/\r?\n/)) {
-		const line = raw.replace(/\s+#.*$/, '');
-		if (collecting) {
-			for (const m of line.matchAll(/["']([^"']+)["']/g)) {
-				const name = requirementName(m[1]);
-				if (name) names.push(name);
-			}
-			if (line.includes(']')) collecting = false;
+	const st = { stack: [], multiline: null, collect: false };
+	// Only strings directly in an array are requirements; {include-group = "test"} is not.
+	const onString = (str, stack) => {
+		if (!st.collect || stack.at(-1) !== '[') return;
+		const name = requirementName(str);
+		if (name) names.push(name);
+	};
+	for (const line of text.split(/\r?\n/)) {
+		if (st.stack.length || st.multiline) {
+			scanTomlValue(line, st, onString);
 			continue;
 		}
-		const header = /^\s*\[{1,2}\s*([^\]]+?)\s*\]{1,2}\s*$/.exec(line);
+		const header = /^\s*\[{1,2}\s*([^\]]+?)\s*\]{1,2}\s*(#.*)?$/.exec(line);
 		if (header) {
-			table = header[1].replace(/["']/g, '');
+			table = header[1].replace(/["'\s]/g, '');
 			continue;
 		}
-		const key = tomlKey(line);
-		if (!key) continue;
-		const arrayTable = (table === 'project' && key === 'dependencies') || table === 'project.optional-dependencies' || table === 'dependency-groups';
-		const keyTable = /^tool\.poetry(\.group\.[^.]+)?\.(dev-)?dependencies$/.test(table) || table === 'packages' || table === 'dev-packages';
-		if (arrayTable && /=\s*\[/.test(line)) {
-			const rest = line.slice(line.indexOf('[') + 1);
-			for (const m of rest.matchAll(/["']([^"']+)["']/g)) {
-				const name = requirementName(m[1]);
-				if (name) names.push(name);
-			}
-			collecting = !rest.includes(']');
-		} else if (keyTable && key.toLowerCase() !== 'python') {
-			names.push(key);
-		}
+		const m = /^\s*(["']?)([A-Za-z0-9_.-]+)\1\s*=/.exec(line);
+		if (!m) continue;
+		if (packageKeyTable(table) && m[2].toLowerCase() !== 'python') names.push(m[2]);
+		st.collect = requirementArray(table, m[2]);
+		scanTomlValue(line.slice(m[0].length), st, onString);
 	}
 	return names;
 }
@@ -449,8 +495,9 @@ function goMod(text) {
 
 /** Dependency names declared in a manifest of the given kind. Unparseable files give an empty list. */
 function manifestDependencies(kind, text, path = '') {
+	text = String(text).replace(/^\uFEFF/, '');
 	try {
-		if (kind === 'npm') return dependencyNames(JSON.parse(text));
+		if (kind === 'npm') return /deno\.jsonc?$/.test(path) ? denoImports(text) : dependencyNames(JSON.parse(text));
 		if (kind === 'go') return goMod(text);
 		if (kind === 'pypi') return /\.toml$|(^|[\\/])Pipfile$/.test(path) ? pythonToml(text) : requirementsTxt(text);
 	} catch {}
@@ -468,12 +515,127 @@ function dependencyMatches(kind, dep, patterns = []) {
 	return false;
 }
 
+// ---- packages/core/src/catalog.mjs
+// Reads vendor maps (catalog/vendors/<id>.md in the repo, vendors/<id>.md inside a skill).
+// A map says where to look and what to extract, never the prices themselves.
+
+const VENDOR_SCHEMA = 1;
+const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'ai', 'other'];
+
+/** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
+function upgradeVendorMap(data) {
+	switch (data.schema) {
+		case VENDOR_SCHEMA:
+			return data;
+		default:
+			throw new Error(`unsupported vendor map schema ${data.schema} (this version reads schema ${VENDOR_SCHEMA})`);
+	}
+}
+
+function parseVendorMap(text, file = '<vendor map>') {
+	let parsed;
+	try {
+		parsed = parseFrontmatter(text);
+	} catch (e) {
+		throw new Error(`${file}: ${e.message}`);
+	}
+	const data = upgradeVendorMap(parsed.data);
+	const detect = data.detect ?? {};
+	return {
+		...data,
+		roles: data.roles ?? [],
+		detect: {
+			packages: detect.packages ?? [],
+			pypi: detect.pypi ?? [],
+			go: detect.go ?? [],
+			imports: detect.imports ?? [],
+			env_prefixes: detect.env_prefixes ?? [],
+			config_files: detect.config_files ?? [],
+			role_signals: detect.role_signals ?? {},
+		},
+		pages: data.pages ?? {},
+		read: data.read ?? [],
+		usage_questions: data.usage_questions ?? [],
+		common_fixes: data.common_fixes ?? [],
+		notes: parsed.body.trim(),
+	};
+}
+
+const DETECT_LISTS = ['packages', 'pypi', 'go', 'imports', 'env_prefixes', 'config_files'];
+const isStringList = (x) => Array.isArray(x) && x.every((s) => typeof s === 'string' && s.trim() !== '');
+
+function validateVendorMap(v) {
+	const errors = [];
+	if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(v.id ?? ''))) errors.push('id must be lowercase a-z, 0-9 and single hyphens');
+	if (!v.name) errors.push('name is required');
+	if (!Array.isArray(v.roles) || !v.roles.length) errors.push('roles must be a non-empty list');
+	for (const r of v.roles ?? []) if (!VENDOR_ROLES.includes(r)) errors.push(`unknown role "${r}"`);
+	const d = v.detect ?? {};
+	// Detection calls .some() on these and an empty pattern matches everything, so the shape is checked here.
+	for (const field of DETECT_LISTS) if (!isStringList(d[field])) errors.push(`detect.${field} must be a list of non-empty strings`);
+	if (!DETECT_LISTS.some((field) => Array.isArray(d[field]) && d[field].length)) errors.push('detect needs at least one signature');
+	const signals = d.role_signals ?? {};
+	if (typeof signals !== 'object' || Array.isArray(signals)) errors.push('detect.role_signals must map roles to lists');
+	else {
+		for (const [role, needles] of Object.entries(signals)) {
+			if (!(v.roles ?? []).includes(role)) errors.push(`role_signals.${role} is not in roles`);
+			if (!isStringList(needles) || !needles.length) errors.push(`role_signals.${role} must be a list of non-empty strings`);
+		}
+	}
+	if (!/^https:\/\//.test(String(v.pages?.pricing ?? ''))) errors.push('pages.pricing must be an https URL');
+	for (const [k, url] of Object.entries(v.pages ?? {})) if (!/^https:\/\//.test(String(url))) errors.push(`pages.${k} must be an https URL`);
+	if (!v.read?.length) errors.push('read must list what to extract from the pages');
+	for (const q of v.usage_questions ?? []) if (!q.metric || !q.ask || !q.where) errors.push('each usage question needs metric, ask and where');
+	if (v.mcp?.official && v.mcp.readonly_flag && !v.mcp.allowed_tools?.length) errors.push('mcp.allowed_tools is required when read-only MCP use is allowed');
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v.verified ?? ''))) errors.push('verified must be a YYYY-MM-DD date');
+	return errors;
+}
+
+/** Loads every map in a directory. Files starting with `_` (the template) are skipped. */
+function loadCatalog(dir) {
+	if (!existsSync(dir)) return [];
+	const vendors = [];
+	for (const name of readdirSync(dir).sort()) {
+		if (!name.endsWith('.md') || name.startsWith('_')) continue;
+		const v = parseVendorMap(readFileSync(join(dir, name), 'utf8'), name);
+		const errors = validateVendorMap(v);
+		if (errors.length) throw new Error(`${name}: ${errors.join('; ')}`);
+		if (`${v.id}.md` !== name) throw new Error(`${name}: id "${v.id}" must match the file name`);
+		vendors.push(v);
+	}
+	const clash = packageClashes(vendors)[0];
+	if (clash) throw new Error(clash);
+	return vendors;
+}
+
+/** Package patterns that two maps both claim: the dependency would be reported as two vendors. */
+function packageClashes(vendors) {
+	const owner = new Map();
+	const clashes = [];
+	for (const v of vendors) {
+		for (const field of ['packages', 'pypi', 'go']) {
+			for (const p of v.detect?.[field] ?? []) {
+				const key = `${field}:${field === 'pypi' ? normalizePypi(p) : p}`;
+				const other = owner.get(key);
+				if (other && other !== v.id) clashes.push(`${other}.md and ${v.id}.md both claim detect.${field} "${p}"`);
+				else owner.set(key, v.id);
+			}
+		}
+	}
+	return clashes;
+}
+
+/** The part of a map that detection needs; embedded into the hook so it runs without the catalog. */
+function vendorSignatures(vendors) {
+	return vendors.map((v) => ({ id: v.id, name: v.name, roles: v.roles, ...v.detect }));
+}
+
 // ---- packages/core/src/detect.mjs
-// Finds vendors in a repository: dependencies from package.json, requirements*.txt, pyproject.toml, Pipfile and
-// go.mod, JS imports, config files and env var NAMES.
+// Finds vendors in a repository: dependencies from package.json, deno.json, requirements*.txt, pyproject.toml, Pipfile and
+// go.mod, JS imports (also npm:, jsr: and esm.sh), config files and env var NAMES.
 // Env values are dropped while reading a line, before anything else sees them. No network.
 
-const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'venv', '__pycache__', 'target', 'tmp']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'venv', 'site-packages', 'Pods', '__pycache__', 'target', 'tmp']);
 const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro|py|go)$/;
 const FRAMEWORKS = { npm: FRAMEWORK_PACKAGES, pypi: FRAMEWORK_PYPI, go: FRAMEWORK_GO };
 const ENV_FILE = /^\.env(\..+)?$/;
@@ -482,8 +644,13 @@ const MAX_EVIDENCE = 8;
 // The "new vendor" hook as `npx manifestack install` or `npx manifestack hook` registers it (packages/cli/src/agents.js).
 const HOOK_FILE = 'manifestack-new-vendor.mjs';
 const HOOK_SETUPS = {
-	'claude-code': { configs: ['.claude/settings.json', '.claude/settings.local.json'], script: `.claude/hooks/${HOOK_FILE}` },
-	cursor: { configs: ['.cursor/hooks.json'], script: `.cursor/hooks/${HOOK_FILE}` },
+	// `current`: the entry the CLI writes today. Older installs (Cursor afterFileEdit, Claude Code without Bash) are `outdated`.
+	'claude-code': {
+		configs: ['.claude/settings.json', '.claude/settings.local.json'],
+		script: `.claude/hooks/${HOOK_FILE}`,
+		current: (c) => (c?.hooks?.PostToolUse ?? []).some((g) => /\bBash\b/.test(g?.matcher ?? '') && JSON.stringify(g).includes(HOOK_FILE)),
+	},
+	cursor: { configs: ['.cursor/hooks.json'], script: `.cursor/hooks/${HOOK_FILE}`, current: (c) => (c?.hooks?.postToolUse ?? []).some((h) => String(h?.command).includes(HOOK_FILE)) },
 };
 // Files that do not make a repository "existing code" on their own.
 const NON_PROJECT_FILES = /^(readme|license|licence|changelog|contributing|code_of_conduct|security|stack|agents|claude|gemini)(\.[a-z]+)?$|^\.(gitignore|gitattributes|editorconfig|env.*)$/i;
@@ -522,44 +689,86 @@ export function matchDependencies(deps, signatures, kind = 'npm') {
 	return { vendors, unmapped };
 }
 
-function* walk(root, limits) {
-	const stack = [root];
-	while (stack.length) {
-		const dir = stack.pop();
+/**
+ * An import specifier against a vendor's import patterns. A pattern ending in `/` or `:` is a prefix ("@sentry/",
+ * "cloudflare:"); any other pattern is a package name and matches it or its subpaths ("mongodb", "mongodb/lib").
+ */
+export function importMatches(spec, patterns = []) {
+	return patterns.some((p) => (/[/:]$/.test(p) ? spec.startsWith(p) : spec === p || spec.startsWith(p + '/')));
+}
+
+/** Files of the repository, shallow ones first, so manifests at the top are listed before deep source trees. */
+function listFiles(root, limits) {
+	const files = [];
+	const queue = [root];
+	for (let q = 0; q < queue.length; q++) {
 		let entries;
 		try {
-			entries = readdirSync(dir, { withFileTypes: true });
+			entries = readdirSync(queue[q], { withFileTypes: true });
 		} catch {
 			continue;
 		}
+		// A virtualenv under any name (python -m venv env, .venv, py312): installed packages, not the product.
+		if (q > 0 && entries.some((e) => e.name === 'pyvenv.cfg')) continue;
 		for (const e of entries) {
-			const full = join(dir, e.name);
+			const full = join(queue[q], e.name);
 			if (e.isDirectory()) {
 				// Dot-directories hold agent configs, installed skills and VCS data, not the product.
-				if (!e.name.startsWith('.') && !SKIP_DIRS.has(e.name)) stack.push(full);
-			} else if (e.isFile()) {
-				if (++limits.count > limits.max) {
-					limits.truncated = true;
-					return;
-				}
-				yield full;
+				if (!e.name.startsWith('.') && !SKIP_DIRS.has(e.name)) queue.push(full);
+				continue;
 			}
+			// Symlinks are followed to files only; a linked directory could loop.
+			if (!e.isFile() && !(e.isSymbolicLink() && isFileSync(full))) continue;
+			if (files.length >= limits.maxListed) {
+				limits.truncated = true;
+				return files;
+			}
+			files.push(full);
 		}
+	}
+	return files;
+}
+
+function isFileSync(path) {
+	try {
+		return statSync(path).isFile();
+	} catch {
+		return false;
 	}
 }
 
-/** Per agent: `on` (registered in the project), `plugin` (the Claude Code plugin brings its own) or `off`. */
+// Evidence kept per vendor, most telling first; every kind found keeps at least one slot.
+const EVIDENCE_ORDER = ['package', 'config', 'import', 'code', 'env'];
+
+function pickEvidence(all) {
+	const sorted = [...all].sort((a, b) => EVIDENCE_ORDER.indexOf(a.kind) - EVIDENCE_ORDER.indexOf(b.kind));
+	const picked = new Set(EVIDENCE_ORDER.map((k) => sorted.find((e) => e.kind === k)).filter(Boolean).slice(0, MAX_EVIDENCE));
+	for (const e of sorted) if (picked.size < MAX_EVIDENCE) picked.add(e);
+	return sorted.filter((e) => picked.has(e));
+}
+
+/** Per agent: `on` (registered in the project), `outdated` (registered by an older version), `plugin` (the Claude Code plugin brings its own) or `off`. */
 export function hookStatus(root, { plugin = false } = {}) {
 	const status = {};
 	for (const [agent, setup] of Object.entries(HOOK_SETUPS)) {
-		const registered = setup.configs.some((c) => {
+		let registered = false;
+		let current = false;
+		for (const c of setup.configs) {
+			let text;
 			try {
-				return readFileSync(join(root, c), 'utf8').includes(HOOK_FILE);
+				text = readFileSync(join(root, c), 'utf8');
 			} catch {
-				return false;
+				continue;
 			}
-		});
-		if (registered && existsSync(join(root, setup.script))) status[agent] = 'on';
+			if (!text.includes(HOOK_FILE)) continue;
+			registered = true;
+			try {
+				current ||= setup.current(JSON.parse(text));
+			} catch {
+				// Unparseable config: the hook is registered, its shape unknown.
+			}
+		}
+		if (registered && existsSync(join(root, setup.script))) status[agent] = current ? 'on' : 'outdated';
 		else status[agent] = agent === 'claude-code' && plugin ? 'plugin' : 'off';
 	}
 	return status;
@@ -579,18 +788,29 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	const frameworks = new Map();
 	const infra = [];
 	let projectFiles = 0;
-	const limits = { count: 0, max: maxFiles, truncated: false };
+	let scanned = 0;
+	// Paths are listed first, then read in two passes: env files and manifests always, YAML and source until maxFiles
+	// files were read. A large tree loses imports, never dependencies.
+	const limits = { maxListed: maxFiles * 20, truncated: false };
 
 	const hit = (sig, kind, file, match, role) => {
-		if (!found.has(sig.id)) found.set(sig.id, { sig, evidence: [], roleHits: new Set() });
+		if (!found.has(sig.id)) found.set(sig.id, { sig, evidence: new Map(), roleHits: new Set() });
 		const f = found.get(sig.id);
 		if (role) f.roleHits.add(role);
-		if (f.evidence.length < MAX_EVIDENCE && !f.evidence.some((e) => e.kind === kind && e.match === match && e.file === file)) {
-			f.evidence.push({ kind, file, match });
-		}
+		const key = `${kind}\0${file}\0${match}`;
+		if (!f.evidence.has(key)) f.evidence.set(key, { kind, file, match });
+	};
+	const read = (full) => {
+		const text = readFileSync(full, 'utf8');
+		scanned++;
+		return text;
 	};
 
-	for (const full of walk(root, limits)) {
+	// Config files are also checked at their exact path: the walk skips dot-directories such as .do/.
+	for (const sig of sigs) for (const cfg of sig.config_files) if (isFileSync(join(root, cfg))) hit(sig, 'config', cfg, cfg);
+
+	const deferred = [];
+	for (const full of listFiles(root, limits)) {
 		const rel = relative(root, full).split(sep).join('/');
 		const name = basename(full);
 		if (!(rel.indexOf('/') === -1 && NON_PROJECT_FILES.test(name))) projectFiles++;
@@ -598,7 +818,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		if (ENV_FILE.test(name)) {
 			let names = [];
 			try {
-				names = readEnvNames(readFileSync(full, 'utf8'));
+				names = readEnvNames(read(full));
 			} catch {}
 			for (const n of names) {
 				envNames.add(n);
@@ -618,7 +838,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		if (manifest) {
 			let text;
 			try {
-				text = readFileSync(full, 'utf8');
+				text = read(full);
 			} catch {
 				continue;
 			}
@@ -644,27 +864,33 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		else if (/^(helmfile|skaffold|kustomization)\.ya?ml$/.test(name)) infra.push({ kind: 'kubernetes', file: rel });
 		else if (/^Pulumi\.ya?ml$/.test(name)) infra.push({ kind: 'pulumi', file: rel });
 		else if (/^serverless\.ya?ml$/.test(name)) infra.push({ kind: 'serverless-framework', file: rel });
-		else if (/\.ya?ml$/.test(name)) {
-			try {
-				if (statSync(full).size < 256 * 1024 && isKubernetesManifest(readFileSync(full, 'utf8'))) infra.push({ kind: 'kubernetes', file: rel });
-			} catch {}
-		}
+		else if (/\.ya?ml$/.test(name) || SOURCE_EXT.test(name)) deferred.push({ full, rel, name });
+	}
 
-		if (SOURCE_EXT.test(name)) {
-			let src;
+	for (const { full, rel, name } of deferred) {
+		if (scanned >= maxFiles) {
+			limits.truncated = true;
+			break;
+		}
+		if (/\.ya?ml$/.test(name)) {
 			try {
-				if (statSync(full).size > MAX_SOURCE_BYTES) continue;
-				src = readFileSync(full, 'utf8');
-			} catch {
-				continue;
-			}
-			const specs = extractImports(src);
-			for (const sig of sigs) {
-				for (const spec of specs) if (sig.imports.some((p) => spec.startsWith(p))) hit(sig, 'import', rel, spec);
-				for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
-					const needle = needles.find((n) => src.includes(n));
-					if (needle) hit(sig, 'code', rel, needle, role);
-				}
+				if (statSync(full).size < 256 * 1024 && isKubernetesManifest(read(full))) infra.push({ kind: 'kubernetes', file: rel });
+			} catch {}
+			continue;
+		}
+		let src;
+		try {
+			if (statSync(full).size > MAX_SOURCE_BYTES) continue;
+			src = stripComments(read(full), { hash: name.endsWith('.py') });
+		} catch {
+			continue;
+		}
+		const specs = extractImports(src).map((spec) => [spec, normalizeSpecifier(spec)]);
+		for (const sig of sigs) {
+			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports)) hit(sig, 'import', rel, spec);
+			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
+				const needle = needles.find((n) => src.includes(n));
+				if (needle) hit(sig, 'code', rel, needle, role);
 			}
 		}
 	}
@@ -674,7 +900,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			// Roles with signals count only when a signal matched; other roles count once the vendor is present.
 			const signalled = Object.keys(sig.role_signals ?? {});
 			const roles_used = sig.roles.filter((r) => !signalled.includes(r) || roleHits.has(r));
-			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence };
+			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence: pickEvidence(evidence.values()) };
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));
 
@@ -686,7 +912,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	return {
 		root,
 		empty: projectFiles === 0,
-		scanned_files: Math.min(limits.count, limits.max),
+		scanned_files: scanned,
 		truncated: limits.truncated,
 		vendors,
 		unmapped: [...unmapped.values()],

@@ -10,7 +10,7 @@ detect:
   packages: ["example-sdk", "@example/"]   # exact npm names; a trailing "/" matches the whole scope
   pypi: ["example-sdk"]                     # PyPI names (case-insensitive, - _ . equal); a trailing "*" is a prefix
   go: ["github.com/example/example-go"]     # Go module paths; ".../v2" suffixes match the base path
-  imports: ["@example/", "example-sdk"]    # import specifier prefixes
+  imports: ["@example/", "example-sdk"]    # a package name also matches its subpaths; a trailing "/" or ":" is a prefix
   env_prefixes: ["EXAMPLE_"]               # env var NAME prefixes (values are never read)
   config_files: ["example.config.json"]    # repo-relative paths or file names
   role_signals:                            # optional: a role counts only if one of these strings is in the code

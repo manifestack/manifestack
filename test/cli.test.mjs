@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, symlinkSync, cpSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, runNode, tempDir } from './helpers.mjs';
 import { AGENTS } from '../packages/cli/src/agents.js';
+import { hookStatus } from '../packages/core/src/detect.mjs';
 
 const CLI = join(ROOT, 'packages/cli/src/manifestack.js');
 const SKILLS = readdirSync(join(ROOT, 'skills')).sort();
@@ -30,6 +31,8 @@ for (const agent of AGENTS) {
 		const removed = cli(dir, 'uninstall', '--agent', agent.id);
 		assert.equal(removed.code, 0, removed.stderr);
 		for (const s of SKILLS) assert.ok(!existsSync(join(dir, agent.skillsDir, s)), `${s} removed`);
+		assert.ok(!existsSync(join(dir, agent.skillsDir)), 'the emptied skills folder is removed');
+		if (agent.hook) assert.ok(!existsSync(join(dir, agent.hook === 'cursor' ? '.cursor/hooks' : '.claude/hooks')), 'the emptied hooks folder is removed');
 		assert.equal(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), '## Requirements\nbudget: $0\n', 'STACK.md untouched');
 	});
 }
@@ -48,7 +51,7 @@ test('claude-code: hook merged into existing settings.json without touching othe
 	assert.deepEqual(merged.hooks.Stop, theirs.hooks.Stop);
 	assert.equal(merged.hooks.PostToolUse.length, 2);
 	assert.deepEqual(merged.hooks.PostToolUse[0], theirs.hooks.PostToolUse[0]);
-	assert.equal(merged.hooks.PostToolUse[1].matcher, 'Write|Edit');
+	assert.equal(merged.hooks.PostToolUse[1].matcher, 'Write|Edit|MultiEdit|Bash');
 	assert.match(merged.hooks.PostToolUse[1].hooks[0].command, /\.claude\/hooks\/manifestack-new-vendor\.mjs/);
 	assert.ok(existsSync(join(dir, '.claude/hooks/manifestack-new-vendor.mjs')));
 	assert.equal(cli(dir, 'uninstall', '--agent', 'claude-code').code, 0);
@@ -70,7 +73,8 @@ test('cursor: hooks.json merge keeps other hooks', (t) => {
 	writeFileSync(join(dir, '.cursor/hooks.json'), JSON.stringify(theirs));
 	assert.equal(cli(dir, 'install', '--agent', 'cursor').code, 0);
 	const merged = json(join(dir, '.cursor/hooks.json'));
-	assert.equal(merged.hooks.afterFileEdit.length, 2);
+	assert.deepEqual(merged.hooks.afterFileEdit, theirs.hooks.afterFileEdit);
+	assert.deepEqual(merged.hooks.postToolUse, [{ command: 'node .cursor/hooks/manifestack-new-vendor.mjs', matcher: 'Write|Shell', timeout: 10 }]);
 	assert.deepEqual(merged.hooks.beforeShellExecution, theirs.hooks.beforeShellExecution);
 	cli(dir, 'uninstall', '--agent', 'cursor');
 	assert.deepEqual(json(join(dir, '.cursor/hooks.json')), theirs);
@@ -192,4 +196,97 @@ test('hook: registers only the hook, for Claude Code and Cursor only', (t) => {
 	assert.match(none.stderr, /no agent folders found.*claude-code, cursor\)/);
 	assert.equal(cli(dir, 'uninstall').code, 0);
 	assert.ok(!existsSync(join(dir, '.claude/settings.json')), 'uninstall removes a hook added by `hook`');
+});
+
+const OURS = (prefix) => `node ${prefix}/hooks/manifestack-new-vendor.mjs`;
+
+test('cursor: install moves an earlier afterFileEdit entry to postToolUse; uninstall removes both', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.cursor'));
+	const theirs = { version: 1, hooks: { afterFileEdit: [{ command: './fmt.sh' }], postToolUse: [{ command: './log.sh' }] } };
+	const old = { version: 1, hooks: { afterFileEdit: [{ command: './fmt.sh' }, { command: OURS('.cursor') }], postToolUse: [{ command: './log.sh' }] } };
+	writeFileSync(join(dir, '.cursor/hooks.json'), JSON.stringify(old));
+	const r = cli(dir, 'hook', '--agent', 'cursor');
+	assert.equal(r.code, 0, r.stderr);
+	const migrated = json(join(dir, '.cursor/hooks.json'));
+	assert.deepEqual(migrated.hooks.afterFileEdit, theirs.hooks.afterFileEdit);
+	assert.equal(migrated.hooks.postToolUse.length, 2);
+	assert.equal(migrated.hooks.postToolUse[1].matcher, 'Write|Shell');
+	// Both entries at once (a hand-made or half-migrated config): uninstall removes ours from each.
+	writeFileSync(join(dir, '.cursor/hooks.json'), JSON.stringify({ ...migrated, hooks: { ...migrated.hooks, afterFileEdit: old.hooks.afterFileEdit } }));
+	assert.equal(cli(dir, 'uninstall', '--agent', 'cursor').code, 0);
+	assert.deepEqual(json(join(dir, '.cursor/hooks.json')), theirs);
+});
+
+test('claude-code: install updates an earlier Write|Edit matcher', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.claude'));
+	const theirs = { matcher: 'Write', hooks: [{ type: 'command', command: 'prettier --write' }] };
+	const old = { matcher: 'Write|Edit', hooks: [{ type: 'command', command: `node "$CLAUDE_PROJECT_DIR/.claude/hooks/manifestack-new-vendor.mjs"`, timeout: 10 }] };
+	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [old, theirs] } }));
+	const r = cli(dir, 'hook', '--agent', 'claude-code');
+	assert.equal(r.code, 0, r.stderr);
+	const groups = json(join(dir, '.claude/settings.json')).hooks.PostToolUse;
+	assert.deepEqual(groups.map((g) => g.matcher), ['Write', 'Write|Edit|MultiEdit|Bash']);
+	assert.equal(cli(dir, 'hook', '--agent', 'claude-code').stdout.includes('hook already registered'), true);
+});
+
+test('config files in an unexpected shape are reported and left alone', (t) => {
+	for (const [file, text, message] of [
+		['.claude/settings.json', '{"hooks": []}', /hooks in \.claude\/settings\.json is not an object/],
+		['.claude/settings.json', '{"hooks": {"PostToolUse": {}}}', /hooks\.PostToolUse in \.claude\/settings\.json is not a list/],
+		['.claude/settings.json', '{"hooks": {"PostToolUse": [{"matcher": "Write", "hooks": {"type": "command"}}]}}', /hooks\.PostToolUse\[0\]\.hooks in \.claude\/settings\.json is not a list/],
+		['.cursor/hooks.json', '{"version": 1, "hooks": {"postToolUse": {}}}', /hooks\.postToolUse in \.cursor\/hooks\.json is not a list/],
+	]) {
+		const dir = tempDir(t);
+		mkdirSync(join(dir, file.split('/')[0]));
+		writeFileSync(join(dir, file), text);
+		const agent = file.startsWith('.cursor') ? 'cursor' : 'claude-code';
+		for (const cmd of ['install', 'uninstall']) {
+			const r = cli(dir, cmd, '--agent', agent);
+			assert.equal(r.code, 1, `${cmd} ${text}`);
+			assert.match(r.stderr, message);
+			assert.match(r.stderr, /Fix it first/);
+			assert.doesNotMatch(r.stderr, /\n\s+at /, 'no stack trace');
+			assert.equal(readFileSync(join(dir, file), 'utf8'), text);
+		}
+	}
+});
+
+test('without a terminal and without --agent or --yes nothing is installed', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.cursor'));
+	const r = runNode(CLI, ['install', '--dir', dir], { input: 'n\n' });
+	assert.equal(r.code, 1);
+	assert.match(r.stdout, /Detected: Cursor/);
+	assert.match(r.stderr, /Pass --agent <id> \(cursor\) or --yes/);
+	assert.deepEqual(readdirSync(dir), ['.cursor']);
+	const hook = runNode(CLI, ['hook', '--dir', dir], { input: '' });
+	assert.equal(hook.code, 1);
+	assert.deepEqual(readdirSync(join(dir, '.cursor')), []);
+	// --agent names the agents, so a script can still install.
+	assert.equal(runNode(CLI, ['install', '--dir', dir, '--agent', 'codex'], { input: '' }).code, 0);
+});
+
+test('uninstall removes only our skill folders and leaves non-empty folders', (t) => {
+	const dir = tempDir(t);
+	assert.equal(cli(dir, 'install', '--agent', 'github-copilot').code, 0);
+	// A renamed copy still carries our marker, but it is the user's now.
+	cpSync(join(dir, '.github/skills/manifestack'), join(dir, '.github/skills/my-stack'), { recursive: true });
+	assert.equal(cli(dir, 'uninstall', '--agent', 'github-copilot').code, 0);
+	assert.ok(!existsSync(join(dir, '.github/skills/manifestack')));
+	assert.ok(existsSync(join(dir, '.github/skills/my-stack/SKILL.md')), 'renamed copy kept');
+	rmSync(join(dir, '.github/skills/my-stack'), { recursive: true });
+	assert.equal(cli(dir, 'install', '--agent', 'github-copilot').code, 0);
+	assert.equal(cli(dir, 'uninstall', '--agent', 'github-copilot').code, 0);
+	assert.ok(!existsSync(join(dir, '.github/skills')), 'empty skills folder removed');
+	assert.ok(existsSync(join(dir, '.github')), 'only the folder we wrote into is removed');
+	const next = cli(dir, 'install');
+	assert.match(next.stderr, /no agent folders found/, 'a leftover .github/skills would make this detect Copilot');
+});
+
+test('detect.mjs reports the hook the CLI installs as on, not outdated', (t) => {
+	const dir = tempDir(t);
+	assert.equal(cli(dir, 'install', '--agent', 'claude-code', '--agent', 'cursor').code, 0);
+	assert.deepEqual(hookStatus(dir), { 'claude-code': 'on', cursor: 'on' });
 });

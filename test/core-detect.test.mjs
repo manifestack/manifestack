@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
-import { detectVendors, readEnvNames, extractImports, hookStatus } from '../packages/core/src/detect.mjs';
+import { detectVendors, readEnvNames, extractImports, hookStatus, importMatches } from '../packages/core/src/detect.mjs';
 import { loadCatalog, vendorSignatures } from '../packages/core/src/catalog.mjs';
 
 const signatures = vendorSignatures(loadCatalog(join(ROOT, 'catalog/vendors')));
@@ -94,10 +94,14 @@ test('hookStatus: off, on once config and script are both there, plugin for Clau
 	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Write|Edit', hooks: [{ type: 'command', command: 'node .claude/hooks/manifestack-new-vendor.mjs' }] }] } }));
 	assert.equal(hookStatus(dir)['claude-code'], 'off', 'config without the script does not count');
 	writeFileSync(join(dir, '.claude/hooks/manifestack-new-vendor.mjs'), '');
+	assert.equal(hookStatus(dir)['claude-code'], 'outdated', 'an entry without Bash misses package-manager installs');
+	writeFileSync(join(dir, '.claude/settings.json'), JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Write|Edit|MultiEdit|Bash', hooks: [{ type: 'command', command: 'node .claude/hooks/manifestack-new-vendor.mjs' }] }] } }));
 	assert.equal(hookStatus(dir)['claude-code'], 'on');
 	mkdirSync(join(dir, '.cursor/hooks'), { recursive: true });
 	writeFileSync(join(dir, '.cursor/hooks.json'), JSON.stringify({ version: 1, hooks: { afterFileEdit: [{ command: 'node .cursor/hooks/manifestack-new-vendor.mjs' }] } }));
 	writeFileSync(join(dir, '.cursor/hooks/manifestack-new-vendor.mjs'), '');
+	assert.equal(detectVendors(dir, { signatures }).hook.cursor, 'outdated', 'Cursor ignores afterFileEdit output');
+	writeFileSync(join(dir, '.cursor/hooks.json'), JSON.stringify({ version: 1, hooks: { postToolUse: [{ command: 'node .cursor/hooks/manifestack-new-vendor.mjs', matcher: 'Write|Shell' }] } }));
 	assert.equal(detectVendors(dir, { signatures }).hook.cursor, 'on');
 });
 
@@ -153,4 +157,99 @@ test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer s
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);
 	assert.deepEqual(r.overlaps.find((o) => o.role === 'payments').vendors, ['adapty', 'lemon-squeezy', 'polar', 'revenuecat']);
+});
+
+test('a virtualenv under any name is skipped and the file limit drops source before manifests', (t) => {
+	const dir = tempDir(t);
+	for (const venv of ['env', 'py312']) {
+		mkdirSync(join(dir, venv, 'lib/python3.12/x'), { recursive: true });
+		writeFileSync(join(dir, venv, 'pyvenv.cfg'), 'home = /usr/bin\n');
+		for (let i = 0; i < 30; i++) writeFileSync(join(dir, venv, 'lib/python3.12/x', `m${i}.js`), "import OpenAI from 'openai';\n");
+		writeFileSync(join(dir, venv, 'lib/python3.12/x/package.json'), JSON.stringify({ dependencies: { openai: '1' } }));
+	}
+	mkdirSync(join(dir, 'a/b/c'), { recursive: true });
+	for (let i = 0; i < 10; i++) writeFileSync(join(dir, 'a/b/c', `s${i}.js`), "import x from '@clerk/nextjs';\n");
+	writeFileSync(join(dir, 'a/b/c/requirements.txt'), 'stripe\n');
+	const r = detectVendors(dir, { signatures, maxFiles: 3 });
+	assert.deepEqual(ids(r), ['clerk', 'stripe'], 'the deep manifest is read, only some source files are');
+	assert.equal(r.truncated, true);
+	assert.equal(r.scanned_files, 3);
+	const full = detectVendors(dir, { signatures });
+	assert.equal(full.truncated, false);
+	assert.equal(full.scanned_files, 11);
+});
+
+test('a source folder named env is scanned: only a pyvenv.cfg marks a virtualenv', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, 'src/env'), { recursive: true });
+	writeFileSync(join(dir, 'src/env/mail.ts'), "import { Resend } from 'resend';\n");
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['resend']);
+});
+
+test('config files in dot-directories: DigitalOcean from .do/app.yaml alone', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.do'));
+	writeFileSync(join(dir, '.do/app.yaml'), 'name: app\n');
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['digitalocean']);
+	assert.deepEqual(r.vendors[0].evidence, [{ kind: 'config', file: '.do/app.yaml', match: '.do/app.yaml' }]);
+});
+
+test('Deno and CDN imports: npm:, jsr: and esm.sh specifiers, deno.json import maps', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, 'supabase/functions/pay'), { recursive: true });
+	writeFileSync(join(dir, 'supabase/functions/pay/index.ts'), `import Stripe from "npm:stripe@14";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Hono } from "jsr:@hono/hono";
+`);
+	mkdirSync(join(dir, 'supabase/functions/mail'));
+	writeFileSync(join(dir, 'supabase/functions/mail/deno.json'), JSON.stringify({ imports: { openai: 'npm:openai@4' } }));
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['openai', 'stripe', 'supabase']);
+	assert.ok(r.vendors.find((v) => v.id === 'stripe').evidence.some((e) => e.kind === 'import' && e.match === 'npm:stripe@14'));
+	assert.ok(r.vendors.find((v) => v.id === 'openai').evidence.some((e) => e.kind === 'package' && e.file === 'supabase/functions/mail/deno.json'));
+});
+
+test('no false positives from comments, longer package names or React Email', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ devDependencies: { 'mongodb-memory-server': '9', 'react-email': '3', '@react-email/components': '0.1' } }));
+	writeFileSync(join(dir, 'a.ts'), `// TODO: import { auth } from "@clerk/nextjs"
+/* const s = require('stripe') */
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import { Html } from '@react-email/components';
+const url = "https://example.com//x"; import { Pool } from 'mongodb-pool-x';
+`);
+	writeFileSync(join(dir, 'b.py'), '# supabase.auth.sign_in_with_password\nprint("ok")\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+});
+
+test('importMatches: package names match themselves and subpaths, "/" and ":" patterns are prefixes', () => {
+	assert.ok(importMatches('mongodb', ['mongodb']));
+	assert.ok(importMatches('mongodb/lib/x', ['mongodb']));
+	assert.ok(!importMatches('mongodb-memory-server', ['mongodb']));
+	assert.ok(importMatches('@sentry/nextjs', ['@sentry/']));
+	assert.ok(importMatches('cloudflare:workers', ['cloudflare:']));
+	assert.ok(!importMatches('anything', []));
+});
+
+test('evidence cap keeps the package evidence when many env names match', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { stripe: '1' } }));
+	writeFileSync(join(dir, '.env'), Array.from({ length: 12 }, (_, i) => `STRIPE_KEY_${i}=x`).join('\n'));
+	writeFileSync(join(dir, 'a.js'), "import Stripe from 'stripe';");
+	const stripe = detectVendors(dir, { signatures }).vendors.find((v) => v.id === 'stripe');
+	assert.equal(stripe.evidence.length, 8);
+	assert.deepEqual(stripe.evidence.slice(0, 3).map((e) => e.kind), ['package', 'import', 'env']);
+});
+
+test('symlinked files are read, symlinked directories are not followed', { skip: process.platform === 'win32' && 'symlinks need privileges' }, (t) => {
+	const dir = tempDir(t);
+	const shared = tempDir(t);
+	writeFileSync(join(shared, 'package.json'), JSON.stringify({ dependencies: { stripe: '1' } }));
+	mkdirSync(join(shared, 'lib'));
+	writeFileSync(join(shared, 'lib/a.js'), "import x from '@clerk/nextjs';");
+	symlinkSync(join(shared, 'package.json'), join(dir, 'package.json'));
+	symlinkSync(join(shared, 'lib'), join(dir, 'lib'));
+	symlinkSync(dir, join(dir, 'loop'));
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['stripe']);
 });

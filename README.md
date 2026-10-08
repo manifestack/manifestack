@@ -73,7 +73,7 @@ Findings are `Requirement`, `Overlap`, `Overbuilt`, `Limit`, `Bill` or `Risk`, e
 | Cursor | `npx manifestack --agent cursor` | ask the agent to run `manifestack` |
 | Codex | `npx manifestack --agent codex` | `$manifestack` |
 
-It also detects Copilot, Windsurf, OpenCode, Cline and Gemini CLI. For Claude Code and Cursor it adds a hook that flags each new vendor the agent adds to `package.json`, `requirements.txt`, `pyproject.toml` or `go.mod`. `npx manifestack uninstall` removes everything except your `.manifestack/` folder.
+It also detects Copilot, Windsurf, OpenCode, Cline and Gemini CLI. For Claude Code and Cursor it adds a hook that flags a new vendor SDK when the agent edits a dependency manifest (`package.json`, `requirements.txt`, `pyproject.toml`, `go.mod`) or runs a package-manager install (`npm install`, `pnpm add`, `pip install`, `uv add`, `go get` and similar). `npx manifestack uninstall` removes everything except your `.manifestack/` folder.
 
 <details>
 <summary>Other ways to install</summary>
@@ -95,7 +95,8 @@ npx skills add manifestack/manifestack
 
 ```bash
 git clone https://github.com/manifestack/manifestack
-cp -r manifestack/skills/manifestack .agents/skills/   # Claude Code: .claude/skills/
+mkdir -p .agents/skills                                # Claude Code: .claude/skills/
+cp -r manifestack/skills/manifestack manifestack/skills/manifestack-guard .agents/skills/
 ```
 
 </details>
@@ -107,7 +108,7 @@ cp -r manifestack/skills/manifestack .agents/skills/   # Claude Code: .claude/sk
 | `/manifestack` | `init` for an empty repo, `audit` otherwise |
 | `/manifestack init "B2B dashboard, EU users"` | Asks about budget, users, requirements and what the team prefers and avoids, proposes and prices a whole stack |
 | `/manifestack audit` | Scans the repo, checks every service against your requirements and growth, reports findings |
-| *(automatic)* | In Claude Code and Cursor, a hook checks every vendor the agent adds against `STACK.md` before you rely on it |
+| *(automatic)* | In Claude Code and Cursor, a hook spots a new vendor SDK in dependency manifest edits and package-manager installs, and `manifestack-guard` checks it against `STACK.md` before you rely on it |
 
 ## STACK.md
 

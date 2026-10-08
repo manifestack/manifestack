@@ -3,11 +3,11 @@
 // Copies the skills into the agent's project skills folder and, for Claude Code and Cursor,
 // registers the "new vendor" hook. `hook` registers only the hook, for skills installed another way
 // (npx skills add, a manual copy). No network, no dependencies.
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, cpSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, rmdirSync, cpSync, statSync } from 'node:fs';
 import { dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
-import { AGENTS, HOOKS, findAgent } from './agents.js';
+import { AGENTS, HOOKS, ConfigError, findAgent } from './agents.js';
 
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VERSION = JSON.parse(readFileSync(join(PKG_ROOT, 'package.json'), 'utf8')).version;
@@ -124,6 +124,8 @@ async function chooseAgents(opts, project, { forUninstall = false, pool = AGENTS
 	if (!process.stdin.isTTY || opts.yes) {
 		if (!detected.length) throw new UserError(`no agent folders found in ${project}. Pass --agent <id> (${ids}).`);
 		console.log(`Detected: ${detected.map((a) => a.name).join(', ')}`);
+		// Without a terminal nobody can confirm the detected agents, so a script has to name them.
+		if (!opts.yes) throw new UserError(`no terminal to confirm the agents. Pass --agent <id> (${detected.map((a) => a.id).join(', ')}) or --yes to use the detected ones.`);
 		return detected;
 	}
 	console.log(pool === AGENTS ? 'Install for which agents?' : 'Add the hook for which agents?');
@@ -174,7 +176,8 @@ function planInstall(project, agents, skills, root, opts) {
 	return actions;
 }
 
-function planUninstall(project, agents) {
+/** Only folders named like our skills and marked by us: a renamed copy is the user's now. */
+function planUninstall(project, agents, skills) {
 	const actions = [];
 	const seenDirs = new Set();
 	for (const agent of agents) {
@@ -183,7 +186,7 @@ function planUninstall(project, agents) {
 			seenDirs.add(dir);
 			for (const name of readdirSync(dir).sort()) {
 				const to = join(dir, name);
-				if (isDir(to) && ours(to)) actions.push({ agent, kind: 'skill', to, status: 'remove' });
+				if (skills.includes(name) && isDir(to) && ours(to)) actions.push({ agent, kind: 'skill', to, status: 'remove' });
 			}
 		}
 		const hook = agent.hook && HOOKS[agent.hook];
@@ -246,6 +249,18 @@ function writeConfig(file, config) {
 	writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
 }
 
+/** Removes the skills and hooks folders that uninstall emptied, so an empty .github/skills is not taken for Copilot. */
+function removeEmptyDirs(actions) {
+	const dirs = new Set(actions.filter((a) => a.status === 'remove' && a.kind !== 'hook-config').map((a) => dirname(a.to)));
+	for (const dir of dirs) {
+		try {
+			if (isDir(dir) && !readdirSync(dir).length) rmdirSync(dir);
+		} catch {
+			// Best effort: a folder we cannot remove is harmless.
+		}
+	}
+}
+
 function apply(actions) {
 	for (const a of actions) {
 		try {
@@ -304,19 +319,20 @@ async function hook(opts) {
 	if (opts.dryRun) return console.log('Dry run: nothing changed.');
 	if (!(await confirm(opts))) return console.log('Cancelled: nothing changed.');
 	apply(actions);
-	console.log('Done. After each file edit the hook flags vendor SDKs that are new to the project.');
+	console.log('Done. After a dependency manifest edit or a package install command the hook flags vendor SDKs that are new to the project.');
 }
 
 async function uninstall(opts) {
 	const project = resolve(opts.dir ?? '.');
 	if (!isDir(project)) throw new UserError(`project folder not found: ${project}`);
 	const agents = await chooseAgents(opts, project, { forUninstall: true });
-	const actions = planUninstall(project, agents);
+	const actions = planUninstall(project, agents, availableSkills(assetsRoot()));
 	if (!actions.length) return console.log(`Nothing to remove in ${project}.`);
 	printPlan(`manifestack ${VERSION}: uninstall (.manifestack/ is kept)`, project, actions);
 	if (opts.dryRun) return console.log('Dry run: nothing changed.');
 	if (!(await confirm(opts))) return console.log('Cancelled: nothing changed.');
 	apply(actions);
+	removeEmptyDirs(actions);
 	console.log('Done. .manifestack/ was not touched.');
 }
 
@@ -332,6 +348,7 @@ async function main(argv) {
 }
 
 main(process.argv.slice(2)).catch((e) => {
-	console.error(`manifestack: ${e instanceof UserError ? e.message : e.stack ?? e.message}`);
+	const message = e instanceof ConfigError ? `${e.message}. Fix it first; manifestack will not overwrite it.` : e instanceof UserError ? e.message : e.stack ?? e.message;
+	console.error(`manifestack: ${message}`);
 	process.exit(1);
 });

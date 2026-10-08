@@ -32,7 +32,7 @@ npm run smoke                # packs the npm package and runs it in an empty pro
 
 1. Copy `catalog/vendors/_template.md` to `catalog/vendors/<id>.md`. The `id` is lowercase and matches the file name.
 2. Fill in:
-   - `detect`: npm package names (a trailing `/` matches a whole scope), PyPI names (`pypi`) and Go module paths (`go`) of the official SDKs, import prefixes, env var name prefixes, config files. Verify every name on npmjs.com, pypi.org and pkg.go.dev. Add `role_signals` if the vendor has several roles and a role should count only when its code is used.
+   - `detect`: npm package names (a trailing `/` matches a whole scope), PyPI names (`pypi`) and Go module paths (`go`) of the official SDKs, imports (a name matches itself and its subpaths; a trailing `/` or `:` makes it a prefix), env var name prefixes, config files. Verify every name on npmjs.com, pypi.org and pkg.go.dev. Add `role_signals` if the vendor has several roles and a role should count only when its code is used.
    - `pages`: official pricing, limits, regions and security/compliance pages. Open every URL.
    - `read`: what the auditor extracts from the pages: quota *names*, what happens at the limit, the next plan.
    - `usage_questions`: what to ask and the exact dashboard path. Use the standard metric names where they fit (`db_size`, `monthly_sent`, `daily_peak`, `transfer_tb`, `mau`, `users`, `monthly_bill`).

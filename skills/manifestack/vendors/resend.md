@@ -5,10 +5,10 @@ id: resend
 name: Resend
 roles: [email]
 detect:
-  packages: ["resend", "@react-email/", "react-email"]
+  packages: ["resend"]
   pypi: ["resend"]
   go: ["github.com/resend/resend-go"]
-  imports: ["resend", "@react-email/"]
+  imports: ["resend"]
   env_prefixes: ["RESEND_"]
   config_files: []
 pages:

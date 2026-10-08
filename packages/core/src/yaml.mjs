@@ -3,7 +3,7 @@
 // scalars, numbers, booleans, null and `#` comments. Not a general YAML parser.
 
 export function parseFrontmatter(text) {
-	const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/.exec(text);
+	const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/.exec(text);
 	if (!m) return { data: {}, body: text };
 	return { data: parseYaml(m[1]), body: m[2] };
 }
@@ -49,6 +49,7 @@ export function parseYaml(src) {
 			if (!kv) throw new Error(`YAML: cannot parse line "${lines[i].text}"`);
 			i++;
 			const [key, value] = kv;
+			if (Object.hasOwn(out, key)) throw new Error(`YAML: duplicate key "${key}"`);
 			if (value !== '') out[key] = parseYamlScalar(value);
 			else if (i < lines.length && (lines[i].indent > indent || (lines[i].indent === indent && isItem(lines[i].text)))) out[key] = parseBlock();
 			else out[key] = null;
@@ -69,8 +70,10 @@ function stripYamlComment(line) {
 		const c = line[k];
 		if (quote) {
 			if (c === '\\' && quote === '"') k++;
+			else if (c === "'" && quote === "'" && line[k + 1] === "'") k++;
 			else if (c === quote) quote = null;
-		} else if (c === '"' || c === "'") {
+		} else if ((c === '"' || c === "'") && /(^|[:\-[{,])\s*$/.test(line.slice(0, k))) {
+			// Only a quote that starts a scalar opens a string; the apostrophe in `What's` does not.
 			quote = c;
 		} else if (c === '#' && (k === 0 || /\s/.test(line[k - 1]))) {
 			return line.slice(0, k);
@@ -99,6 +102,7 @@ export function parseYamlScalar(raw) {
 		for (const part of splitInline(s.slice(1, -1))) {
 			const kv = splitYamlKey(part);
 			if (!kv) throw new Error(`YAML: cannot parse map entry ${part}`);
+			if (Object.hasOwn(out, kv[0])) throw new Error(`YAML: duplicate key "${kv[0]}"`);
 			out[kv[0]] = parseYamlScalar(kv[1]);
 		}
 		return out;

@@ -11,7 +11,7 @@ prefer:
 avoid: 
 
 <!--
-One section per service, "## <Role>: <Vendor>". Roles: Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Other.
+One section per service, "## <Role>: <Vendor>". Roles: Hosting, Database, Auth, Email, Storage, Payments, Monitoring, AI, Other.
 
 ```
 ## Database: Supabase

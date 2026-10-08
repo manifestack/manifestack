@@ -70,33 +70,57 @@ export function findAgent(id) {
 
 const isOurs = (command) => typeof command === 'string' && command.includes(HOOK_SCRIPT);
 
+/** A config the user wrote in a shape we do not expect: reported, never overwritten. */
+export class ConfigError extends Error {}
+
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function checkList(value, where) {
+	if (value !== undefined && !Array.isArray(value)) throw new ConfigError(`${where} is not a list`);
+	return value ?? [];
+}
+
+const CLAUDE_MATCHER = 'Write|Edit|MultiEdit|Bash';
+// Cursor reads additional_context only from postToolUse; earlier versions registered afterFileEdit.
+const CURSOR_EVENTS = ['postToolUse', 'afterFileEdit'];
+const CURSOR_MATCHER = 'Write|Shell';
+
 // Each hook adapter knows where its script and config live and how to merge or remove our entry
-// without touching anything else in the config.
+// without touching anything else in the config. `add` replaces an outdated entry of ours.
 export const HOOKS = {
 	'claude-code': {
 		script: `.claude/hooks/${HOOK_SCRIPT}`,
 		config: '.claude/settings.json',
-		describe: 'PostToolUse hook (Write|Edit) in .claude/settings.json',
+		describe: `PostToolUse hook (${CLAUDE_MATCHER}) in .claude/settings.json`,
+		groups(config) {
+			if (config.hooks !== undefined && !isObject(config.hooks)) throw new ConfigError('hooks in .claude/settings.json is not an object');
+			const groups = checkList(config.hooks?.PostToolUse, 'hooks.PostToolUse in .claude/settings.json');
+			groups.forEach((g, i) => {
+				if (!isObject(g)) throw new ConfigError(`hooks.PostToolUse[${i}] in .claude/settings.json is not an object`);
+				checkList(g.hooks, `hooks.PostToolUse[${i}].hooks in .claude/settings.json`);
+			});
+			return groups;
+		},
 		add(config) {
+			const groups = this.groups(config);
+			const ours = groups.filter((g) => (g.hooks ?? []).some((h) => isOurs(h?.command)));
+			if (ours.length === 1 && ours[0].matcher === CLAUDE_MATCHER) return false;
+			this.remove(config);
 			const command = `node "$CLAUDE_PROJECT_DIR/.claude/hooks/${HOOK_SCRIPT}"`;
 			config.hooks ??= {};
 			config.hooks.PostToolUse ??= [];
-			if (!Array.isArray(config.hooks.PostToolUse)) throw new Error('hooks.PostToolUse in .claude/settings.json is not a list');
-			const present = config.hooks.PostToolUse.some((g) => (g?.hooks ?? []).some((h) => isOurs(h?.command)));
-			if (present) return false;
-			config.hooks.PostToolUse.push({ matcher: 'Write|Edit', hooks: [{ type: 'command', command, timeout: 10 }] });
+			config.hooks.PostToolUse.push({ matcher: CLAUDE_MATCHER, hooks: [{ type: 'command', command, timeout: 10 }] });
 			return true;
 		},
 		remove(config) {
-			const groups = config.hooks?.PostToolUse;
-			if (!Array.isArray(groups)) return false;
+			const groups = this.groups(config);
 			let changed = false;
 			const kept = [];
 			for (const g of groups) {
-				const hooks = (g?.hooks ?? []).filter((h) => !isOurs(h?.command));
-				if (hooks.length !== (g?.hooks ?? []).length) changed = true;
+				const hooks = (g.hooks ?? []).filter((h) => !isOurs(h?.command));
+				if (hooks.length !== (g.hooks ?? []).length) changed = true;
 				if (hooks.length) kept.push({ ...g, hooks });
-				else if (!(g?.hooks ?? []).length) kept.push(g);
+				else if (!(g.hooks ?? []).length) kept.push(g);
 			}
 			if (!changed) return false;
 			if (kept.length) config.hooks.PostToolUse = kept;
@@ -110,24 +134,33 @@ export const HOOKS = {
 		// Verify the event name and output format before a release (CONTRIBUTING.md, "Before a release").
 		script: `.cursor/hooks/${HOOK_SCRIPT}`,
 		config: '.cursor/hooks.json',
-		describe: 'afterFileEdit hook in .cursor/hooks.json',
+		describe: `postToolUse hook (${CURSOR_MATCHER}) in .cursor/hooks.json`,
+		lists(config) {
+			if (config.hooks !== undefined && !isObject(config.hooks)) throw new ConfigError('hooks in .cursor/hooks.json is not an object');
+			return Object.fromEntries(CURSOR_EVENTS.map((e) => [e, checkList(config.hooks?.[e], `hooks.${e} in .cursor/hooks.json`)]));
+		},
 		add(config) {
-			const command = `node .cursor/hooks/${HOOK_SCRIPT}`;
+			const lists = this.lists(config);
+			const current = lists.postToolUse.filter((h) => isOurs(h?.command));
+			if (current.length === 1 && current[0].matcher === CURSOR_MATCHER && !lists.afterFileEdit.some((h) => isOurs(h?.command))) return false;
+			this.remove(config);
 			config.version ??= 1;
 			config.hooks ??= {};
-			config.hooks.afterFileEdit ??= [];
-			if (!Array.isArray(config.hooks.afterFileEdit)) throw new Error('hooks.afterFileEdit in .cursor/hooks.json is not a list');
-			if (config.hooks.afterFileEdit.some((h) => isOurs(h?.command))) return false;
-			config.hooks.afterFileEdit.push({ command });
+			config.hooks.postToolUse ??= [];
+			config.hooks.postToolUse.push({ command: `node .cursor/hooks/${HOOK_SCRIPT}`, matcher: CURSOR_MATCHER, timeout: 10 });
 			return true;
 		},
 		remove(config) {
-			const list = config.hooks?.afterFileEdit;
-			if (!Array.isArray(list)) return false;
-			const kept = list.filter((h) => !isOurs(h?.command));
-			if (kept.length === list.length) return false;
-			if (kept.length) config.hooks.afterFileEdit = kept;
-			else delete config.hooks.afterFileEdit;
+			const lists = this.lists(config);
+			let changed = false;
+			for (const event of CURSOR_EVENTS) {
+				const kept = lists[event].filter((h) => !isOurs(h?.command));
+				if (kept.length === lists[event].length) continue;
+				changed = true;
+				if (kept.length) config.hooks[event] = kept;
+				else delete config.hooks[event];
+			}
+			if (!changed) return false;
 			if (!Object.keys(config.hooks).length) delete config.hooks;
 			if (Object.keys(config).length === 1 && config.version === 1) delete config.version;
 			return true;

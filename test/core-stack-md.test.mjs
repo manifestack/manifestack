@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
-import { parseStackMd, setFields, checkStack, lintStackMd, parseRevisit, parseUsage, findSecrets, scrubSecrets } from '../packages/core/src/stack-md.mjs';
+import { parseStackMd, setFields, checkStack, lintStackMd, parseRevisit, parseUsage, parseUsers, findSecrets, scrubSecrets } from '../packages/core/src/stack-md.mjs';
+
+// Built from parts so that secret scanners (GitHub push protection) do not take the fixture for a real key.
+const RESEND_LIKE = ['re', 'c1tpEyD8', 'NKFusih9vKVQknRAQfmFcWCv'].join('_');
 
 const SITE_EXAMPLE = `## Requirements
 budget: ~$600/mo
@@ -175,4 +178,185 @@ test('stack-md.mjs set creates .manifestack/ when it is missing', (t) => {
 	assert.equal(r.code, 0, r.stderr);
 	assert.equal(JSON.parse(r.stdout).file, '.manifestack/STACK.md');
 	assert.match(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), /## Database: Neon\nplan: Free\n/);
+});
+
+test('a comment starts at two spaces and #: set keeps "#" inside values', () => {
+	const input = '## Database: Supabase\ndecided: use plan #2 for now\nsource: x.com/pricing  # read 2026-10-06\n';
+	assert.equal(parseStackMd(input).sections[0].values.decided, 'use plan #2 for now');
+	const out = setFields(input, 'Database: Supabase', { decided: 'move to Pro' });
+	assert.match(out, /^decided: move to Pro$/m);
+	const issue = setFields(input, 'Database: Supabase', { decided: 'see issue #42' });
+	assert.equal(parseStackMd(issue).sections[0].values.decided, 'see issue #42');
+	// Two spaces before # in a new value would turn the rest into a comment on the next read.
+	assert.equal(parseStackMd(setFields(input, 'Database: Supabase', { next: 'Pro  #1 pick' })).sections[0].values.next, 'Pro #1 pick');
+});
+
+test('check: one unreadable section is an error, the others are still checked', () => {
+	const doc = (usage, rw = 'db_size > 400 MB') => `## Database: A\nusage: ${usage}\nrevisit_when: ${rw}\n\n## Email: B\nusage: 10\nrevisit_when: monthly_sent > 5\n`;
+	const r = checkStack(doc('312 MB, +1.1 MB/day (2026-13-01)'), { today: '2026-10-07' });
+	assert.equal(r.sections[0].status, 'error');
+	assert.match(r.sections[0].error, /2026-13-01/);
+	assert.equal(r.sections[1].status, 'triggered');
+	assert.equal(checkStack(doc('312 MB (2027-02-30)'), { today: '2026-10-07' }).sections[0].status, 'error');
+	assert.equal(checkStack(doc('1 MB', 'date >= 2027-02-30'), { today: '2026-10-07' }).sections[0].status, 'error');
+	const zero = checkStack(doc('0, +20%/mo', 'db_size > 400'), { today: '2026-10-07' }).sections[0];
+	assert.deepEqual([zero.status, zero.eta], ['ok', null]);
+	const slow = checkStack(doc('1 MB, +0.000001 MB/day (2026-10-01)'), { today: '2026-10-07' }).sections[0];
+	assert.deepEqual([slow.status, slow.eta], ['ok', null]);
+	assert.throws(() => checkStack(doc('1 MB'), { today: '2026-02-30' }), /YYYY-MM-DD/);
+	assert.deepEqual(lintStackMd('## Database: A\nusage: 1 MB (2026-13-01)\n').errors.map((e) => e.line), [1]);
+});
+
+test('check: a stale reading whose trend has crossed the threshold is triggered (projected)', () => {
+	const r = checkStack('## Database: A\nusage: 312 MB, +1.1 MB/day (2026-01-01)\nrevisit_when: db_size > 400 MB\n', { today: '2026-10-07' }).sections[0];
+	assert.equal(r.status, 'triggered');
+	assert.equal(r.projected, '2026-03-22');
+	assert.equal(r.when, 'Now');
+	assert.equal(r.eta, null);
+	// A real hit in an OR is not a projection.
+	const or = checkStack('## Database: A\nusage: db_size 312 MB, +1.1 MB/day (2026-01-01); mau 900\nrevisit_when: db_size > 400 MB OR mau > 500\n', { today: '2026-10-07' }).sections[0];
+	assert.equal(or.status, 'triggered');
+	assert.equal(or.projected, undefined);
+});
+
+test('check: readings without units follow the metric name, like thresholds', () => {
+	const v = '## Hosting: Vercel\nusage: transfer_tb 1.6 (2026-10-01); monthly_bill 540 (2026-10-01)\nrevisit_when: transfer_tb > 1.5 AND monthly_bill > $300\n';
+	assert.equal(checkStack(v, { today: '2026-10-07' }).sections[0].status, 'triggered');
+	const bare = '## Hosting: Vercel\nrevisit_when: transfer_tb > 1.5\n';
+	assert.equal(checkStack(bare, { today: '2026-10-07', metrics: { transfer_tb: { value: 1.6, dim: 'count' } } }).sections[0].status, 'triggered');
+	assert.equal(checkStack(bare, { today: '2026-10-07', metrics: { transfer_tb: { value: 1.4, dim: 'count' } } }).sections[0].status, 'ok');
+	const rate = checkStack('## Hosting: Vercel\nusage: transfer_tb 1.4, +0.1/mo (2026-10-01)\nrevisit_when: transfer_tb > 1.5\n', { today: '2026-10-07' }).sections[0];
+	assert.equal(rate.status, 'ok');
+	assert.equal(rate.eta, '2026-10-31');
+	assert.equal(checkStack('## Hosting: Vercel\nusage: 3 GB\nrevisit_when: monthly_bill > $300\n', { today: '2026-10-07' }).sections[0].status, 'unknown');
+});
+
+test('secrets: env var names, URL slugs and word names are not keys', () => {
+	const fine = 'env: NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL, AWS_S3_BUCKET_NAME_FOR_EXPORTS_2024\nsource: clerk.com/changelog/2024-11-05-pro-plan-pricing-update  # read 2026-10-07\ndecided: re_engagement_campaign_emails go through Resend\nnote: re_engagement_campaigns\n';
+	assert.deepEqual(findSecrets(fine), []);
+	assert.equal(scrubSecrets(fine), fine);
+	const keys = `a: ${RESEND_LIKE}\nb: a3f9c2e1b4d5a6f7e8d9c0b1a2f3e4d5c6b7a8f9\nc: dozjgNryP4J3jVmNHl0w5NdozjgNryP4J3jVmN\nd: see docs/2024-11-05-pricing then key_8f3KdA9xQ2mZ7pL4vB6nT1cR5yW0eH3j`;
+	assert.deepEqual([...new Set(findSecrets(keys).map((s) => s.line))], [1, 2, 3, 4]);
+	assert.doesNotThrow(() => setFields('', 'Storage: R2', { env: 'NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL', source: 'clerk.com/changelog/2024-11-05-pro-plan-pricing-update' }));
+});
+
+test('a UTF-8 BOM does not hide the first heading and is not written back', () => {
+	const text = '\uFEFF## Requirements\nbudget: $1\n';
+	assert.deepEqual(parseStackMd(text).requirements, { budget: '$1' });
+	assert.equal(setFields(text, 'Requirements', { users: '5' }), '## Requirements\nbudget: $1\nusers: 5\n');
+	assert.deepEqual(lintStackMd(text).warnings, []);
+});
+
+test('set keeps each line ending and uses the dominant one for new lines', () => {
+	assert.equal(setFields('## A: B\r\nplan: x\nlimit: y\nnext: z\n', 'A: B', { plan: 'w', env: 'E' }), '## A: B\r\nplan: w\nlimit: y\nnext: z\nenv: E\n');
+	assert.equal(setFields('## A: B\r\nplan: x\r\nnext: z\n', 'A: B', { env: 'E' }), '## A: B\r\nplan: x\r\nnext: z\nenv: E\r\n');
+	assert.equal(setFields('## A: B\nplan: x', 'A: B', { env: 'E' }), '## A: B\nplan: x\nenv: E\n');
+});
+
+test('set rejects line breaks in section names and comments', () => {
+	assert.throws(() => setFields('', 'Auth: X', { plan: 'a' }, { plan: 'ok\n## Auth: Evil' }), /one line/);
+	assert.throws(() => setFields('', 'Auth: X\r\n## Auth: Evil', { plan: 'a' }), /one line/);
+	assert.throws(() => setFields('', 'Auth: X', { plan: 'a' }, { plan: 'sk_live_abcdefgh12345678' }), /secret/);
+});
+
+test('a comment without a value comments the existing line', () => {
+	assert.equal(setFields('## A: B\nplan: x\n', 'A: B', {}, { plan: 'checked 2026-10-07' }), '## A: B\nplan: x  # checked 2026-10-07\n');
+	assert.equal(setFields('## A: B\nplan: x  # old\n', 'A: B', {}, { plan: '' }), '## A: B\nplan: x\n');
+	assert.throws(() => setFields('## A: B\nplan: x\n', 'A: B', {}, { limit: 'checked' }), /no limit line/);
+	assert.throws(() => setFields('', 'A: B', {}, { plan: 'checked' }), /no plan line/);
+});
+
+test('section names match regardless of spacing around ":" and case', () => {
+	const input = '## Database: Supabase\nplan: x\n';
+	assert.equal(setFields(input, 'Database:Supabase', { plan: 'y' }), '## Database: Supabase\nplan: y\n');
+	assert.equal(setFields(input, '  database :  supabase ', { plan: 'y' }), '## Database: Supabase\nplan: y\n');
+	assert.match(setFields(input, 'Auth:Clerk', { plan: 'Hobby' }), /\n## Auth: Clerk\nplan: Hobby\n$/);
+});
+
+test('headings inside HTML comments are not sections', () => {
+	const text = '## Requirements\nbudget: $1\n\n<!--\n## Database: Firebase\nplan: x\n-->\n<!-- ## Auth: Y -->\n\n## Email: Resend\nplan: Free\n';
+	assert.deepEqual(parseStackMd(text).sections.map((s) => s.heading), ['Requirements', 'Email: Resend']);
+	assert.match(setFields(text, 'Database: Firebase', { plan: 'Spark' }), /\n## Database: Firebase\nplan: Spark\n$/);
+	const template = readFileSync(join(ROOT, 'skills/manifestack/assets/STACK.template.md'), 'utf8');
+	assert.deepEqual(parseStackMd(template).sections.map((s) => s.heading), ['Requirements']);
+});
+
+test('Requirements users: thousands, k/m and the first number only when it is a user count', () => {
+	for (const [text, n] of [['9 000', 9000], ['9,000 now', 9000], ['~9k', 9000], ['1_500 users', 1500], ['1.2M', 1.2e6], ['9k now, 50k by Q3', 9000], ['40 now, 60 by next year', 40], ['Q3: 50k', 50000]]) assert.equal(parseUsers(text), n, text);
+	for (const text of ['12 months out, 3k', '2026-10-01: 9k', '$5 / seat', 'not sure', '', undefined]) assert.equal(parseUsers(text), null, String(text));
+	const doc = (users) => `## Requirements\nusers: ${users}\n\n## Auth: Clerk\nrevisit_when: users > 5k\n`;
+	assert.equal(checkStack(doc('9 000'), { today: '2026-10-07' }).sections[0].status, 'triggered');
+	assert.equal(checkStack(doc('12 months out, 3k'), { today: '2026-10-07' }).sections[0].status, 'unknown');
+});
+
+test('quantities: "1,5 GB" is not 15 GB, and parentheses need no spaces', () => {
+	assert.throws(() => parseRevisit('db_size > 1,5 GB'), /cannot read/);
+	assert.equal(checkStack('## Database: A\nusage: 1,5 GB\nrevisit_when: db_size > 1 GB\n', { today: '2026-10-07' }).sections[0].status, 'unknown');
+	assert.equal(parseRevisit('(db_size > 400 MB)AND(date >= 2027-01-01)').type, 'AND');
+	assert.equal(parseRevisit('(db_size > 400 MB)OR date >= 2027-01-01').type, 'OR');
+	assert.equal(checkStack('## Database: A\nusage: 450 MB\nrevisit_when: (db_size > 400 MB)AND(date >= 2026-01-01)\n', { today: '2026-10-07' }).sections[0].status, 'triggered');
+});
+
+test('stack-md.mjs set --json reads values and comments from a file or stdin', (t) => {
+	const dir = tempDir(t);
+	const script = join(ROOT, 'skills/manifestack-guard/scripts/stack-md.mjs');
+	const page = 'Free: 3,000 emails/mo $(touch pwned) `id`';
+	const r = runNode(script, ['set', '--section', 'Email: Resend', '--json', '-'], { cwd: dir, input: JSON.stringify({ plan: 'Free', limit: page, source: { value: 'resend.com/pricing', comment: 'read 2026-10-07' } }) });
+	assert.equal(r.code, 0, r.stderr);
+	const file = join(dir, '.manifestack/STACK.md');
+	assert.equal(readFileSync(file, 'utf8'), `## Email: Resend\nplan: Free\nlimit: ${page}\nsource: resend.com/pricing  # read 2026-10-07\n`);
+	writeFileSync(join(dir, 'fields.json'), JSON.stringify({ plan: { comment: 'checked 2026-10-08' }, usage: 'monthly_sent 1,200 (2026-10-08)' }));
+	const f = runNode(script, ['set', '--section', 'Email:Resend', '--json', 'fields.json', '--set', 'next=Pro'], { cwd: dir });
+	assert.equal(f.code, 0, f.stderr);
+	assert.match(readFileSync(file, 'utf8'), /^plan: Free {2}# checked 2026-10-08\n[^]*usage: monthly_sent 1,200 \(2026-10-08\)\nnext: Pro\n$/m);
+	const before = readFileSync(file, 'utf8');
+	for (const [input, re] of [['[1]', /object/], ['{"plan": ', /not valid JSON/], ['{"plan": {"value": "x", "extra": 1}}', /value/], ['{"plan": "Pro"}', /given twice/], [`{"env": "RESEND_KEY=${RESEND_LIKE}"}`, /secret/]]) {
+		const bad = runNode(script, ['set', '--section', 'Email: Resend', '--set', 'plan=Pro', '--json', '-'], { cwd: dir, input });
+		assert.notEqual(bad.code, 0, input);
+		assert.match(bad.stderr, re, input);
+		assert.ok(!bad.stderr.includes('re_c1tp'));
+	}
+	assert.equal(readFileSync(file, 'utf8'), before);
+});
+
+test('stack-md.mjs CLI: --help, --today, confinement and newline injection', (t) => {
+	const dir = tempDir(t);
+	const script = join(ROOT, 'skills/manifestack/scripts/stack-md.mjs');
+	const help = runNode(script, ['set', '--help'], { cwd: dir });
+	assert.equal(help.code, 0);
+	assert.match(help.stdout, /--json/);
+	mkdirSync(join(dir, 'proj/.manifestack'), { recursive: true });
+	const cwd = join(dir, 'proj');
+	writeFileSync(join(cwd, '.manifestack/STACK.md'), SITE_EXAMPLE);
+	assert.match(runNode(script, ['check', '--today'], { cwd }).stderr, /--today needs a date/);
+	assert.match(runNode(script, ['check', '--today', '2026-13-01'], { cwd }).stderr, /--today needs a date/);
+	const out = runNode(script, ['set', '../outside.md', '--section', 'A: B', '--set', 'plan=x'], { cwd });
+	assert.notEqual(out.code, 0);
+	assert.match(out.stderr, /outside the current directory/);
+	assert.ok(!existsSync(join(dir, 'outside.md')));
+	symlinkSync(join(dir, 'elsewhere.md'), join(cwd, 'link.md'));
+	assert.notEqual(runNode(script, ['set', 'link.md', '--section', 'A: B', '--set', 'plan=x'], { cwd }).code, 0);
+	assert.ok(!existsSync(join(dir, 'elsewhere.md')));
+	const before = readFileSync(join(cwd, '.manifestack/STACK.md'), 'utf8');
+	const inj = runNode(script, ['set', '--section', 'Auth: Clerk', '--set', 'plan=Hobby', '--comment', 'plan=ok\n## Auth: Evil'], { cwd });
+	assert.notEqual(inj.code, 0);
+	assert.equal(readFileSync(join(cwd, '.manifestack/STACK.md'), 'utf8'), before);
+	const c = runNode(script, ['set', '--section', 'Database: Supabase', '--comment', 'plan=checked 2026-10-08'], { cwd });
+	assert.equal(c.code, 0, c.stderr);
+	assert.match(readFileSync(join(cwd, '.manifestack/STACK.md'), 'utf8'), /^plan: free {2}# checked 2026-10-08$/m);
+	assert.notEqual(runNode(script, ['set', '--section', 'Database: Supabase', '--comment', 'owner=me'], { cwd }).code, 0);
+});
+
+test('"<!--" inside a value is text; only a line starting with <!-- opens a comment', () => {
+	const doc = parseStackMd('## Database: Neon\ndecided: keep free tier <!-- see wiki\nusage: 450 MB\n\n<!--\n## Auth: Example\n-->\n## Email: Resend\nplan: Free\n');
+	assert.deepEqual(doc.sections.map((s) => s.heading), ['Database: Neon', 'Email: Resend']);
+	assert.equal(doc.sections[0].values.usage, '450 MB');
+});
+
+test('users written out in words: million, thousand, bn', () => {
+	assert.equal(parseUsers('5 million'), 5e6);
+	assert.equal(parseUsers('1.5 Million by 2027'), 1.5e6);
+	assert.equal(parseUsers('2 thousand'), 2000);
+	assert.equal(parseUsers('3 bn'), 3e9);
+	assert.equal(parseUsers('5 mo'), null);
 });

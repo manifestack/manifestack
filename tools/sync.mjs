@@ -7,6 +7,15 @@
 //   node tools/sync.mjs                      write the copies
 //   node tools/sync.mjs --check              fail if a copy differs from its source (CI)
 //   node tools/sync.mjs --into packages/cli  also copy skills/, hooks/, README and LICENSE into a package (prepack)
+//
+// Bundling works line by line, so core modules follow a few rules (sync fails if they do not):
+//   - imports are one-line named imports from node: or ./ modules, without "as" renames;
+//   - no `export ... from` re-exports and no multi-line `export { ... }` lists;
+//   - top-level names are unique across the bundled modules. The check sees declarations that
+//     start at column 0, including one-line destructuring (`const { a, b: c } = ...`); it does not
+//     see nested destructuring or names declared on a continuation line.
+// Generated copies whose source is gone are removed: every file in OWNED_DIRS, and elsewhere in
+// skills/ and hooks/ only files that carry the generated banner (hand-written files stay).
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, rmSync, cpSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -23,9 +32,24 @@ const SKILLS = {
 };
 // Directories that sync owns completely: files without a source there are removed.
 const OWNED_DIRS = Object.entries(SKILLS).flatMap(([name, s]) => [s.vendors && `skills/${name}/vendors`, s.scripts.length && `skills/${name}/scripts`].filter(Boolean));
+// Directories that mix generated and hand-written files: only files with the banner are removed.
+const MIXED_DIRS = [...Object.keys(SKILLS).flatMap((name) => ['references', 'vendors', 'scripts'].map((d) => `skills/${name}/${d}`)), 'hooks'].filter((d) => !OWNED_DIRS.includes(d));
 
 const BANNER_JS = '// generated, edit catalog/ or packages/core/ (then run: node tools/sync.mjs)';
 const bannerMd = (src) => `<!-- generated, edit ${src} (then run: node tools/sync.mjs) -->`;
+
+/** Top-level names a line declares, if it starts with a declaration (one-line destructuring included). */
+export function declaredNames(line) {
+	const simple = /^(?:export\s+)?(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/.exec(line);
+	if (simple) return [simple[1]];
+	const destructured = /^(?:export\s+)?(?:const|let|var)\s*([{[])(.*)([}\]])\s*=/.exec(line);
+	if (!destructured) return [];
+	return destructured[2]
+		.split(',')
+		.map((part) => part.split('=')[0].trim().replace(/^\.\.\./, ''))
+		.map((part) => (part.includes(':') ? part.split(':').pop().trim() : part))
+		.filter((name) => /^[A-Za-z_$][\w$]*$/.test(name));
+}
 
 /** Bundles a core module and its local imports into one dependency-free ES module. */
 export function bundle(entryFile, embeds = {}) {
@@ -53,6 +77,8 @@ export function bundle(entryFile, embeds = {}) {
 				} else throw new Error(`${rel}: only node: and relative imports are allowed (scripts have no dependencies): ${m[2]}`);
 				continue;
 			}
+			if (/^export\s*\*/.test(line) || /^export\s*\{[^}]*\}\s*from\b/.test(line)) throw new Error(`${rel}: re-exports are not supported; import the names and export them from the module that uses them: ${line}`);
+			if (/^export\s*\{/.test(line) && !line.includes('}')) throw new Error(`${rel}: export lists must be on one line: ${line}`);
 			if (!isEntry && /\/\/ @main\s*$/.test(line)) continue;
 			const embed = /^let (\w+) = null; \/\/ @embed:(\w+)\s*$/.exec(line);
 			if (embed) {
@@ -60,10 +86,9 @@ export function bundle(entryFile, embeds = {}) {
 				body.push(`let ${embed[1]} = ${JSON.stringify(embeds[embed[2]])};`);
 				continue;
 			}
-			const decl = /^(?:export\s+)?(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/.exec(line);
-			if (decl) {
-				if (names.has(decl[1]) && names.get(decl[1]) !== rel) throw new Error(`top-level name "${decl[1]}" is declared in both ${names.get(decl[1])} and ${rel}`);
-				names.set(decl[1], rel);
+			for (const name of declaredNames(line)) {
+				if (names.has(name) && names.get(name) !== rel) throw new Error(`top-level name "${name}" is declared in both ${names.get(name)} and ${rel}`);
+				names.set(name, rel);
 			}
 			if (isEntry) body.push(line);
 			else if (/^export\s+\{/.test(line)) continue;
@@ -104,15 +129,24 @@ export async function plan() {
 	return files;
 }
 
-function stale(files) {
+const isGenerated = (abs) => readFileSync(abs, 'utf8').split('\n').slice(0, 2).some((l) => l.includes('generated, edit '));
+
+/** Generated files under `root` that no source produces any more (repo-relative paths). */
+export function stale(files, root = ROOT) {
 	const wanted = new Set(files.map((f) => f.path));
 	const out = [];
-	for (const dir of OWNED_DIRS) {
-		const abs = join(ROOT, dir);
-		if (!existsSync(abs)) continue;
-		for (const f of readdirSync(abs)) if (!wanted.has(`${dir}/${f}`)) out.push(`${dir}/${f}`);
+	for (const [dirs, owned] of [[OWNED_DIRS, true], [MIXED_DIRS, false]]) {
+		for (const dir of dirs) {
+			const abs = join(root, dir);
+			if (!existsSync(abs)) continue;
+			for (const e of readdirSync(abs, { withFileTypes: true })) {
+				const rel = `${dir}/${e.name}`;
+				if (!e.isFile() || wanted.has(rel)) continue;
+				if (owned || isGenerated(join(abs, e.name))) out.push(rel);
+			}
+		}
 	}
-	return out;
+	return out.sort();
 }
 
 async function main(argv) {

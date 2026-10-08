@@ -5,7 +5,7 @@ name: RevenueCat
 roles: [payments]
 detect:
   packages: ["react-native-purchases", "react-native-purchases-ui", "react-native-purchases-store-galaxy", "cordova-plugin-purchases", "@revenuecat/"]
-  imports: ["react-native-purchases", "cordova-plugin-purchases", "@revenuecat/"]
+  imports: ["react-native-purchases", "react-native-purchases-ui", "cordova-plugin-purchases", "@revenuecat/"]
   pypi: []
   go: []
   env_prefixes: ["REVENUECAT_", "EXPO_PUBLIC_REVENUECAT_", "NEXT_PUBLIC_REVENUECAT_", "VITE_REVENUECAT_"]

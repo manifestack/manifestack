@@ -1,9 +1,9 @@
 {
-  "description": "Manifestack: after package.json changes, flag vendors that are new to the project",
+  "description": "Manifestack: after a dependency manifest edit (package.json, requirements*.txt, pyproject.toml, Pipfile, go.mod) or a package-manager install command (npm, pnpm, yarn, bun, pip, uv, poetry, pipenv, go get), flag vendors that are new to the project",
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|Bash",
         "hooks": [
           {
             "type": "command",

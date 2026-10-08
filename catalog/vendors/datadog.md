@@ -7,7 +7,7 @@ detect:
   packages: ["dd-trace", "dd-trace-api", "@datadog/", "datadog-lambda-js"]
   pypi: ["ddtrace", "datadog", "datadog-api-client", "datadog-lambda"]
   go: ["github.com/DataDog/dd-trace-go", "gopkg.in/DataDog/dd-trace-go.v1", "github.com/DataDog/datadog-go", "github.com/DataDog/datadog-api-client-go", "github.com/DataDog/datadog-lambda-go"]
-  imports: ["dd-trace", "@datadog/", "datadog-lambda-js"]
+  imports: ["dd-trace", "dd-trace-api", "@datadog/", "datadog-lambda-js"]
   env_prefixes: ["DD_", "DATADOG_", "NEXT_PUBLIC_DATADOG_", "VITE_DATADOG_"]
   config_files: ["datadog.yaml", "datadog-values.yaml", "datadog-ci.json"]
 pages:
@@ -70,4 +70,4 @@ verified: 2026-10-07
 - The site is fixed per organization (EU1 is in Germany; US1 is the default). A data-region requirement means checking the site in the app URL (`app.datadoghq.eu` vs `app.datadoghq.com`), and moving means a new organization.
 - MCP: the official Datadog MCP server (remote, `toolsets` and `omit_tools` URL parameters) has no read-only switch. Writes are blocked only if the authorizing user's Datadog role lacks write permissions, which the skill cannot check, and its core tools return log, span and RUM contents that can hold user data. Do not use it for the audit; ask the usage questions instead.
 - Detection: `DD_` env names are weak alone (short prefix). `datadog.yaml` is the Agent config and `datadog-values.yaml` the usual Helm values file; both mean the Agent is deployed from this repo. `hot-shots` and other StatsD clients can send to Datadog, but they are not counted, because they also send to plain StatsD.
-- Datadog next to Sentry (errors, APM), PostHog or LogRocket (session replay vs RUM), or a second log platform is an Overlap finding.
+- Datadog next to Sentry (errors, APM), PostHog or LogRocket (session replay vs RUM), or a second log platform is a candidate Overlap. Two monitoring tools often do different jobs, so confirm in the code which features each one uses and ask the user before reporting it.

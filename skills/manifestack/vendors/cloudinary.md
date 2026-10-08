@@ -6,7 +6,7 @@ name: Cloudinary
 roles: [storage]
 detect:
   packages: ["cloudinary", "@cloudinary/", "next-cloudinary", "cloudinary-core", "cloudinary-react", "astro-cloudinary", "svelte-cloudinary"]
-  imports: ["cloudinary", "@cloudinary/", "next-cloudinary"]
+  imports: ["cloudinary", "@cloudinary/", "next-cloudinary", "cloudinary-core", "cloudinary-react"]
   pypi: ["cloudinary", "django-cloudinary-storage"]
   go: ["github.com/cloudinary/cloudinary-go"]
   env_prefixes: ["CLOUDINARY_", "NEXT_PUBLIC_CLOUDINARY_"]

@@ -48,8 +48,11 @@ try {
 	writeFileSync(join(app, 'package.json'), after);
 	const claude = JSON.parse(node(['.claude/hooks/manifestack-new-vendor.mjs'], app, JSON.stringify({ cwd: app, tool_name: 'Write', tool_input: { file_path: 'package.json' } })));
 	assert.match(claude.hookSpecificOutput.additionalContext, /Resend \(email\) was added/);
-	const cursor = JSON.parse(node(['.cursor/hooks/manifestack-new-vendor.mjs'], app, JSON.stringify({ hook_event_name: 'afterFileEdit', file_path: join(app, 'package.json'), edits: [{ old_string: before, new_string: after }], workspace_roots: [app] })));
+	const cursorEvent = (tool_name, tool_input) => JSON.stringify({ hook_event_name: 'postToolUse', workspace_roots: [app], cwd: app, tool_name, tool_input });
+	const cursor = JSON.parse(node(['.cursor/hooks/manifestack-new-vendor.mjs'], app, cursorEvent('Write', { file_path: join(app, 'package.json'), edits: [{ old_string: before, new_string: after }] })));
 	assert.match(cursor.additional_context, /Resend \(email\) was added/);
+	const shell = JSON.parse(node(['.cursor/hooks/manifestack-new-vendor.mjs'], app, cursorEvent('Shell', { command: 'npm install stripe' })));
+	assert.match(shell.additional_context, /Stripe \(payments\) was added with npm install/);
 
 	const detected = JSON.parse(node(['.claude/skills/manifestack/scripts/detect.mjs'], app));
 	assert.ok(detected.vendors.some((v) => v.id === 'resend'), 'detect.mjs did not find resend');

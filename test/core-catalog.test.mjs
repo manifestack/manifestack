@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './helpers.mjs';
-import { loadCatalog, parseVendorMap, validateVendorMap } from '../packages/core/src/catalog.mjs';
+import { loadCatalog, parseVendorMap, validateVendorMap, packageClashes } from '../packages/core/src/catalog.mjs';
 import { parseYaml, parseFrontmatter } from '../packages/core/src/yaml.mjs';
 
 const VENDORS_DIR = join(ROOT, 'catalog/vendors');
@@ -23,7 +23,8 @@ test('every vendor map is valid, with usage questions and notes', () => {
 test('maps hold no prices', () => {
 	for (const id of ALL_IDS) {
 		const text = readFileSync(join(VENDORS_DIR, `${id}.md`), 'utf8');
-		assert.ok(!/\$\s?\d/.test(text), `${id}.md contains a dollar amount; prices are read from the page at run time`);
+		const price = /[$€£]\s?\d|\d\s?[€£]|\b(?:USD|EUR|GBP)\s?\d|\d\s?(?:USD|EUR|GBP)\b/.exec(text);
+		assert.ok(!price, `${id}.md contains a price ("${price?.[0]}"); prices are read from the page at run time`);
 	}
 });
 
@@ -72,4 +73,35 @@ empty:
 	assert.deepEqual(data, { a: 1, b: 'x # not a comment', c: ['one', 'two, three', "it's"], d: { e: true, f: null }, list: ['plain item', { key: 'v', other: 'w' }], nested: ['x', 'y'], url: 'https://example.com/a#b', empty: null });
 	assert.deepEqual(parseFrontmatter('no frontmatter').data, {});
 	assert.throws(() => parseYaml('a: 1\n   b: 2'), /indentation|parse/);
+});
+
+test('yaml: an apostrophe inside a plain scalar does not hide a comment', () => {
+	assert.deepEqual(parseYaml(`ask: What's the MAU? # note\nq: say "hi" # note\nr: 'it''s # kept'  # note`), { ask: "What's the MAU?", q: 'say "hi"', r: "it's # kept" });
+	assert.deepEqual(parseYaml('- {a: 1}\n- [x, "y # z"] # note'), [{ a: 1 }, ['x', 'y # z']]);
+});
+
+test('yaml: duplicate keys are an error', () => {
+	assert.throws(() => parseYaml('a: 1\nb: 2\na: 3'), /duplicate key "a"/);
+	assert.throws(() => parseYaml('d:\n  x: 1\n  x: 2'), /duplicate key "x"/);
+	assert.throws(() => parseYaml('m: {x: 1, x: 2}'), /duplicate key "x"/);
+	assert.deepEqual(parseFrontmatter('\uFEFF---\na: 1\n---\nbody').data, { a: 1 });
+});
+
+test('detect fields must be lists of non-empty strings', () => {
+	const template = readFileSync(join(ROOT, 'catalog/vendors/_template.md'), 'utf8');
+	const withDetect = (detect) => validateVendorMap(parseVendorMap(template.replace(/^detect:\n(?: {2}.*\n)+/m, `detect:\n${detect}\n`)));
+	assert.deepEqual(withDetect('  packages: ["stripe"]'), []);
+	assert.ok(withDetect('  packages: stripe').includes('detect.packages must be a list of non-empty strings'));
+	assert.ok(withDetect('  packages: ["x"]\n  imports: [""]').includes('detect.imports must be a list of non-empty strings'));
+	assert.ok(withDetect('  packages: ["x"]\n  go: [1]').includes('detect.go must be a list of non-empty strings'));
+	assert.ok(withDetect('  packages: ["x"]\n  role_signals: ["send("]').includes('detect.role_signals must map roles to lists'));
+	assert.ok(withDetect('  packages: ["x"]\n  role_signals:\n    auth: "send("').includes('role_signals.auth must be a list of non-empty strings'));
+	assert.ok(withDetect('  packages: []').includes('detect needs at least one signature'));
+});
+
+test('two maps cannot claim the same package', () => {
+	const vendors = loadCatalog(VENDORS_DIR);
+	assert.deepEqual(packageClashes(vendors), []);
+	const copy = { id: 'copy', detect: { packages: ['@clerk/'], pypi: ['Clerk_Backend.API'], go: [] } };
+	assert.deepEqual(packageClashes([...vendors, copy]), ['clerk.md and copy.md both claim detect.packages "@clerk/"', 'clerk.md and copy.md both claim detect.pypi "Clerk_Backend.API"']);
 });

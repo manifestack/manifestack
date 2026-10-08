@@ -30,7 +30,13 @@ A quick check before the stack changes. It reads `.manifestack/STACK.md` only; i
 4. Report in two to four lines:
    - nothing to flag → say so in one line and continue;
    - a conflict or a new vendor → say what it is and suggest checking it before relying on it: `/manifestack audit` when STACK.md exists, `/manifestack` when it does not (it records the stack first). Do not block the user's task.
-5. If the user confirms the change, offer to add a section for the new service to STACK.md. Write it only on a yes, with `node <skill-dir>/scripts/stack-md.mjs set .manifestack/STACK.md --section "<Role>: <Vendor>" --set "plan=…"`, and then `… lint .manifestack/STACK.md`.
+5. If the user confirms the change, offer to add a section for the new service to STACK.md. Write it only on a yes, passing the fields as JSON in a heredoc with a quoted delimiter (`<<'EOF'`), so the shell does not expand `$(…)`, backticks or `$VAR` in text copied from a page:
+   ```bash
+   node <skill-dir>/scripts/stack-md.mjs set --section "Email: Resend" --json - <<'EOF'
+   {"plan": "Free", "limit": "3,000 emails/mo"}
+   EOF
+   ```
+   A field can carry a comment: `{"source": {"value": "resend.com/pricing", "comment": "read 2026-10-06"}}`. Then run `node <skill-dir>/scripts/stack-md.mjs lint .manifestack/STACK.md`.
 
 ## Rules
 

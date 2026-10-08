@@ -8,6 +8,11 @@ on:
 
 permissions: {}
 
+# One release at a time; a second tag waits instead of racing the first.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   # The full CI (every Node version, Windows, plugin and package checks) must pass before anything is published.
   ci:
@@ -35,10 +40,17 @@ jobs:
         run: |
           version=$(node -p "require('./packages/cli/package.json').version")
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != v$version"; exit 1; }
+      # The release notes are the CHANGELOG section of this version; a release without one stops here.
+      - name: Release notes from CHANGELOG.md
+        run: node tools/changelog-notes.mjs "${GITHUB_REF_NAME#v}" > "$RUNNER_TEMP/notes.md"
       # Trusted publishing (OIDC): no tokens. Set up on npmjs.com for release.yml, environment npm.
+      # A re-run after a failed GitHub release skips the publish that already went through.
       - name: Publish to npm
-        run: npm publish -w packages/cli --access public --provenance
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if npm view "manifestack@$version" version >/dev/null 2>&1; then echo "manifestack@$version is already on npm"; exit 0; fi
+          npm publish -w packages/cli --access public --provenance
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

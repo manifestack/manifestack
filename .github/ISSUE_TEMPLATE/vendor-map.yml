@@ -1,0 +1,35 @@
+name: Vendor map request
+description: Ask for a page map for a vendor manifestack does not know yet.
+labels: [vendor-map]
+body:
+  - type: input
+    id: vendor
+    attributes:
+      label: Vendor
+      placeholder: Turso
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Role
+      options: [Hosting, Database, Auth, Email, Storage, Payments, Monitoring, AI, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: pages
+    attributes:
+      label: Official pages
+      description: Pricing, limits or quotas, regions and security pages on the vendor's own domain.
+    validations:
+      required: true
+  - type: input
+    id: packages
+    attributes:
+      label: SDK package names
+      description: npm, PyPI or Go module names the vendor's SDKs use.
+  - type: textarea
+    id: traps
+    attributes:
+      label: Limits or bills that surprised you
+      description: Optional. A cap, a pause or a charge an audit should check.

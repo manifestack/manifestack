@@ -1,0 +1,39 @@
+name: Bug
+description: Something manifestack did wrong, from the installer, the hook or a skill answer.
+labels: [bug]
+body:
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options: [Claude Code, Cursor, Codex, GitHub Copilot, Windsurf, OpenCode, Cline, Gemini CLI, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed with
+      options: [npx manifestack, Claude Code plugin, npx skills add, manual copy]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Output of `npx manifestack --version`, `node --version` and your OS.
+      placeholder: manifestack 0.3.0, Node 24.1.0, macOS 15
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What you ran and what happened
+      description: The command or prompt, and the output or answer. Remove keys, tokens and customer data first.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true

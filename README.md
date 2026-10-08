@@ -23,6 +23,8 @@ Manifestack is a skill for your coding agent (Claude Code, Cursor, Codex and oth
 
 ## Quick start
 
+Requires Node.js 22 or newer.
+
 ```bash
 npx manifestack
 ```
@@ -36,7 +38,7 @@ Then run `/manifestack`, or just ask your agent: "what breaks first at 50k users
 - **Choosing a vendor:** compares two or three vendors for the same job on your workload: requirements, cost at your size, the first limit, the features you use and what it takes to leave.
 - **Every change:** in Claude Code and Cursor, a hook flags each new vendor SDK and checks it against your requirements before you rely on it.
 
-It never changes your code or vendor settings, needs no API keys or account, and writes only `.manifestack/STACK.md`.
+It never changes your code or vendor settings and needs no API keys or account. The skill writes only inside `.manifestack/`: `STACK.md`, plus working files in `.manifestack/tmp/` that git ignores. The installer adds the skill folders and, for Claude Code and Cursor, one hook entry; `npx manifestack uninstall` removes them.
 
 ## Usage
 
@@ -166,7 +168,7 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Monitoring | Sentry, PostHog, Datadog |
 | AI | OpenAI, Anthropic, Google Gemini |
 
-[Request a map](https://github.com/manifestack/manifestack/issues).
+[Request a map](https://github.com/manifestack/manifestack/issues/new?template=vendor-map.yml).
 
 ## Contributing
 

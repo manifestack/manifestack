@@ -16,23 +16,29 @@ pages:
   limits: https://vercel.com/docs/limits
   hobby: https://vercel.com/docs/plans/hobby
   regions: https://vercel.com/docs/regions
+  flat_rate_cdn: https://vercel.com/docs/pricing/flat-rate-cdn
+  spend_management: https://vercel.com/docs/spend-management
   security: https://vercel.com/security
   dpa: https://vercel.com/legal/dpa
 read:
   - Hobby is for personal, non-commercial use only (a commercial project on Hobby is a Requirement finding)
   - Fast Data Transfer included per plan and the overage rate per GB
+  - Flat Rate CDN tiers on Pro (fixed monthly price for CDN requests and data transfer) and who is not eligible; compare the tier that fits with the on-demand overage before reporting a transfer Bill
   - Fast Origin Transfer and Edge/CDN requests included and overage rates
   - Function invocations, Active CPU hours and provisioned memory included and overage rates
   - Image transformations and image cache reads/writes included
   - Pro price per seat and the included usage credit
   - what happens past a Hobby limit (features paused, typically until the 30-day window resets)
-  - Spend Management availability and defaults on Pro
+  - Spend Management on Pro: the default on-demand budget, whether reaching it pauses production deployments, and that paused projects must be resumed by hand
   - compute regions and the default function region
   - certifications (SOC 2 Type 2, ISO 27001, PCI DSS, HIPAA on Enterprise) and DPA
 usage_questions:
   - metric: transfer_tb
     ask: Fast Data Transfer last month (and the month before, for the trend)?
     where: Dashboard → team → Usage → Networking → Fast Data Transfer
+  - metric: cdn_requests
+    ask: CDN requests last month? (decides which Flat Rate CDN tier fits)
+    where: Dashboard → team → Usage → CDN Requests
   - metric: function_invocations
     ask: Function invocations last month?
     where: Dashboard → team → Usage → Functions → Invocations

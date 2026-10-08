@@ -23,7 +23,7 @@ env: SUPABASE_URL, SUPABASE_ANON_KEY  # names only
 
 ## Sections
 
-- `## Requirements`: keys `budget`, `users`, `requires`, `prefer`, `avoid`. Free text values. `requires` holds hard rules from outside (region, certifications, contracts); `prefer` what the team knows or wants to use; `avoid` vendors, technologies or setups the team rules out (Kubernetes, a specific cloud, self-hosting, lock-in), with an optional reason as a comment.
+- `## Requirements`: keys `budget`, `users`, `requires`, `prefer`, `avoid`, `priority`. Free text values. `requires` holds hard rules from outside (region, certifications, contracts); `prefer` what the team knows or wants to use; `avoid` vendors, technologies or setups the team rules out (Kubernetes, a specific cloud, self-hosting, lock-in), with an optional reason as a comment; `priority` what the team gives up first when options trade off: `lowest cost`, `balanced`, `least ops` or `control`. A value the user gave in an interview carries the comment `# user YYYY-MM-DD`, so a later run knows its source and age (`references/interview.md`).
 - `## <Role>: <Vendor>`: one per service. Roles: `Hosting`, `Database`, `Auth`, `Email`, `Storage`, `Payments`, `Monitoring`, `AI`, `Other`. A vendor that serves two roles gets two sections (`## Database: Supabase`, `## Auth: Supabase`) only if both are used.
 
 ## Keys of a service section
@@ -46,8 +46,8 @@ Unknown keys are allowed and must be kept when updating. A comment starts at two
 | Fields | Kind | An audit or init may |
 | --- | --- | --- |
 | `usage`, `limit`, `source`, `env` | facts read today | write them, with the date |
-| `plan`, `decided`, `revisit_when`, `next` | decisions of the team | propose new lines; write them only after a yes |
-| `## Requirements` | the team's constraints | propose; write only after a yes (in `init`, write what the user told you) |
+| `plan`, `decided`, `revisit_when`, `next` | decisions of the team | propose new lines; write them only after a yes (a plan the user stated in an answer is that yes) |
+| `## Requirements` | the team's constraints | propose; write only after a yes (what the user told you in `init` or in an interview answer counts as one) |
 
 In `init` the file is new and comes from the stack the user asked for: write the decision fields, and start `decided` with `proposed (init, <date>):` until the user confirms the stack.
 

@@ -25,6 +25,7 @@ A quick check before the stack changes. It reads `.manifestack/STACK.md` only; i
    - **Budget**: does a paid plan of this service fit `budget`?
    - **Limits**: name the plan limits that matter for how this service will be used, as things to check (by name, without numbers): daily and monthly send caps for email, billed users for auth, storage and egress for databases and files, API rate limits for payments or AI. A welcome email that works in testing and stops at the free daily cap on launch day is exactly what this check is for.
    - **Overlap**: is there already a section with the same role (a second auth provider, a second email sender)?
+   - **Priority**: if `priority` is set, does the change go against it? A service the team must run itself under `least ops`, a proprietary API at the core under `control`, a paid convenience add-on under `lowest cost`. One line, no verdict.
    - **revisit_when**: run `node <skill-dir>/scripts/stack-md.mjs check .manifestack/STACK.md`. A `triggered` section touched by this change is worth a full audit.
    - **decided**: does the change contradict a recorded decision? Quote it.
 4. Report in two to four lines:

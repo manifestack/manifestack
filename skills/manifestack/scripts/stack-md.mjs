@@ -446,7 +446,8 @@ function projectMain(argv) {
 
 export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'AI', 'Other'];
 export const STACK_KEYS = ['plan', 'limit', 'source', 'usage', 'decided', 'revisit_when', 'next', 'env'];
-export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid'];
+export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid', 'priority'];
+export const PRIORITIES = ['lowest cost', 'balanced', 'least ops', 'control'];
 export const REVISIT_METRICS = ['db_size', 'monthly_sent', 'daily_peak', 'transfer_tb', 'mau', 'users', 'monthly_bill', 'date'];
 
 // Env var names (NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL) and URL slugs (2024-11-05-pro-plan-pricing-update) are made of
@@ -892,6 +893,8 @@ export function lintStackMd(text) {
 	for (const s of findSecrets(text)) errors.push({ line: s.line, message: `looks like a secret (${s.kind}); remove it, STACK.md keeps names only` });
 	const doc = parseStackMd(text);
 	if (!doc.requirements) warnings.push({ line: 1, message: 'no ## Requirements section' });
+	const priority = doc.requirements?.priority;
+	if (priority && !PRIORITIES.includes(priority.toLowerCase())) warnings.push({ line: 1, message: `priority "${priority}" is not one of ${PRIORITIES.join(', ')}` });
 	for (const s of doc.sections) {
 		if (s.kind === 'other') warnings.push({ line: s.line, message: `heading "${s.heading}" is not "<Role>: <Vendor>"` });
 		if (s.kind !== 'service') continue;

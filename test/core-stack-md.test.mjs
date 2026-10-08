@@ -360,3 +360,17 @@ test('users written out in words: million, thousand, bn', () => {
 	assert.equal(parseUsers('3 bn'), 3e9);
 	assert.equal(parseUsers('5 mo'), null);
 });
+
+test('Requirements: priority is a known key and goes after avoid', () => {
+	const text = setFields('## Requirements\nbudget: ~$150/mo\navoid: Kubernetes\n\n## Database: Supabase\nplan: Pro\n', 'Requirements', { priority: 'least ops' });
+	assert.match(text, /^avoid: Kubernetes\npriority: least ops\n\n## Database/m);
+	assert.equal(parseStackMd(text).requirements.priority, 'least ops');
+	assert.deepEqual(lintStackMd(text).errors, []);
+});
+
+test('lint warns about a priority outside the four known values', () => {
+	const warn = (p) => lintStackMd(`## Requirements\nbudget: ~$150/mo\npriority: ${p}\n`).warnings.map((w) => w.message);
+	assert.ok(warn('least-ops').some((m) => /priority "least-ops" is not one of lowest cost, balanced, least ops, control/.test(m)));
+	assert.deepEqual(warn('Least ops'), []);
+	assert.deepEqual(warn('lowest cost  # user 2026-10-08'), []);
+});

@@ -4,6 +4,10 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-08
+
+To update an installed project: `npx manifestack@latest`, then `npx manifestack hook` so the Claude Code hook gets the command that also works on Windows.
+
 ### Added
 
 - `compare` mode (`/manifestack compare neon supabase`): two or three vendors for the same job, side by side for your workload: requirements, cost at your size, the first limit, the features you use and what it takes to leave. When one is in use, it also sizes the switch.
@@ -69,7 +73,8 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 - "New vendor" hook for Claude Code and Cursor.
 - Vendor maps: Vercel, Supabase, Neon, Clerk, Resend.
 
-[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/manifestack/manifestack/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/manifestack/manifestack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/manifestack/manifestack/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/manifestack/manifestack/releases/tag/v0.1.0

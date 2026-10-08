@@ -1,6 +1,6 @@
 {
   "name": "manifestack",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Installs the Manifestack Agent Skill for Claude Code, Cursor, Codex and other agents: fits your stack to budget, users and data rules, audits limits, bills, requirement gaps and overlaps, and checks every new vendor.",
   "type": "module",
   "license": "MIT",

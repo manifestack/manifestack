@@ -644,11 +644,13 @@ const MAX_EVIDENCE = 8;
 // The "new vendor" hook as `npx manifestack install` or `npx manifestack hook` registers it (packages/cli/src/agents.js).
 const HOOK_FILE = 'manifestack-new-vendor.mjs';
 const HOOK_SETUPS = {
-	// `current`: the entry the CLI writes today. Older installs (Cursor afterFileEdit, Claude Code without Bash) are `outdated`.
+	// `current`: the entry the CLI writes today. Older installs (Cursor afterFileEdit, Claude Code without Bash or
+	// with $CLAUDE_PROJECT_DIR, which PowerShell does not expand) are `outdated`.
 	'claude-code': {
 		configs: ['.claude/settings.json', '.claude/settings.local.json'],
 		script: `.claude/hooks/${HOOK_FILE}`,
-		current: (c) => (c?.hooks?.PostToolUse ?? []).some((g) => /\bBash\b/.test(g?.matcher ?? '') && JSON.stringify(g).includes(HOOK_FILE)),
+		current: (c) =>
+			(c?.hooks?.PostToolUse ?? []).some((g) => /\bBash\b/.test(g?.matcher ?? '') && (g?.hooks ?? []).some((h) => String(h?.command).includes(HOOK_FILE) && !/\$CLAUDE_PROJECT_DIR\b/.test(h.command))),
 	},
 	cursor: { configs: ['.cursor/hooks.json'], script: `.cursor/hooks/${HOOK_FILE}`, current: (c) => (c?.hooks?.postToolUse ?? []).some((h) => String(h?.command).includes(HOOK_FILE)) },
 };

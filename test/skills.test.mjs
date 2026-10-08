@@ -62,6 +62,13 @@ test('manifestack-guard stays short', () => {
 	assert.ok(readFileSync(join(ROOT, 'skills/manifestack-guard/SKILL.md'), 'utf8').split('\n').length <= 100);
 });
 
+test('the skill offers the hook from the same manifestack version, never an unpinned npx', () => {
+	const text = readFileSync(join(ROOT, 'skills/manifestack/SKILL.md'), 'utf8');
+	const commands = [...text.matchAll(/npx manifestack(@[^\s`]+)? hook/g)];
+	assert.ok(commands.length, 'SKILL.md offers the hook command');
+	for (const m of commands) assert.equal(m[1], `@${VERSION}`, m[0]);
+});
+
 test('one version everywhere: package, plugin, skills', () => {
 	assert.equal(json('.claude-plugin/plugin.json').version, VERSION);
 	assert.equal(json('packages/core/package.json').version, VERSION);

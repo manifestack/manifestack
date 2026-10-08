@@ -45,7 +45,7 @@ function parseCli(argv) {
 		const [flag, inline] = a.startsWith('--') && a.includes('=') ? [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] : [a, null];
 		const value = () => {
 			const v = inline ?? argv[++i];
-			if (v == null || v.startsWith('-')) throw new UserError(`${flag} needs a value`);
+			if (v == null || v === '' || v.startsWith('-')) throw new UserError(`${flag} needs a value`);
 			return v;
 		};
 		if (flag === '--agent' || flag === '-a') opts.agent.push(...value().split(','));
@@ -85,6 +85,7 @@ const ours = (skillDir) => existsSync(join(skillDir, MARKER));
 
 function readJsonConfig(file) {
 	if (!existsSync(file)) return {};
+	if (isDir(file)) throw new UserError(`${file} is a folder, not a file. Remove or rename it first.`);
 	const text = readFileSync(file, 'utf8');
 	if (!text.trim()) return {};
 	try {
@@ -112,6 +113,7 @@ async function ask(question) {
 /** `pool` limits the choice: `hook` offers only the agents that have a hook. */
 async function chooseAgents(opts, project, { forUninstall = false, pool = AGENTS } = {}) {
 	const ids = pool.map((a) => a.id).join(', ');
+	opts.agent = [...new Set(opts.agent)];
 	if (opts.agent.length) {
 		const unknown = opts.agent.filter((id) => !findAgent(id));
 		if (unknown.length) throw new UserError(`unknown agent ${unknown.join(', ')}. Known agents: ${AGENTS.map((a) => a.id).join(', ')}`);
@@ -325,6 +327,8 @@ async function hook(opts) {
 async function uninstall(opts) {
 	const project = resolve(opts.dir ?? '.');
 	if (!isDir(project)) throw new UserError(`project folder not found: ${project}`);
+	// Without a terminal nobody confirms, so removing from every agent needs --yes or the agents named.
+	if (!process.stdin.isTTY && !opts.yes && !opts.agent.length) throw new UserError('no terminal to confirm the removal. Pass --agent <id> or --yes.');
 	const agents = await chooseAgents(opts, project, { forUninstall: true });
 	const actions = planUninstall(project, agents, availableSkills(assetsRoot()));
 	if (!actions.length) return console.log(`Nothing to remove in ${project}.`);

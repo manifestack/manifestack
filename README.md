@@ -15,6 +15,12 @@
 
 Manifestack is a skill for your coding agent (Claude Code, Cursor, Codex and others). Ask it to check your stack, and it finds the bills, outages and compliance gaps ahead of you, with a fix for each and every price read from the vendor's own page.
 
+<p align="center">
+<img width="702" alt="Claude Code running a manifestack audit: over budget at 50k users, with critical and high findings and a fix for each" src="https://github.com/user-attachments/assets/62acd5c4-3779-48f4-9c09-264598a67acd" />
+<br>
+<sub>Audit of a demo product (Next.js, FastAPI and Go, 7 vendors). Usage numbers are the demo's; every price and limit was read from the vendor's page on Oct 8, 2026.</sub>
+</p>
+
 ## Quick start
 
 ```bash
@@ -42,9 +48,7 @@ It never changes your code or vendor settings, needs no API keys or account, and
 You can also just ask: "what breaks first at 50k users?" or "what should we build this on?".
 
 <details>
-<summary>Example: an audit of a demo product (Next.js, FastAPI and Go, 7 vendors)</summary>
-
-<sub>A real run: usage numbers are the demo's, every price and limit was read from the vendor's page on Oct 8, 2026.</sub>
+<summary>Example: the full audit from the image above</summary>
 
 | Severity | Finding | When | Cost | Fix |
 | --- | --- | --- | --- | --- |

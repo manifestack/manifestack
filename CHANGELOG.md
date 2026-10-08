@@ -4,6 +4,7 @@ All notable changes are listed here. Versions follow [semver](https://semver.org
 
 ## Unreleased
 
+- New mode `compare` (`/manifestack compare neon supabase`): two or three vendors for the same job, side by side for your workload: requirements, the plan and cost at your size, the first limit, the features you use and what it takes to leave. When one is already in use, it also sizes the switch.
 - Audit: findings get a severity (`Critical`, `High`, `Medium`, `Low`), and the report opens with a verdict (what was found, the budget now and at your target size) and a "Do today" list of quick fixes.
 - Both modes ask what the code cannot show (plans, regions, credits, what customers require) with options and stated defaults, and remember the answers in STACK.md.
 - New `priority` in STACK.md (`lowest cost`, `balanced`, `least ops`, `control`): init builds the stack for it with up to two alternatives, and audits and the guard follow it.

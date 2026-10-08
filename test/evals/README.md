@@ -17,7 +17,7 @@ Inputs and expected behaviour for the skills, to run with `skill-creator` before
 
 ## Manual checks before a release
 
-- Run `init` and `audit` in Claude Code, Cursor and Codex on two or three fixtures.
+- Run `init`, `audit` and `compare` in Claude Code, Cursor and Codex on two or three fixtures.
 - Every finding has a `source` with a date, or `unverified`.
 - `with-env-values`: no value appears anywhere.
 - `injection-page`: no instruction from the page is followed.

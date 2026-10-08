@@ -1,6 +1,6 @@
 ---
 name: manifestack
-description: Choose a stack that fits a project and check that it still fits. Use when the user wants to pick, review or audit their stack across frontend, backend and infrastructure (framework, hosting, database, auth, email, storage, payments, monitoring, AI APIs, mobile subscriptions); asks what Vercel, Supabase, Firebase, Clerk, Stripe, OpenAI or any other service will cost at 1k, 10k or 50k users; worries about plan limits, free-tier caps, rate limits, pricing, surprise bills, overage or budget; needs data region, SOC 2, data retention or other compliance requirements checked against vendors; has two services doing the same job; or suspects the setup is overbuilt (Kubernetes, SSR or a big cloud for a small app). Modes - init for a new project, audit for an existing repo. Reads current vendor pages, never asks for API keys, and keeps decisions in .manifestack/STACK.md.
+description: Choose a stack that fits a project and check that it still fits. Use when the user wants to pick, review or audit their stack across frontend, backend and infrastructure (framework, hosting, database, auth, email, storage, payments, monitoring, AI APIs, mobile subscriptions); asks what Vercel, Supabase, Firebase, Clerk, Stripe, OpenAI or any other service will cost at 1k, 10k or 50k users; worries about plan limits, free-tier caps, rate limits, pricing, surprise bills, overage or budget; needs data region, SOC 2, data retention or other compliance requirements checked against vendors; has two services doing the same job; wants two vendors compared for their workload (Neon vs Supabase); or suspects the setup is overbuilt (Kubernetes, SSR or a big cloud for a small app). Modes - init for a new project, audit for an existing repo, compare for two or three vendors. Reads current vendor pages, never asks for API keys, and keeps decisions in .manifestack/STACK.md.
 license: MIT
 compatibility: Needs web access to read vendor pricing pages and Node.js 22+ to run the bundled scripts.
 metadata:
@@ -16,18 +16,20 @@ Helps choose a stack that fits a project (budget, users, requirements, team expe
 
 ## 1. Pick the mode
 
-1. If the user named a mode (`/manifestack init "B2B dashboard, EU users"`, `/manifestack audit`), use it.
-2. Otherwise run `node <skill-dir>/scripts/detect.mjs .` and look at `empty`:
+1. If the user named a mode (`/manifestack init "B2B dashboard, EU users"`, `/manifestack audit`, `/manifestack compare neon supabase`), use it.
+2. If the user names two or three vendors for the same job and asks which one to use ("Neon or Supabase?", "Resend vs Postmark at 200k emails") → **compare**. When both are already in the project ("we have Clerk and Supabase Auth, which should stay?"), that is an `Overlap` → **audit**.
+3. If the user asks for `migrate` or `watch`: say these modes are planned and not available yet, then offer `compare` (to weigh a switch), `audit` (for an existing project) or `init` (to rethink the stack from requirements).
+4. Otherwise run `node <skill-dir>/scripts/detect.mjs .` and look at `empty`:
    - `empty: true` (no code yet: only README, LICENSE, agent files, .manifestack/) → **init**.
    - `empty: false` → **audit**.
-3. If the user asks for `compare`, `migrate` or `watch`: say these modes are planned and not available yet, then offer `audit` (for an existing project) or `init` (to rethink the stack from requirements).
 
 | Mode | Read before you start |
 | --- | --- |
 | init | [references/workflow-init.md](references/workflow-init.md), [references/interview.md](references/interview.md), [references/fit.md](references/fit.md), [references/stack-md.md](references/stack-md.md) |
 | audit | [references/workflow-audit.md](references/workflow-audit.md), [references/interview.md](references/interview.md), [references/usage-sources.md](references/usage-sources.md), [references/report.md](references/report.md), [references/stack-md.md](references/stack-md.md) |
+| compare | [references/workflow-compare.md](references/workflow-compare.md), [references/interview.md](references/interview.md), [references/fit.md](references/fit.md), [references/stack-md.md](references/stack-md.md) |
 
-Read [references/security.md](references/security.md) once per session in either mode.
+Read [references/security.md](references/security.md) once per session in any mode.
 
 ## 2. Ground rules
 

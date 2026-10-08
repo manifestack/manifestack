@@ -48,6 +48,22 @@
         "Acknowledges the setup might be deliberate or asks about it",
         "STACK.md gains at least one '## <Role>: <Vendor>' section and passes lint with zero errors"
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "/manifestack compare neon supabase (fixture next-vercel-supabase-resend)",
+      "expected_output": "Treats Supabase as the current vendor with evidence from the code; puts Neon and Supabase side by side for the project's workload with the same jobs on both sides; ...",
+      "files": [],
+      "expectations": [
+        "Names Supabase as the vendor in use, with evidence from package.json or STACK.md, and frames the answer as stay or switch",
+        "Notes that the code uses only the Supabase database, through the supabase-js query API (`supabase.from`), so the comparison covers the database job only and a switch means rewriting those calls",
+        "Checks the 'EU database' and 'SOC 2 vendors' requirements for both vendors against pages read in this run, with the not-a-legal-guarantee note",
+        "Monthly costs for both sides at the same user counts (9k, 50k and 90k) come from project.mjs cost, with the assumptions stated, including how the workload maps to each vendor's billed metrics",
+        "Every price, limit and feature cites a vendor page with the date it was read, or is marked unverified",
+        "The verdict names the constraint that decides it and what would flip it, without calling either vendor better in general",
+        "Sizes the switch (data, auth users, places in the code, effort in days) without writing a migration plan",
+        "STACK.md plan, decided, revisit_when and next lines are unchanged; any change is offered as a proposal"
+      ]
     }
   ]
 }

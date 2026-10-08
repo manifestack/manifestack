@@ -13,7 +13,7 @@
 
 </div>
 
-Manifestack is a skill for your coding agent (Claude Code, Cursor, Codex and others). Ask it to check your stack, and it finds the bills, outages and compliance gaps ahead of you, with a fix for each and every price read from the vendor's own page.
+Manifestack is a skill for your coding agent (Claude Code, Cursor, Codex and others). Ask it to check your stack, and it finds the bills, outages and compliance gaps ahead of you. Each finding comes with a fix, and every price is read from the vendor's own page.
 
 <p align="center">
 <img width="702" alt="Claude Code running a manifestack audit: over budget at 50k users, with critical and high findings and a fix for each" src="https://github.com/user-attachments/assets/62acd5c4-3779-48f4-9c09-264598a67acd" />
@@ -27,11 +27,11 @@ Manifestack is a skill for your coding agent (Claude Code, Cursor, Codex and oth
 npx manifestack
 ```
 
-Then ask your agent to check your stack, or run `/manifestack`.
+Then run `/manifestack`, or just ask your agent: "what breaks first at 50k users?", "what should we build this on?".
 
 ## What it does
 
-- **New project:** asks about users, budget, data rules and your team, then picks hosting, database, auth, email and the rest, priced at 1k, 10k and 100k users, and says what you don't need.
+- **New project:** asks about users, budget, data rules and your team, then picks hosting, database, auth, email and the rest, priced from launch to 100k users, and says what you don't need.
 - **Existing project:** scans the whole product (JS, Python and Go dependencies, config files, env var names) and reports what breaks or costs too much, by severity, with a fix for each.
 - **Every change:** in Claude Code and Cursor, a hook flags each new vendor SDK and checks it against your requirements before you rely on it.
 
@@ -45,8 +45,6 @@ It never changes your code or vendor settings, needs no API keys or account, and
 | `/manifestack init "B2B dashboard, EU users"` | Proposes and prices a whole stack |
 | `/manifestack audit` | Checks every service against your requirements, budget and growth |
 
-You can also just ask: "what breaks first at 50k users?" or "what should we build this on?".
-
 <details>
 <summary>Example: the full audit from the image above</summary>
 
@@ -56,9 +54,9 @@ You can also just ask: "what breaks first at 50k users?" or "what should we buil
 | Critical | **Requirement** Supabase project in us-east-1, STACK.md requires an EU database | Now | ~1 day of migration | New project in eu-central-1, move the 312 MB now; pin Vercel functions to `fra1` |
 | Critical | **Risk** Resend allows 10 API requests/s; the weekly digest sends 9,000 emails, 50 in parallel | Mondays | Digests lost to 429 errors | Throttle the worker to 10 requests/s, retry 429 with backoff |
 | Critical | **Requirement** OpenAI's trust page does not confirm the API is in its SOC 2 Type 2 scope (unverified) | Before the next security review | — | Check OpenAI's product compliance status page for the API |
-| High | **Bill** At 50k users (the Q3 plan in STACK.md) the stack costs ~$4,580/mo; Vercel transfer is $2,684 of it | By Q3 | ~$55k/yr against a ~$600/mo budget | With Vercel Flat Rate CDN the same 50k users cost ~$1,920/mo, and today ~$350/mo instead of ~$690/mo |
 | High | **Bill** Vercel Pro: 3.4 TB of Fast Data Transfer billed on demand ($0.15/GB past 1 TB), +0.3 TB/mo | Now, growing | ~$360/mo, ~$2,684/mo at 50k users | Billing → Flat Rate CDN: the $20/mo tier covers 50 TB and 10M CDN requests (check Usage → CDN Requests first) |
 | High | **Risk** OpenAI Build tier caps usage at $500/mo; spend is $310, +21%/mo | ~Dec 2026 | API calls blocked until the month resets | Top up to $100 in total credit purchases to reach Launch ($5,000/mo cap) |
+| High | **Bill** At 50k users (the Q3 plan in STACK.md) the stack costs ~$4,580/mo; Vercel transfer is $2,684 of it | By Q3 | ~$55k/yr against a ~$600/mo budget | With Vercel Flat Rate CDN the same 50k users cost ~$1,920/mo, and today ~$350/mo instead of ~$690/mo |
 | Medium | **Limit** Resend Pro: 41,200 / 50,000 emails, +18%/mo | ~Nov 2026 | +$15/mo on the 100k tier | Move to the 100k tier ($35/mo) before November |
 | Medium | **Limit** Supabase Free: 312 / 500 MB, read-only above it, +1.1 MB/day | ~Mar 2027 | $25/mo on Pro | Archive `events` rows older than 90 days, or upgrade with the EU move |
 | Low | **Overlap** Clerk and Supabase Auth both sign users in | Now | Two user stores | Move team invites to Clerk, remove Supabase Auth |
@@ -83,7 +81,11 @@ You can also just ask: "what breaks first at 50k users?" or "what should we buil
 | --- | --- | --- | --- | --- |
 | Per month | $71 | $71 | $131 | $266 |
 
-Fits the $150/mo budget up to ~55k users; email is what grows. Less to run instead: Next.js on Vercel Pro with the same backend, ~$111/mo. Not needed: Kubernetes, SSR, a separate auth service. Decide now: create Supabase in eu-central-1 and Sentry in the EU; neither region can be changed later.
+Fits the $150/mo budget up to ~55k users; email is what grows.
+
+- **Keep Next.js:** Vercel Pro (2 seats) with the same backend, ~$111/mo.
+- **Not needed:** Kubernetes, SSR, a separate auth service.
+- **Decide now:** create Supabase in eu-central-1 and Sentry in the EU; neither region can be changed later.
 
 </details>
 
@@ -135,7 +137,7 @@ budget: ~$600/mo
 users: 9k now, 50k by Q3
 requires: EU database, SOC 2 vendors
 avoid: Kubernetes
-priority: least ops
+priority: balanced
 
 ## Database: Supabase
 plan: free

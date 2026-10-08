@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT, runNode, tempDir } from './helpers.mjs';
+import { readHookEvent, newVendorMessage } from '../packages/core/src/hook.mjs';
+import { loadCatalog, vendorSignatures } from '../packages/core/src/catalog.mjs';
 
 const HOOK = join(ROOT, 'hooks/new-vendor.mjs');
 const pkg = (deps) => JSON.stringify({ name: 'app', dependencies: deps }, null, 2) + '\n';
@@ -64,6 +66,45 @@ test('Write compares with the committed version when there is one', (t) => {
 	assert.match(msg, /Mailgun \(email\) was added/);
 	assert.ok(!/Supabase/.test(msg), 'Supabase was already committed');
 	assert.match(msg, /no page map for Mailgun/);
+});
+
+function gitRepo(t, files) {
+	const dir = tempDir(t);
+	const git = (...a) => execFileSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=t', ...a], { cwd: dir, stdio: 'ignore' });
+	git('init', '-q');
+	for (const [file, text] of Object.entries(files)) {
+		mkdirSync(dirname(join(dir, file)), { recursive: true });
+		writeFileSync(join(dir, file), text);
+	}
+	git('add', '.');
+	git('commit', '-qm', 'init');
+	return dir;
+}
+
+test('Write compares with the committed version of a manifest in a subdirectory', (t) => {
+	const dir = gitRepo(t, { 'apps/web/package.json': pkg({ '@supabase/supabase-js': '2' }) });
+	writeFileSync(join(dir, 'apps/web/package.json'), pkg({ '@supabase/supabase-js': '2', resend: '4' }));
+	const r = run({ cwd: dir, tool_name: 'Write', tool_input: { file_path: 'apps/web/package.json', content: '' } });
+	const msg = JSON.parse(r.stdout).hookSpecificOutput.additionalContext;
+	assert.match(msg, /Resend \(email\) was added/);
+	assert.ok(!/Supabase/.test(msg), 'Supabase was already committed');
+});
+
+test('Write of a manifest that is not committed yet reports every vendor in it', (t) => {
+	const dir = gitRepo(t, { 'README.md': 'app\n' });
+	writeFileSync(join(dir, 'package.json'), pkg({ '@supabase/supabase-js': '2' }));
+	const r = run({ cwd: dir, tool_name: 'Write', tool_input: { file_path: 'package.json', content: '' } });
+	assert.match(JSON.parse(r.stdout).hookSpecificOutput.additionalContext, /Supabase/);
+});
+
+test('Write stays quiet when git is too slow to tell what was committed', (t) => {
+	const dir = gitRepo(t, { 'package.json': pkg({ '@supabase/supabase-js': '2' }) });
+	writeFileSync(join(dir, 'package.json'), pkg({ '@supabase/supabase-js': '2', resend: '4' }));
+	const event = readHookEvent({ cwd: dir, tool_name: 'Write', tool_input: { file_path: 'package.json', content: '' } });
+	const signatures = vendorSignatures(loadCatalog(join(ROOT, 'catalog/vendors')));
+	assert.match(newVendorMessage(event, { signatures }), /Resend \(email\) was added/);
+	// No git process starts within 1 ms, so this is the timeout path on every platform.
+	assert.equal(newVendorMessage(event, { signatures, gitTimeout: 1 }), null);
 });
 
 test('Cursor afterFileEdit payload', (t) => {

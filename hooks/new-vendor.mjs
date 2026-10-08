@@ -1430,15 +1430,18 @@ export function readHookEvent(input) {
 	return { agent: 'claude-code', file, edits, write: false, roots: [input.cwd].filter(Boolean) };
 }
 
-/** The file as it was before the edits: undo them in reverse order. */
-function previousContent(current, event) {
+const toPosix = (p) => p.split('\\').join('/');
+
+/** The file as it was before the edits: undo them in reverse order. Null when that cannot be told. */
+function previousContent(current, event, gitTimeout) {
 	if (event.write) {
+		// `HEAD:./name` resolves against cwd, so one git process is enough: starting one is slow on Windows.
 		try {
-			const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: dirname(event.file), encoding: 'utf8', timeout: 150, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-			const rel = relative(root, event.file).split('\\').join('/');
-			return execFileSync('git', ['show', `HEAD:${rel}`], { cwd: root, encoding: 'utf8', timeout: 150, stdio: ['ignore', 'pipe', 'ignore'] });
-		} catch {
-			return '';
+			return execFileSync('git', ['show', `HEAD:./${basename(event.file)}`], { cwd: dirname(event.file), encoding: 'utf8', timeout: gitTimeout, stdio: ['ignore', 'pipe', 'ignore'] });
+		} catch (err) {
+			// No git, no commit or a new file: everything in it is new. Git too slow: unknown, so stay quiet
+			// rather than report every vendor in the file as added.
+			return err?.code === 'ETIMEDOUT' ? null : '';
 		}
 	}
 	let text = current;
@@ -1465,13 +1468,15 @@ function findStackMd(file, roots) {
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Returns the context line for the agent, or null when nothing new was added. */
-export function newVendorMessage(event, { signatures }) {
+export function newVendorMessage(event, { signatures, gitTimeout = 2000 }) {
 	const kind = event && manifestKind(event.file);
 	if (!kind || !existsSync(event.file)) return null;
 	const current = readFileSync(event.file, 'utf8');
 	const now = matchDependencies(manifestDependencies(kind, current, event.file), signatures, kind);
 	if (!now.vendors.length && !now.unmapped.length) return null;
-	const before = matchDependencies(manifestDependencies(kind, previousContent(current, event), event.file), signatures, kind);
+	const previous = previousContent(current, event, gitTimeout);
+	if (previous === null) return null;
+	const before = matchDependencies(manifestDependencies(kind, previous, event.file), signatures, kind);
 	const stackFile = findStackMd(event.file, event.roots);
 	const listed = new Set();
 	if (stackFile) {
@@ -1489,7 +1494,7 @@ export function newVendorMessage(event, { signatures }) {
 	// message says what to check even if the manifestack-guard skill is never loaded.
 	let msg = `Manifestack: ${names} was added in ${basename(event.file)}. Before you finish, tell the user in two or three lines`;
 	if (stackFile) {
-		msg += ` how it fits STACK.md (${relative(dirname(event.file), stackFile)}): the "requires" line (data region, certifications), the "avoid" line (vendors or tech the team rules out), the budget, any section with the same role, and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
+		msg += ` how it fits STACK.md (${toPosix(relative(dirname(event.file), stackFile))}): the "requires" line (data region, certifications), the "avoid" line (vendors or tech the team rules out), the budget, any section with the same role, and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
 	} else {
 		msg += ` which plan limits to check for it (send caps, billed users, storage, rate limits), and suggest running /manifestack to record the stack in ${STACK_FILE}.`;
 	}

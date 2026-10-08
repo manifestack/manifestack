@@ -10,11 +10,16 @@ permissions:
 
 jobs:
   test:
-    name: Tests (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
+    name: Tests (Node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         node: [18, 20, 22, 24]
+        include:
+          - os: windows-latest
+            node: 24
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

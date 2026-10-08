@@ -37,7 +37,7 @@ export function bundle(entryFile, embeds = {}) {
 	function visit(file, isEntry) {
 		if (seen.has(file)) return;
 		seen.add(file);
-		const rel = relative(ROOT, file);
+		const rel = relative(ROOT, file).split('\\').join('/');
 		const deps = [];
 		const body = [];
 		for (const line of readFileSync(file, 'utf8').split('\n')) {
@@ -70,7 +70,7 @@ export function bundle(entryFile, embeds = {}) {
 			else body.push(line.replace(/^export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)/, ''));
 		}
 		for (const dep of deps) visit(dep, false);
-		parts.push(`// ---- ${relative(ROOT, file)}\n${body.join('\n').trim()}\n`);
+		parts.push(`// ---- ${rel}\n${body.join('\n').trim()}\n`);
 	}
 
 	visit(entryFile, true);

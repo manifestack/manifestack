@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
-import { detectVendors, readEnvNames, extractImports, hookStatus, importMatches } from '../packages/core/src/detect.mjs';
+import { detectVendors, readEnvNames, extractImports, extractPythonModules, extractGoImports, hookStatus, importMatches } from '../packages/core/src/detect.mjs';
 import { loadCatalog, vendorSignatures } from '../packages/core/src/catalog.mjs';
 
 const signatures = vendorSignatures(loadCatalog(join(ROOT, 'catalog/vendors')));
@@ -254,4 +254,55 @@ test('symlinked files are read, symlinked directories are not followed', { skip:
 	symlinkSync(join(shared, 'lib'), join(dir, 'lib'));
 	symlinkSync(dir, join(dir, 'loop'));
 	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['stripe']);
+});
+
+test('readEnvNames skips the lines of a multi-line value', () => {
+	const env = 'PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\nZm9vYmFyU2VjcmV0S2V5RnJhZ21lbnQ=\n-----END PRIVATE KEY-----"\nOK_NAME=1\nB=\'one\ntwo=x\'\nC=3\n';
+	assert.deepEqual(readEnvNames(env), ['PRIVATE_KEY', 'OK_NAME', 'B', 'C']);
+	assert.deepEqual(readEnvNames('A="quoted \\" inside"\nB=2\n'), ['A', 'B'], 'an escaped quote does not open a block');
+});
+
+test('Python and Go imports find vendors without a manifest', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'app.py'), 'import os, stripe\nfrom openai import OpenAI\nimport sentry_sdk as sentry\n');
+	mkdirSync(join(dir, 'worker'));
+	writeFileSync(join(dir, 'worker/main.go'), 'package main\n\nimport (\n\t"fmt"\n\tresend "github.com/resend/resend-go/v2"\n)\n');
+	assert.deepEqual(extractPythonModules('import os, stripe\nfrom openai import OpenAI\nfrom . import x\n'), ['os', 'stripe', 'openai']);
+	assert.deepEqual(extractGoImports('import (\n\t"fmt"\n\tx "github.com/a/b"\n)\nimport "github.com/c/d"\n'), ['fmt', 'github.com/a/b', 'github.com/c/d']);
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['openai', 'resend', 'sentry', 'stripe']);
+	assert.ok(r.vendors.every((v) => v.evidence.some((e) => e.kind === 'import')));
+});
+
+test('fixtures, mocks and examples are samples, not the stack', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { resend: '6' } }));
+	mkdirSync(join(dir, 'test/fixtures/shop'), { recursive: true });
+	writeFileSync(join(dir, 'test/fixtures/shop/package.json'), JSON.stringify({ dependencies: { stripe: '14', '@clerk/nextjs': '6' } }));
+	writeFileSync(join(dir, 'test/fixtures/shop/.env'), 'SECRET_FROM_FIXTURE=1\n');
+	mkdirSync(join(dir, 'examples/k8s'), { recursive: true });
+	writeFileSync(join(dir, 'examples/k8s/deploy.yaml'), 'apiVersion: apps/v1\nkind: Deployment\n');
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['resend']);
+	assert.deepEqual(r.samples.map((s) => s.id).sort(), ['clerk', 'stripe']);
+	assert.deepEqual(r.infra, [], 'a Kubernetes example is not the project running Kubernetes');
+	assert.ok(!r.env_names.includes('SECRET_FROM_FIXTURE'));
+});
+
+test('a role signal alone does not make a vendor', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'upload.ts'), 'export const up = (client) => client.storage.from("avatars").upload("a", b);\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+});
+
+test('the file limit drops source files, never manifests', (t) => {
+	const dir = tempDir(t);
+	for (let i = 0; i < 30; i++) writeFileSync(join(dir, `n${i}.ts`), 'export {}\n');
+	for (let i = 0; i < 30; i++) writeFileSync(join(dir, `d${i}.txt`), 'x\n');
+	mkdirSync(join(dir, 'apps/web'), { recursive: true });
+	writeFileSync(join(dir, 'apps/web/package.json'), JSON.stringify({ dependencies: { stripe: '14' } }));
+	const r = detectVendors(dir, { signatures, maxFiles: 1 });
+	assert.equal(r.truncated, true);
+	assert.deepEqual(ids(r), ['stripe']);
+	assert.equal(r.empty, false);
 });

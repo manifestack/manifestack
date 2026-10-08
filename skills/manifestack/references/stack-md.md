@@ -61,8 +61,9 @@ usage: <metric> <quantity>[, <rate>] (<date>); <metric> <quantity> (<date>)
 ```
 
 - quantity: `312 MB`, `3.4 TB`, `41,200`, `9k`, `$540`. Thousands are grouped in threes (`41,200`, `41 200`, `41_200`); write decimals with a dot: `1,5 GB` cannot be read, use `1.5 GB`.
-- rate: `+1.1 MB/day`, `+14 MB/week`, `+18%/mo`
-- date: a real day as `YYYY-MM-DD`. An impossible date (`2026-13-01`) makes `check` report `error` for that section.
+- rate: `+1.1 MB/day`, `+14 MB/week`, `+18%/mo`. A percentage compounds: `+10%/week` is about +51% a month.
+- date: a real day as `YYYY-MM-DD`. An impossible date (`2026-13-01`) makes `check` report `error` for that section. A reading with a rate needs its date, or projections start from today.
+- `lint` warns about any part of `usage` it cannot read; fix it, because `check` cannot project from it.
 - Without a metric name, the reading is bound to the only metric in `revisit_when`. With several metrics, name them: `usage: monthly_sent 41,200, +18%/mo (2026-10-01); daily_peak 2,900 (2026-10-01)`.
 - A unitless reading follows the same rule as a threshold: `transfer_tb 1.6` is 1.6 TB, `monthly_bill 540` is $540.
 

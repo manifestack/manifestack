@@ -4,6 +4,11 @@ All notable changes are listed here. Versions follow [semver](https://semver.org
 
 ## Unreleased
 
+- Projections: a percentage growth compounds when converted between periods (+10%/week is about +51% a month, not +43%). `eta` rejects a `--rate` without a period or in the wrong unit, `--points` in a different unit from `--limit`, and a `--growth` without `%`.
+- `usage` in STACK.md: also reads `312 MB; +1.1 MB/day`, `312 MB,+1.1 MB/day`, `(as of 2026-10-6)` and `41,200 emails`, and `lint` warns about what it cannot read instead of letting `check` report `ok`.
+- Secrets: also catches AWS secret keys, `redis://:password@host`, `db_password: …` and `"apiKey": "…"`. A commit hash or UUID in a URL path, and Stripe object ids, are not secrets. `set` refuses only the lines it writes, writes atomically and never echoes a rejected value.
+- Detection: vendors seen only in fixtures, mocks, tests or examples are listed under `samples`, not as the stack. Python and Go imports count as evidence, a role signal alone no longer makes a vendor, and the file limit never drops a manifest. A multi-line value in `.env` no longer leaks into `env_names`.
+- STACK.md: a code block opened with `~~~` or four backticks is not closed by a ``` line inside it; `## Other: C#` keeps its `#`; `date > X` is due the day after X; `users` skips years and multipliers ("launch in 2027 with 5k users" is 5,000).
 - Hook: fewer false alarms. It no longer reports every vendor when git is missing or refuses the repository, treats an install of a package the project already has as an upgrade, reads commands with quotes and heredocs correctly (a commit message is not an install), and names each vendor once per session.
 - Hook: with both the Claude Code plugin and a project hook, only the project hook reports.
 - Hook: the Claude Code command uses `${CLAUDE_PROJECT_DIR}`, which also works on Windows without Git Bash. `detect.mjs` reports older entries as `outdated`; run `npx manifestack hook` to update.

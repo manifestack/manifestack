@@ -1,6 +1,6 @@
 // generated, edit catalog/ or packages/core/ (then run: node tools/sync.mjs)
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,7 +39,9 @@ function parseArgs(argv) {
 		} else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
 			value = argv[++i];
 		}
-		if (key in args) args[key] = [].concat(args[key], value);
+		// --__proto__ or --constructor must not reach the object's prototype; no script has such an option.
+		if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+		if (Object.hasOwn(args, key)) args[key] = [].concat(args[key], value);
 		else args[key] = value;
 	}
 	return args;
@@ -659,14 +661,52 @@ const HOOK_SETUPS = {
 // Files that do not make a repository "existing code" on their own.
 const NON_PROJECT_FILES = /^(readme|license|licence|changelog|contributing|code_of_conduct|security|stack|agents|claude|gemini)(\.[a-z]+)?$|^\.(gitignore|gitattributes|editorconfig|env.*)$/i;
 
-/** Variable names from a dotenv file. The value part of each line is discarded immediately. */
+/**
+ * Variable names from a dotenv file. The value part of each line is discarded immediately. A quoted value may
+ * span lines (a private key): its continuation lines are values too and are skipped, never read as names.
+ */
 function readEnvNames(text) {
 	const names = [];
+	let open = null;
 	for (const line of text.split(/\r?\n/)) {
-		const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
-		if (m) names.push(m[1]);
+		if (open) {
+			if (closesQuote(line, open, 0)) open = null;
+			continue;
+		}
+		const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+		if (!m) continue;
+		names.push(m[1]);
+		const q = m[2][0];
+		if ((q === '"' || q === "'" || q === '`') && !closesQuote(m[2], q, 1)) open = q;
 	}
 	return names;
+}
+
+// Whether `line` has the closing quote from `from` on; in "…" a backslash escapes it.
+function closesQuote(line, quote, from) {
+	for (let i = from; i < line.length; i++) {
+		if (line[i] === '\\' && quote === '"') i++;
+		else if (line[i] === quote) return true;
+	}
+	return false;
+}
+
+/** Top-level modules a Python file imports: `import stripe`, `from openai import OpenAI`, `import a.b, c`. */
+function extractPythonModules(source) {
+	const mods = new Set();
+	for (const m of source.matchAll(/^[ \t]*(?:from[ \t]+([A-Za-z_][\w.]*)[ \t]+import\b|import[ \t]+([A-Za-z_][\w.]*(?:[ \t]+as[ \t]+\w+)?(?:[ \t]*,[ \t]*[A-Za-z_][\w.]*(?:[ \t]+as[ \t]+\w+)?)*))/gm)) {
+		const list = m[1] ? [m[1]] : m[2].split(',').map((x) => x.trim().split(/\s+/)[0]);
+		for (const x of list) mods.add(x.split('.')[0]);
+	}
+	return [...mods];
+}
+
+/** Import paths of a Go file, single (`import "x"`, `import alias "x"`) and grouped (`import ( ... )`). */
+function extractGoImports(source) {
+	const paths = new Set();
+	for (const block of source.matchAll(/^import\s*\(([\s\S]*?)\)/gm)) for (const m of block[1].matchAll(/"([^"\n]+)"/g)) paths.add(m[1]);
+	for (const m of source.matchAll(/^import\s+(?:[\w.]+\s+)?"([^"\n]+)"/gm)) paths.add(m[1]);
+	return [...paths];
 }
 
 function extractImports(source) {
@@ -701,9 +741,17 @@ function importMatches(spec, patterns = []) {
 	return patterns.some((p) => (/[/:]$/.test(p) ? spec.startsWith(p) : spec === p || spec.startsWith(p + '/')));
 }
 
-/** Files of the repository, shallow ones first, so manifests at the top are listed before deep source trees. */
-function listFiles(root, limits) {
+/**
+ * Files of the repository worth reading, shallow ones first. `classify(rel, name)` says 'essential' (manifests, env,
+ * config and infrastructure files: always listed), 'candidate' (source and YAML: listed up to limits.maxListed) or
+ * null (not read, only counted). Past the limit the walk goes on for essential files, so a large tree loses
+ * imports, never dependencies. Returns the files and how many files look like the project's own.
+ */
+function listFiles(root, limits, classify) {
 	const files = [];
+	let candidates = 0;
+	let projectFiles = 0;
+	let walked = 0;
 	const queue = [root];
 	for (let q = 0; q < queue.length; q++) {
 		let entries;
@@ -723,14 +771,22 @@ function listFiles(root, limits) {
 			}
 			// Symlinks are followed to files only; a linked directory could loop.
 			if (!e.isFile() && !(e.isSymbolicLink() && isFileSync(full))) continue;
-			if (files.length >= limits.maxListed) {
+			if (++walked > limits.maxWalked) {
 				limits.truncated = true;
-				return files;
+				return { files, projectFiles };
+			}
+			const rel = relative(root, full).split(sep).join('/');
+			if (!(q === 0 && NON_PROJECT_FILES.test(e.name))) projectFiles++;
+			const kind = classify(rel, e.name);
+			if (!kind) continue;
+			if (kind === 'candidate' && ++candidates > limits.maxListed) {
+				limits.truncated = true;
+				continue;
 			}
 			files.push(full);
 		}
 	}
-	return files;
+	return { files, projectFiles };
 }
 
 function isFileSync(path) {
@@ -740,6 +796,14 @@ function isFileSync(path) {
 		return false;
 	}
 }
+
+// Folders that hold test data, mocks and examples rather than the product. A vendor seen only there is reported
+// under `samples`, not as part of the stack (a fixture repo inside tests is not the app's own Stripe).
+const SAMPLE_DIR = /(?:^|\/)(?:fixtures?|__fixtures__|__mocks__|mocks?|examples?|samples?|testdata|tests?|__tests__|e2e|cypress|playwright)\//i;
+const isSample = (rel) => SAMPLE_DIR.test(rel);
+
+// Infrastructure files read by name: always listed, even past the file limit.
+const INFRA_FILE = /^(Dockerfile(\..+)?|(docker-)?compose(\.[\w-]+)?\.ya?ml|.+\.tf|Chart\.yaml|(helmfile|skaffold|kustomization)\.ya?ml|Pulumi\.ya?ml|serverless\.ya?ml)$/;
 
 // Evidence kept per vendor, most telling first; every kind found keeps at least one slot.
 const EVIDENCE_ORDER = ['package', 'config', 'import', 'code', 'env'];
@@ -791,11 +855,16 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 	const envNames = new Set();
 	const frameworks = new Map();
 	const infra = [];
-	let projectFiles = 0;
 	let scanned = 0;
 	// Paths are listed first, then read in two passes: env files and manifests always, YAML and source until maxFiles
 	// files were read. A large tree loses imports, never dependencies.
-	const limits = { maxListed: maxFiles * 20, truncated: false };
+	const limits = { maxListed: maxFiles * 20, maxWalked: maxFiles * 200, truncated: false };
+	const configNames = sigs.flatMap((sig) => sig.config_files);
+	const classify = (rel, name) => {
+		if (ENV_FILE.test(name) || manifestKind(rel) || INFRA_FILE.test(name)) return 'essential';
+		if (configNames.some((cfg) => rel === cfg || rel.endsWith('/' + cfg))) return 'essential';
+		return /\.ya?ml$/.test(name) || SOURCE_EXT.test(name) ? 'candidate' : null;
+	};
 
 	const hit = (sig, kind, file, match, role) => {
 		if (!found.has(sig.id)) found.set(sig.id, { sig, evidence: new Map(), roleHits: new Set() });
@@ -814,10 +883,10 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 	for (const sig of sigs) for (const cfg of sig.config_files) if (isFileSync(join(root, cfg))) hit(sig, 'config', cfg, cfg);
 
 	const deferred = [];
-	for (const full of listFiles(root, limits)) {
+	const listing = listFiles(root, limits, classify);
+	for (const full of listing.files) {
 		const rel = relative(root, full).split(sep).join('/');
 		const name = basename(full);
-		if (!(rel.indexOf('/') === -1 && NON_PROJECT_FILES.test(name))) projectFiles++;
 
 		if (ENV_FILE.test(name)) {
 			let names = [];
@@ -825,7 +894,7 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 				names = readEnvNames(read(full));
 			} catch {}
 			for (const n of names) {
-				envNames.add(n);
+				if (!isSample(rel)) envNames.add(n);
 				for (const sig of sigs) {
 					const prefix = sig.env_prefixes.find((p) => n.startsWith(p));
 					if (prefix) hit(sig, 'env', rel, n);
@@ -853,6 +922,7 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 				if (!unmapped.has(u.name)) unmapped.set(u.name, { name: u.name, role: u.role, evidence: [] });
 				for (const p of u.packages) unmapped.get(u.name).evidence.push({ kind: 'package', file: rel, match: p });
 			}
+			if (isSample(rel)) continue;
 			for (const d of deps) {
 				const key = Object.keys(FRAMEWORKS[manifest]).find((k) => dependencyMatches(manifest, d, [k]));
 				const fw = key && FRAMEWORKS[manifest][key];
@@ -861,6 +931,7 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 			continue;
 		}
 
+		if (INFRA_FILE.test(name) && isSample(rel)) continue;
 		if (name === 'Dockerfile' || /^Dockerfile\./.test(name)) infra.push({ kind: 'docker', file: rel });
 		else if (/^(docker-)?compose(\.[\w-]+)?\.ya?ml$/.test(name)) infra.push({ kind: 'docker-compose', file: rel });
 		else if (/\.tf$/.test(name)) infra.push({ kind: 'terraform', file: rel });
@@ -878,7 +949,7 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 		}
 		if (/\.ya?ml$/.test(name)) {
 			try {
-				if (statSync(full).size < 256 * 1024 && isKubernetesManifest(read(full))) infra.push({ kind: 'kubernetes', file: rel });
+				if (!isSample(rel) && statSync(full).size < 256 * 1024 && isKubernetesManifest(read(full))) infra.push({ kind: 'kubernetes', file: rel });
 			} catch {}
 			continue;
 		}
@@ -890,6 +961,9 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 			continue;
 		}
 		const specs = extractImports(src).map((spec) => [spec, normalizeSpecifier(spec)]);
+		// Python and Go imports name the package itself, so they match like dependencies.
+		const native = name.endsWith('.py') ? ['pypi', extractPythonModules(src)] : name.endsWith('.go') ? ['go', extractGoImports(src)] : null;
+		if (native) for (const v of matchDependencies(native[1], sigs, native[0]).vendors) for (const p of v.packages) hit(sigs.find((x) => x.id === v.id), 'import', rel, p);
 		for (const sig of sigs) {
 			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports)) hit(sig, 'import', rel, spec);
 			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
@@ -899,31 +973,43 @@ function detectVendors(root, { signatures, maxFiles = 5000, plugin = false } = {
 		}
 	}
 
-	const vendors = [...found.values()]
+	const all = [...found.values()]
+		// A role signal (".storage.from(") only says how a vendor found otherwise is used; on its own it is too generic.
+		.filter(({ evidence }) => [...evidence.values()].some((e) => e.kind !== 'code'))
 		.map(({ sig, evidence, roleHits }) => {
 			// Roles with signals count only when a signal matched; other roles count once the vendor is present.
 			const signalled = Object.keys(sig.role_signals ?? {});
 			const roles_used = sig.roles.filter((r) => !signalled.includes(r) || roleHits.has(r));
-			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence: pickEvidence(evidence.values()) };
+			// Product code needs its own non-code evidence; a vendor that is a dependency only in fixtures is a sample.
+			const product = [...evidence.values()].filter((e) => !isSample(e.file));
+			const sample = !product.some((e) => e.kind !== 'code');
+			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence: pickEvidence(sample ? evidence.values() : product), sample };
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));
+	const vendors = all.filter((v) => !v.sample).map(({ sample, ...v }) => v);
+	const samples = [
+		...all.filter((v) => v.sample).map((v) => ({ id: v.id, name: v.name, evidence: v.evidence })),
+		...[...unmapped.values()].filter((u) => u.evidence.every((e) => isSample(e.file))).map((u) => ({ name: u.name, evidence: u.evidence })),
+	];
+	const unmappedInProduct = [...unmapped.values()].filter((u) => !u.evidence.every((e) => isSample(e.file)));
 
 	const byRole = new Map();
 	for (const v of vendors) for (const r of v.roles_used) byRole.set(r, [...(byRole.get(r) ?? []), v.id]);
-	for (const u of unmapped.values()) if (u.role !== 'other') byRole.set(u.role, [...(byRole.get(u.role) ?? []), u.name]);
+	for (const u of unmappedInProduct) if (u.role !== 'other') byRole.set(u.role, [...(byRole.get(u.role) ?? []), u.name]);
 	const overlaps = [...byRole].filter(([, ids]) => ids.length > 1).map(([role, ids]) => ({ role, vendors: ids }));
 
 	return {
 		root,
-		empty: projectFiles === 0,
+		empty: listing.projectFiles === 0,
 		scanned_files: scanned,
 		truncated: limits.truncated,
 		vendors,
-		unmapped: [...unmapped.values()],
+		unmapped: unmappedInProduct,
 		overlaps,
 		frameworks: [...frameworks.values()],
 		infra,
 		env_names: [...envNames].sort(),
+		samples,
 		hook: hookStatus(root, { plugin }),
 	};
 }
@@ -953,8 +1039,8 @@ function detectMain(argv) {
 	}
 	const vendorsDir = args.vendors || defaultVendorsDir();
 	if (!vendorsDir) fail('vendor maps not found; pass --vendors <dir>');
-	const signatures = vendorSignatures(loadCatalog(vendorsDir));
 	try {
+		const signatures = vendorSignatures(loadCatalog(vendorsDir));
 		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000, plugin: runsFromPlugin() }));
 	} catch (e) {
 		fail(e.message);
@@ -1044,7 +1130,9 @@ const METRIC_UNIT_MB = { mb: 1, gb: 1e3, tb: 1e6 };
  */
 function parseQuantity(input) {
 	if (typeof input === 'number') return { value: input, dim: 'count', per: null };
-	const s = String(input).trim();
+	// Runs of spaces become one, so the optional parts below cannot backtrack over a long gap.
+	const s = String(input).trim().replace(/\s+/g, ' ');
+	if (s.length > 64) throw new Error(`cannot read quantity "${s.slice(0, 24)}…": too long`);
 	const m = /^([+-])?\s*(\$)?\s*(\d{1,3}(?:([, _])\d{3})(?:\4\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)\s*([kKmM](?![bB]))?\s*(%|[KMGT]?B\b)?\s*(?:\/\s*(day|d|week|wk|w|month|mo|year|yr))?$/i.exec(s);
 	if (!m) throw new Error(`cannot read quantity "${input}"`);
 	const [, sign, dollar, num, , mult, unit, period] = m;
@@ -1067,9 +1155,15 @@ function formatSize(mb) {
 	return `${round(mb, 2)} MB`;
 }
 
+// The factor nudges values like 1.005, stored as 1.00499…, to round half up as written.
 function round(n, digits = 2) {
 	const f = 10 ** digits;
-	return Math.round(n * f) / f;
+	return Math.round(n * f * (1 + Number.EPSILON)) / f;
+}
+
+/** A compounding rate over `perDays` as a monthly fraction: 10%/week is (1.1^(30.4375/7) − 1), about 51% a month, not 43%. */
+function monthlyGrowth(pct, perDays = PERIOD_DAYS.mo) {
+	return (1 + pct / 100) ** (PERIOD_DAYS.mo / perDays) - 1;
 }
 
 // null past year 9999: such a date means "not on this trend", and toISOString cannot write it as YYYY-MM-DD.
@@ -1243,9 +1337,14 @@ function readPoints(list) {
 		const eq = p.indexOf('=');
 		const date = p.slice(0, Math.max(eq, 0)).trim();
 		if (eq < 1 || !isIsoDate(date)) throw new Error(`--points expects YYYY-MM-DD=value, got "${p}"`);
-		return { date, value: parseQuantity(p.slice(eq + 1)).value };
+		const qv = parseQuantity(p.slice(eq + 1));
+		return { date, value: qv.value, dim: qv.dim };
 	});
 }
+
+const sameKind = (what, a, limit) => {
+	if (a.dim !== limit.dim) throw new Error(`${what} is a ${a.dim} but --limit is a ${limit.dim}: give both in the same kind of unit`);
+};
 
 const USAGE = `usage:
   node project.mjs eta --current "312 MB" --limit "500 MB" --rate "1.1 MB/day" [--from 2026-10-06]
@@ -1272,6 +1371,7 @@ function projectMain(argv) {
 			if (args.points != null) {
 				if (args.points === true) throw new Error('--points needs YYYY-MM-DD=value pairs');
 				input.points = readPoints(args.points);
+				for (const p of input.points) sameKind(`--points ${p.date}`, p, limit);
 			} else {
 				const current = q(args, 'current');
 				if (!current) throw new Error('--current or --points is required');
@@ -1279,10 +1379,16 @@ function projectMain(argv) {
 				input.current = current.value;
 				if (args.growth) {
 					const g = q(args, 'growth');
-					input.growthPerMonth = (g.dim === 'pct' ? g.value / 100 : g.value) * (PERIOD_DAYS.mo / (g.per ?? PERIOD_DAYS.mo));
+					// "18%/mo" or the fraction 0.18; a bare 18 would be 1800% a month.
+					if (g.dim === 'pct') input.growthPerMonth = monthlyGrowth(g.value, g.per ?? PERIOD_DAYS.mo);
+					else if (g.dim === 'count' && g.value > 0 && g.value < 1 && g.per == null) input.growthPerMonth = g.value;
+					else throw new Error('--growth is a percentage with a period, such as "18%/mo" or "4%/week"');
 				} else if (args.rate) {
 					const r = q(args, 'rate');
-					input.ratePerDay = r.value / (r.per ?? 1);
+					if (r.dim === 'pct') throw new Error('--rate is an amount per period ("1.1 MB/day"); for a percentage use --growth');
+					if (r.per == null) throw new Error('--rate needs a period, such as "1.1 MB/day" or "300/week"');
+					sameKind('--rate', r, limit);
+					input.ratePerDay = r.value / r.per;
 				}
 			}
 			printJson(eta(input));
@@ -1341,6 +1447,8 @@ const REVISIT_METRICS = ['db_size', 'monthly_sent', 'daily_peak', 'transfer_tb',
 // Env var names (NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL) and URL slugs (2024-11-05-pro-plan-pricing-update) are made of
 // words, numbers and short parts like R2 or v2. A key has at least one long part that mixes letters and digits.
 function looksRandom(token) {
+	// Stripe object ids (price_…, prod_…) identify things; they are not secrets.
+	if (/^(?:price|prod|plan|cus|sub|acct|evt|pi|ch|in|si|txn|po|tr|seti|pm)_[A-Za-z0-9]+$/.test(token)) return false;
 	const parts = token.split(/[-_]+/).filter(Boolean);
 	if (/^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(token) && parts.every((p) => p.length <= 12)) return false;
 	return !parts.every((p) => /^(?:[A-Za-z]+|\d+)$/.test(p) || p.length <= 4);
@@ -1352,12 +1460,28 @@ const isResendKey = (m) => {
 	return (/\d/.test(body) && /[A-Za-z]/.test(body)) || (/[a-z]/.test(body) && /[A-Z]/.test(body));
 };
 
+// A value after a key=, key: or "key": looks like a password when it mixes letters with digits or cases; an env
+// var name (STRIPE_SECRET_KEY) or a plain word is not one.
+const isCredentialValue = (m) => {
+	const v = m[1] ?? '';
+	if (/^[A-Z][A-Z0-9_]*$/.test(v) || /^\$\{?[A-Za-z_]/.test(v) || /^<.*>$/.test(v)) return false;
+	return (/\d/.test(v) && /[A-Za-z]/.test(v)) || (/[a-z]/.test(v) && /[A-Z]/.test(v));
+};
+
+// A commit hash, digest or UUID as a segment of a URL path (github.com/o/r/blob/<sha>/x.md) names a version, not a
+// secret. Alone, the same shapes can be keys (old GitHub tokens are 40 hex characters), so they still count.
+const inUrlPath = (m) => m.input[m.index - 1] === '/' && /^(?:[0-9a-f]{40}|[0-9a-f]{64}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(m[0]);
+
+// 40 characters of base64 with both cases and a digit: an AWS secret access key and its kind.
+const isMixedBase64 = (m) => /[a-z]/.test(m[0]) && /[A-Z]/.test(m[0]) && /\d/.test(m[0]);
+
 const SECRET_PATTERNS = [
 	['private key', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
-	['URL with credentials', /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@\S+/i],
+	// redis://:password@host has no user; the password may not contain "/" (that would be a path).
+	['URL with credentials', /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]*:[^\s@/]+@[^\s@]+/i],
 	['API key (sk_/pk_/rk_)', /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{8,}/],
 	['Supabase key', /\bsb_(?:secret|publishable)_[A-Za-z0-9_-]{8,}/],
-	['Resend key', /\bre_[A-Za-z0-9]{6,}_[A-Za-z0-9]{8,}(?![A-Za-z0-9_])|\bre_[A-Za-z0-9]{24,}\b/, isResendKey],
+	['Resend key', /\bre_[A-Za-z0-9]{6,}_[A-Za-z0-9]{8,}(?![A-Za-z0-9_])|\bre_[A-Za-z0-9]{24,}\b/, (m) => isResendKey(m[0])],
 	['JWT', /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/],
 	['GitHub token', /\bgh[pousr]_[A-Za-z0-9]{20,}/],
 	['Slack token', /\bxox[abprs]-[A-Za-z0-9-]{10,}/],
@@ -1365,23 +1489,33 @@ const SECRET_PATTERNS = [
 	['Neon API key', /\bnapi_[A-Za-z0-9]{16,}/],
 	// Only names that usually hold secrets: NODE_ENV=production in a note is fine.
 	['env assignment', /\b[A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|PWD|DSN|CREDENTIALS?|PRIVATE)[A-Z0-9_]*\s*=\s*['"]?[^\s'"]{6,}/],
-	['long token', /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/, looksRandom],
+	// db_password: Sup3rS3cret, "apiKey": "…", stripe_secret_key=… (any case, = or :).
+	['credential', /\b[A-Za-z0-9_]*(?:key|secret|token|password|passwd|pwd|credentials?)["']?\s*[:=]\s*['"]?([^\s'",;]{6,})/i, isCredentialValue],
+	['AWS secret key', /(?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+=])/, isMixedBase64],
+	['long token', /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/, (m) => !inUrlPath(m) && looksRandom(m[0])],
 ].map(([kind, re, check]) => [kind, new RegExp(re.source, re.flags + 'g'), check]);
 
-const secretIn = (line, re, check) => [...line.matchAll(re)].some((m) => !check || check(m[0]));
+const secretIn = (line, re, check) => [...line.matchAll(re)].some((m) => !check || check(m));
 
-/** Finds strings that look like secrets. STACK.md must never contain one. */
+/** Finds strings that look like secrets, one hit per line. STACK.md must never contain one. */
 function findSecrets(text) {
 	const hits = [];
 	text.split(/\r?\n/).forEach((line, idx) => {
-		for (const [kind, re, check] of SECRET_PATTERNS) if (secretIn(line, re, check)) hits.push({ line: idx + 1, kind });
+		const hit = SECRET_PATTERNS.find(([, re, check]) => secretIn(line, re, check));
+		if (hit) hits.push({ line: idx + 1, kind: hit[0] });
 	});
 	return hits;
 }
 
 function scrubSecrets(text) {
 	let out = text;
-	for (const [, re, check] of SECRET_PATTERNS) out = out.replace(re, (m) => (!check || check(m) ? '[removed]' : m));
+	for (const [, re, check] of SECRET_PATTERNS) {
+		// replace() passes (match, ...groups, offset, input): rebuild the match object the checks expect.
+		out = out.replace(re, (...a) => {
+			const m = Object.assign(a.slice(0, -2), { index: a.at(-2), input: a.at(-1) });
+			return !check || check(m) ? '[removed]' : m[0];
+		});
+	}
 	return out;
 }
 
@@ -1419,7 +1553,7 @@ function splitComment(raw) {
 function scanSections(lines) {
 	const sections = [];
 	let current = null;
-	let fence = false;
+	let fence = null;
 	let comment = false;
 	lines.forEach((line, idx) => {
 		// Text inside <!-- --> is not part of the document (the template keeps its example there).
@@ -1427,14 +1561,24 @@ function scanSections(lines) {
 			if (line.includes('-->')) comment = false;
 			return;
 		}
-		if (/^\s*(```|~~~)/.test(line)) fence = !fence;
-		if (fence) return;
+		// A fence closes only with the same character, at least as long and with nothing after it (CommonMark), so
+		// a ``` line inside a ~~~ block or a ```` block does not end it.
+		const fm = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+		if (fence) {
+			if (fm && fm[1][0] === fence[0] && fm[1].length >= fence.length && !fm[2].trim()) fence = null;
+			return;
+		}
+		if (fm && !(fm[1][0] === '`' && fm[2].includes('`'))) {
+			fence = fm[1];
+			return;
+		}
 		// Only a line that starts with <!-- opens a comment block (as in Markdown); "<!--" inside a value is text.
 		if (/^\s*<!--/.test(line)) {
 			if (!line.includes('-->', line.indexOf('<!--') + 4)) comment = true;
 			return;
 		}
-		const h = /^##\s+(.+?)\s*#*\s*$/.exec(line);
+		// A closing run of # needs a space before it: "## Other: C#" names C#.
+		const h = /^##\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
 		if (h) {
 			const heading = h[1];
 			const rv = /^([A-Za-z][A-Za-z ]*?)\s*:\s*(.+)$/.exec(heading);
@@ -1471,7 +1615,7 @@ function parseStackMd(text) {
 }
 
 // "Database:Supabase", "database :  supabase" and "Database: Supabase" name the same section.
-const normalizeHeading = (h) => String(h).trim().replace(/\s+/g, ' ').replace(/\s*:\s*/, ': ');
+const normalizeHeading = (h) => String(h).trim().replace(/^#+\s*/, '').replace(/\s+/g, ' ').replace(/\s*:\s*/, ': ');
 const sameHeading = (a, b) => normalizeHeading(a).toLowerCase() === normalizeHeading(b).toLowerCase();
 
 /**
@@ -1483,6 +1627,7 @@ function setFields(text, heading, updates, comments = {}) {
 	if (/[\r\n]/.test(String(heading))) throw new Error('section name must be one line');
 	heading = normalizeHeading(heading);
 	if (!heading) throw new Error('section name is empty');
+	if (/^[^:]+:\s*$/.test(heading)) throw new Error(`section "${heading}" names no vendor after the colon`);
 	for (const [k, v] of Object.entries(updates)) {
 		if (!/^[a-z_][a-z0-9_]*$/.test(k)) throw new Error(`invalid key "${k}"`);
 		if (/[\r\n]/.test(String(v))) throw new Error(`value for ${k} must be one line`);
@@ -1549,51 +1694,89 @@ function insertionIndex(section, key) {
 	return section.headingLine + 1;
 }
 
+// Dates in a usage entry: "(2026-10-06)", "(as of 2026-10-6)", "(read 2026-10-06, dashboard)".
+const USAGE_DATE = /\(([^()]*?)\b(\d{4})-(\d{1,2})-(\d{1,2})\b([^()]*)\)/;
+
+// "41,200" groups thousands; "312 MB,+1.1 MB/day" separates parts.
+const USAGE_PARTS = /,(?!\d{3}(?!\d))\s*/;
+
+/** A quantity with an optional word after it: "41,200 emails", "+300 emails/day", "9k users". */
+function usageQuantity(text) {
+	try {
+		return parseQuantity(text);
+	} catch {
+		const m = /^(.*?\d[^A-Za-z/]*(?:\s?[KMGT]?B\b|[kKmM]\b)?)\s*[A-Za-z][A-Za-z ]*?\s*(\/\s*[A-Za-z]+)?$/.exec(text.trim());
+		if (!m) throw new Error(`cannot read "${text}"`);
+		return parseQuantity(`${m[1]}${m[2] ?? ''}`);
+	}
+}
+
 /**
- * Reads a `usage` value: "312 MB, +1.1 MB/day (2026-10-06)", optionally named
- * ("db_size 312 MB, ..."), several entries separated by ";".
- * Returns { metricName | "_": { value, dim, ratePerDay?, rateDim?, growthPerMonth?, asOf? } }.
- * An entry it cannot read is skipped; an impossible date is an error.
+ * Reads a `usage` value: "312 MB, +1.1 MB/day (2026-10-06)", optionally named ("db_size 312 MB, ..."),
+ * several entries separated by ";". Returns { metrics, problems }: metrics is
+ * { metricName | "_": { value, dim, ratePerDay?, rateDim?, growthPerMonth?, asOf? } }, problems lists what could
+ * not be read, so lint can say so instead of a check that quietly reports "ok". An impossible date is an error.
  */
-function parseUsage(raw) {
+function readUsage(raw) {
 	const metrics = {};
+	const problems = [];
+	let last = null;
 	for (const entry of String(raw ?? '').split(';')) {
 		let s = entry.trim();
 		if (!s) continue;
-		const d = /\((\d{4}-\d{2}-\d{2})\)/.exec(s);
-		const asOf = d ? d[1] : null;
-		if (asOf && !isIsoDate(asOf)) throw new Error(`usage: "${asOf}" is not a date (YYYY-MM-DD)`);
-		if (d) s = s.replace(d[0], '').trim();
-		let name = '_';
-		const n = /^([a-z_][a-z0-9_]*)(?:\s*[=:]\s*|\s+)(?=[+$\d.])/.exec(s);
+		let asOf = null;
+		const d = USAGE_DATE.exec(s);
+		if (d) {
+			asOf = `${d[2]}-${d[3].padStart(2, '0')}-${d[4].padStart(2, '0')}`;
+			if (!isIsoDate(asOf)) throw new Error(`usage: "${d[2]}-${d[3]}-${d[4]}" is not a date (YYYY-MM-DD)`);
+			s = s.replace(d[0], '').trim();
+		}
+		let name = null;
+		const n = /^([A-Za-z_][A-Za-z0-9_]*)(?:\s*[=:]\s*|\s+)(?=[+$\d.~])/.exec(s);
 		if (n) {
-			name = n[1];
+			name = n[1].toLowerCase();
 			s = s.slice(n[0].length);
 		}
-		const parts = s.split(/,\s+/).map((p) => p.trim()).filter(Boolean);
-		let base;
-		try {
-			base = parseQuantity(parts[0]);
-		} catch {
-			continue;
-		}
-		const m = { value: base.value, dim: base.dim, asOf };
-		for (const p of parts.slice(1)) {
-			let r;
+		const parts = s.split(USAGE_PARTS).map((p) => p.trim().replace(/^~\s*/, '')).filter(Boolean);
+		const rates = [];
+		let base = null;
+		for (const p of parts) {
+			let q;
 			try {
-				r = parseQuantity(p);
+				q = usageQuantity(p);
 			} catch {
+				problems.push(`cannot read "${p}"`);
 				continue;
 			}
-			if (r.dim === 'pct') m.growthPerMonth = (r.value / 100) * (30.4375 / (r.per ?? 30.4375));
+			if (q.per != null || q.dim === 'pct') rates.push(q);
+			else if (!base) base = q;
+			else problems.push(`"${p}" is a second reading; separate metrics with ";" and name them`);
+		}
+		// "312 MB; +1.1 MB/day (date)": a rate alone continues the reading before it.
+		const target = base ? { value: base.value, dim: base.dim, asOf } : !name && last ? last : null;
+		if (!target) {
+			if (parts.length) problems.push(`"${entry.trim()}" has a rate but no reading`);
+			continue;
+		}
+		if (!base && asOf && !target.asOf) target.asOf = asOf;
+		for (const r of rates) {
+			if (r.dim === 'pct') target.growthPerMonth = monthlyGrowth(r.value, r.per ?? undefined);
 			else if (r.per) {
-				m.ratePerDay = r.value / r.per;
-				if (r.dim !== base.dim) m.rateDim = r.dim;
+				target.ratePerDay = r.value / r.per;
+				if (r.dim !== target.dim) target.rateDim = r.dim;
 			}
 		}
-		metrics[name] = m;
+		if (base) {
+			metrics[name ?? '_'] = target;
+			last = target;
+		}
+		if ((target.ratePerDay != null || target.growthPerMonth != null) && !target.asOf) problems.push('a reading with a rate has no date; add (YYYY-MM-DD) so projections start from it');
 	}
-	return metrics;
+	return { metrics, problems: [...new Set(problems)] };
+}
+
+function parseUsage(raw) {
+	return readUsage(raw).metrics;
 }
 
 /**
@@ -1603,9 +1786,17 @@ function parseUsage(raw) {
 function parseUsers(raw) {
 	const s = String(raw ?? '');
 	const re = /(?<![\w.$-])(?:~\s*)?(\d{1,3}(?:([ ,_])\d{3})(?:\2\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s*([km]|thousand|million|mln|bn|billion)(?![a-z]))?/gi;
-	const first = re.exec(s);
-	if (!first) return null;
-	const after = s.slice(first.index + first[0].length);
+	let first;
+	let after;
+	for (;;) {
+		first = re.exec(s);
+		if (!first) return null;
+		after = s.slice(first.index + first[0].length);
+		// "5x growth" is a multiplier; "launch in 2027" is a year, unless users follow ("2000 users").
+		if (/^\s*[x×](?![a-z])/i.test(after)) continue;
+		if (!first[3] && /^(19|20)\d\d$/.test(first[1]) && !/^\s*[-/.]\d/.test(after) && !/^\s*(?:users?|people|customers?|accounts?|seats?|mau|members?)\b/i.test(after)) continue;
+		break;
+	}
 	if (/^\s*(?:%|\$|[-/.]\d|(?:hours?|hrs?|days?|weeks?|wks?|months?|mos?|years?|yrs?|quarters?|[KMGT]?B)\b|\/)/i.test(after)) return null;
 	let value = Number(first[1].replace(/[ ,_]/g, ''));
 	if (first[3]) value *= /^(k|thousand)$/i.test(first[3]) ? 1e3 : /^(m|million|mln)$/i.test(first[3]) ? 1e6 : 1e9;
@@ -1692,6 +1883,8 @@ function inMetricUnit(metric, q) {
 	return out;
 }
 
+const nextDay = (iso) => new Date(Date.parse(iso + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+
 const latest = (dates) => dates.filter(Boolean).sort().at(-1) ?? null;
 const earliest = (dates) => dates.filter(Boolean).sort()[0] ?? null;
 
@@ -1700,7 +1893,8 @@ function evalRevisit(node, ctx) {
 	if (node.type === 'cmp') {
 		if (node.metric === 'date') {
 			const value = compare(ctx.today, node.op, node.date);
-			const due = !value && (node.op === '>' || node.op === '>=') ? node.date : null;
+			// "date > 2026-12-01" holds from Dec 2.
+			const due = !value && node.op === '>=' ? node.date : !value && node.op === '>' ? nextDay(node.date) : null;
 			return { value, eta: due, unknown: [], manual: [] };
 		}
 		const reading = ctx.metrics[node.metric];
@@ -1790,7 +1984,7 @@ function lintStackMd(text) {
 		if (s.values.env && /=/.test(s.values.env)) errors.push({ line: s.line, message: 'env lists names only, without values' });
 		if (s.values.source && !/\d{4}-\d{2}-\d{2}/.test(`${s.values.source} ${s.comments.source ?? ''}`)) warnings.push({ line: s.line, message: 'source has no read date (add "# read YYYY-MM-DD")' });
 		try {
-			parseUsage(s.values.usage);
+			for (const p of readUsage(s.values.usage).problems) warnings.push({ line: s.line, message: `usage: ${p}. Write it as "312 MB, +1.1 MB/day (2026-10-06)"` });
 		} catch (e) {
 			errors.push({ line: s.line, message: e.message });
 		}
@@ -1823,7 +2017,8 @@ function keyValues(list, flag) {
 	const out = {};
 	for (const item of [].concat(list ?? [])) {
 		const eq = String(item).indexOf('=');
-		if (item === true || eq < 1) throw new Error(`${flag} expects key=value, got "${item === true ? '' : item}"`);
+		// The item is not echoed: a value pasted without its key may be the very secret set refuses to write.
+		if (item === true || eq < 1) throw new Error(`${flag} expects key=value`);
 		out[String(item).slice(0, eq).trim()] = String(item).slice(eq + 1).trim();
 	}
 	return out;
@@ -1906,14 +2101,28 @@ function stackMdMain(argv) {
 			}
 			if (!Object.keys(updates).length && !Object.keys(comments).length) throw new Error('nothing to set: pass --json, --set or --comment');
 			const out = setFields(text, args.section, updates, comments);
+			// Lines this write adds must be clean; a line already in the file is lint's to report, so one old
+			// false alarm does not block every later update.
+			const before = new Set(text.split(/\r?\n/));
+			const outLines = out.split(/\r?\n/);
 			const secrets = findSecrets(out);
-			if (secrets.length) {
+			const added = secrets.filter((h) => !before.has(outLines[h.line - 1]));
+			if (added.length) {
 				process.exitCode = 2;
-				throw new Error(`refusing to write: lines ${secrets.map((s) => s.line).join(', ')} look like secrets`);
+				throw new Error(`refusing to write: lines ${[...new Set(added.map((h) => h.line))].join(', ')} look like secrets`);
 			}
 			ensureWorkDir(file);
-			writeFileSync(file, out);
-			printJson({ file, written: true, section: normalizeHeading(args.section) });
+			// Write a sibling file, then rename: an interrupted write never leaves half a STACK.md.
+			const tmp = `${file}.${process.pid}.tmp`;
+			try {
+				writeFileSync(tmp, out);
+				renameSync(tmp, file);
+			} catch (e) {
+				rmSync(tmp, { force: true });
+				throw e;
+			}
+			const elsewhere = [...new Set(secrets.filter((h) => before.has(outLines[h.line - 1])).map((h) => h.line))];
+			printJson({ file, written: true, section: normalizeHeading(args.section), ...(elsewhere.length ? { secrets_elsewhere: elsewhere } : {}) });
 		}
 	} catch (e) {
 		fail(e.message, process.exitCode || 1);

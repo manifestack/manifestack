@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
-import { parseStackMd, setFields, checkStack, lintStackMd, parseRevisit, parseUsage, parseUsers, findSecrets, scrubSecrets } from '../packages/core/src/stack-md.mjs';
+import { parseStackMd, setFields, checkStack, lintStackMd, parseRevisit, parseUsage, readUsage, parseUsers, findSecrets, scrubSecrets } from '../packages/core/src/stack-md.mjs';
 
 // Built from parts so that secret scanners (GitHub push protection) do not take the fixture for a real key.
 const RESEND_LIKE = ['re', 'c1tpEyD8', 'NKFusih9vKVQknRAQfmFcWCv'].join('_');
@@ -373,4 +373,96 @@ test('lint warns about a priority outside the four known values', () => {
 	assert.ok(warn('least-ops').some((m) => /priority "least-ops" is not one of lowest cost, balanced, least ops, control/.test(m)));
 	assert.deepEqual(warn('Least ops'), []);
 	assert.deepEqual(warn('lowest cost  # user 2026-10-08'), []);
+});
+
+test('readUsage: separators, dates and words people write, and what it cannot read', () => {
+	const semi = readUsage('312 MB; +1.1 MB/day (2026-10-06)');
+	assert.deepEqual(semi.metrics, { _: { value: 312, dim: 'size', asOf: '2026-10-06', ratePerDay: 1.1 } }, 'a rate after ; continues the reading');
+	assert.deepEqual(semi.problems, []);
+	assert.equal(parseUsage('312 MB,+1.1 MB/day (2026-10-06)')._.ratePerDay, 1.1, 'no space after the comma');
+	assert.equal(parseUsage('312 MB, +1.1 MB/day (as of 2026-10-6)')._.asOf, '2026-10-06');
+	const sent = parseUsage('41,200 emails, +18%/mo (2026-10-01)')._;
+	assert.equal(sent.value, 41200);
+	assert.ok(Math.abs(sent.growthPerMonth - 0.18) < 1e-12);
+	assert.equal(parseUsage('MAU 9k users').mau.value, 9000);
+	assert.ok(Math.abs(parseUsage('db_size 100 MB, +10%/week (2026-10-01)').db_size.growthPerMonth - (1.1 ** (30.4375 / 7) - 1)) < 1e-12, 'weekly growth compounds');
+	assert.match(readUsage('about three hundred megs').problems[0], /cannot read/);
+	assert.match(readUsage('312 MB, +1.1 MB/day').problems[0], /has no date/);
+	assert.throws(() => readUsage('312 MB (2026-02-30)'), /not a date/);
+});
+
+test('lint warns about usage it cannot read instead of passing it', () => {
+	const r = lintStackMd('## Requirements\nbudget: $50\n\n## Database: Supabase\nusage: lots of data\nsource: supabase.com/pricing  # read 2026-10-08\n');
+	assert.equal(r.ok, true);
+	assert.match(r.warnings.map((w) => w.message).join('\n'), /usage: cannot read "lots of data"/);
+	const ok = lintStackMd('## Requirements\nbudget: $50\n\n## Database: Supabase\nusage: 312 MB, +1.1 MB/day (2026-10-06)\nsource: supabase.com/pricing  # read 2026-10-08\n');
+	assert.deepEqual(ok.warnings, []);
+	const c = checkStack('## Database: Supabase\nusage: 312 MB; +1.1 MB/day (2026-10-06)\nrevisit_when: db_size > 400 MB\n', { today: '2026-10-08' }).sections[0];
+	assert.equal(c.eta, '2026-12-25', 'the ; form projects instead of reading 1.1 MB');
+});
+
+test('parseUsers skips years and multipliers', () => {
+	assert.equal(parseUsers('launch in 2027 with 5k users'), 5000);
+	assert.equal(parseUsers('by end of 2026: 50k'), 50000);
+	assert.equal(parseUsers('5x growth, 9k now'), 9000);
+	assert.equal(parseUsers('2000 users at launch'), 2000);
+	assert.equal(parseUsers('2026-10-01: 9k'), null, 'a date first stays unclear');
+});
+
+test('date > X is due the day after X', () => {
+	const r = checkStack('## Database: Supabase\nrevisit_when: date > 2026-12-01\n', { today: '2026-10-08' }).sections[0];
+	assert.equal(r.eta, '2026-12-02');
+	assert.equal(checkStack('## Database: Supabase\nrevisit_when: date >= 2026-12-01\n', { today: '2026-10-08' }).sections[0].eta, '2026-12-01');
+});
+
+test('secrets: forms that slipped through before, and ids that are not secrets', () => {
+	for (const line of [
+		`note: ${['wJalrXUtnFEMI', 'K7MDENG', 'bPxRfiCYEXAMPLEKEY'].join('/')}`,
+		'cache: redis://:hunter2pass@cache.example.com:6379',
+		'db_password: Sup3rS3cretPw',
+		'stripe_secret_key=sk9fj3Kd02mZ',
+		'{"apiKey": "AIzaSyD3x9Q"}',
+	]) {
+		assert.equal(findSecrets(line).length, 1, line);
+	}
+	for (const line of [
+		'source: github.com/o/r/blob/3f786850e387550fdab836ed7e6dc881de23001b/P.md',
+		'note: project https://app.example.com/p/123e4567-e89b-12d3-a456-426614174000/settings',
+		'plan: price_1NabcDEFghiJKLmnoPQRstuVWx',
+		'env: STRIPE_SECRET_KEY, RESEND_API_KEY',
+		'note: token: limits apply per minute',
+	]) {
+		assert.deepEqual(findSecrets(line), [], line);
+	}
+	assert.equal(findSecrets('STRIPE_SECRET_KEY=whsec_live_abc123').length, 1, 'one hit per line');
+});
+
+test('set: a false alarm already in the file does not block other updates; the write is atomic', (t) => {
+	const dir = tempDir(t);
+	const file = join(dir, '.manifestack/STACK.md');
+	mkdirSync(join(dir, '.manifestack'));
+	writeFileSync(file, '## Database: Supabase\nnote: a3f9c2e1b4d5a6f7e8d9c0b1a2f3e4d5c6b7a8f9\n');
+	const r = runNode(join(ROOT, 'skills/manifestack/scripts/stack-md.mjs'), ['set', '--section', 'Database: Supabase', '--set', 'plan=Pro'], { cwd: dir });
+	assert.equal(r.code, 0, r.stderr);
+	assert.deepEqual(JSON.parse(r.stdout).secrets_elsewhere, [2]);
+	assert.match(readFileSync(file, 'utf8'), /plan: Pro/);
+	assert.ok(!readdirSync(join(dir, '.manifestack')).some((f) => f.endsWith('.tmp')), 'no temp file left');
+	const bad = runNode(join(ROOT, 'skills/manifestack/scripts/stack-md.mjs'), ['set', '--section', 'Database: Supabase', '--set', 'sk_live_abcdefgh12345678'], { cwd: dir });
+	assert.equal(bad.code, 1);
+	assert.doesNotMatch(bad.stderr, /sk_live/, 'the value is not echoed');
+});
+
+test('fences close only on the same marker; headings keep a trailing # and drop a leading ##', () => {
+	const tilde = '## Database: Supabase\nplan: free\n\n~~~\n```\n~~~\n';
+	assert.match(setFields(tilde, 'Database: Supabase', { plan: 'pro' }), /^## Database: Supabase\nplan: pro\n/);
+	assert.equal(setFields(tilde, 'Database: Supabase', { plan: 'pro' }).match(/## Database/g).length, 1);
+	const four = '## Database: Supabase\nplan: free\n\n````\n```\n## Database: Supabase\nplan: example\n```\n````\n';
+	const out = setFields(four, 'Database: Supabase', { plan: 'pro' });
+	assert.match(out, /^## Database: Supabase\nplan: pro\n/);
+	assert.match(out, /plan: example/, 'the example inside the code block is untouched');
+	const sharp = setFields('', 'Other: C#', { plan: 'x' });
+	assert.equal(setFields(sharp, 'Other: C#', { plan: 'y' }).match(/## Other/g).length, 1);
+	assert.equal(parseStackMd(sharp).sections[0].heading, 'Other: C#');
+	assert.match(setFields('', '## Database: Neon', { plan: 'x' }), /^## Database: Neon\n/);
+	assert.throws(() => setFields('', 'Database:', { plan: 'x' }), /names no vendor/);
 });

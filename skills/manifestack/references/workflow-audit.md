@@ -13,6 +13,7 @@ Run `node <skill-dir>/scripts/detect.mjs .` from the repository root. It returns
 - `overlaps`: roles served by more than one vendor (candidate `Overlap` findings);
 - `frameworks` and `infra`: inputs for `Overbuilt` (Next.js, Django, FastAPI, Gin, Docker, Terraform, Helm, Kubernetes manifests);
 - `env_names`: variable names only;
+- `samples`: vendors seen only in fixtures, mocks, tests or examples. They are not the product's stack: no findings for them;
 - `hook`: new-vendor hook status per agent (SKILL.md section 6).
 
 Other ecosystems (Ruby, PHP, Java, native mobile) are found only through config files and env names; ask the user about services the scan cannot see.

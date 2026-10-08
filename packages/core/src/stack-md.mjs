@@ -1,8 +1,8 @@
 // Reads and updates .manifestack/STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
 // Updates touch only the named fields: other lines, unknown keys and user comments stay as they are.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, rmSync } from 'node:fs';
 import { isMain, parseArgs, printJson, fail, todayIso, isIsoDate, dateArg } from './cli-util.mjs';
-import { parseQuantity, eta, approxMonth, METRIC_UNIT_MB } from './project.mjs';
+import { parseQuantity, eta, approxMonth, monthlyGrowth, METRIC_UNIT_MB } from './project.mjs';
 import { STACK_FILE, ensureWorkDir, withinCwd } from './workdir.mjs';
 
 export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'AI', 'Other'];
@@ -14,6 +14,8 @@ export const REVISIT_METRICS = ['db_size', 'monthly_sent', 'daily_peak', 'transf
 // Env var names (NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL) and URL slugs (2024-11-05-pro-plan-pricing-update) are made of
 // words, numbers and short parts like R2 or v2. A key has at least one long part that mixes letters and digits.
 function looksRandom(token) {
+	// Stripe object ids (price_…, prod_…) identify things; they are not secrets.
+	if (/^(?:price|prod|plan|cus|sub|acct|evt|pi|ch|in|si|txn|po|tr|seti|pm)_[A-Za-z0-9]+$/.test(token)) return false;
 	const parts = token.split(/[-_]+/).filter(Boolean);
 	if (/^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(token) && parts.every((p) => p.length <= 12)) return false;
 	return !parts.every((p) => /^(?:[A-Za-z]+|\d+)$/.test(p) || p.length <= 4);
@@ -25,12 +27,28 @@ const isResendKey = (m) => {
 	return (/\d/.test(body) && /[A-Za-z]/.test(body)) || (/[a-z]/.test(body) && /[A-Z]/.test(body));
 };
 
+// A value after a key=, key: or "key": looks like a password when it mixes letters with digits or cases; an env
+// var name (STRIPE_SECRET_KEY) or a plain word is not one.
+const isCredentialValue = (m) => {
+	const v = m[1] ?? '';
+	if (/^[A-Z][A-Z0-9_]*$/.test(v) || /^\$\{?[A-Za-z_]/.test(v) || /^<.*>$/.test(v)) return false;
+	return (/\d/.test(v) && /[A-Za-z]/.test(v)) || (/[a-z]/.test(v) && /[A-Z]/.test(v));
+};
+
+// A commit hash, digest or UUID as a segment of a URL path (github.com/o/r/blob/<sha>/x.md) names a version, not a
+// secret. Alone, the same shapes can be keys (old GitHub tokens are 40 hex characters), so they still count.
+const inUrlPath = (m) => m.input[m.index - 1] === '/' && /^(?:[0-9a-f]{40}|[0-9a-f]{64}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(m[0]);
+
+// 40 characters of base64 with both cases and a digit: an AWS secret access key and its kind.
+const isMixedBase64 = (m) => /[a-z]/.test(m[0]) && /[A-Z]/.test(m[0]) && /\d/.test(m[0]);
+
 const SECRET_PATTERNS = [
 	['private key', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
-	['URL with credentials', /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@\S+/i],
+	// redis://:password@host has no user; the password may not contain "/" (that would be a path).
+	['URL with credentials', /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]*:[^\s@/]+@[^\s@]+/i],
 	['API key (sk_/pk_/rk_)', /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{8,}/],
 	['Supabase key', /\bsb_(?:secret|publishable)_[A-Za-z0-9_-]{8,}/],
-	['Resend key', /\bre_[A-Za-z0-9]{6,}_[A-Za-z0-9]{8,}(?![A-Za-z0-9_])|\bre_[A-Za-z0-9]{24,}\b/, isResendKey],
+	['Resend key', /\bre_[A-Za-z0-9]{6,}_[A-Za-z0-9]{8,}(?![A-Za-z0-9_])|\bre_[A-Za-z0-9]{24,}\b/, (m) => isResendKey(m[0])],
 	['JWT', /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/],
 	['GitHub token', /\bgh[pousr]_[A-Za-z0-9]{20,}/],
 	['Slack token', /\bxox[abprs]-[A-Za-z0-9-]{10,}/],
@@ -38,23 +56,33 @@ const SECRET_PATTERNS = [
 	['Neon API key', /\bnapi_[A-Za-z0-9]{16,}/],
 	// Only names that usually hold secrets: NODE_ENV=production in a note is fine.
 	['env assignment', /\b[A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|PWD|DSN|CREDENTIALS?|PRIVATE)[A-Z0-9_]*\s*=\s*['"]?[^\s'"]{6,}/],
-	['long token', /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/, looksRandom],
+	// db_password: Sup3rS3cret, "apiKey": "…", stripe_secret_key=… (any case, = or :).
+	['credential', /\b[A-Za-z0-9_]*(?:key|secret|token|password|passwd|pwd|credentials?)["']?\s*[:=]\s*['"]?([^\s'",;]{6,})/i, isCredentialValue],
+	['AWS secret key', /(?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+=])/, isMixedBase64],
+	['long token', /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/, (m) => !inUrlPath(m) && looksRandom(m[0])],
 ].map(([kind, re, check]) => [kind, new RegExp(re.source, re.flags + 'g'), check]);
 
-const secretIn = (line, re, check) => [...line.matchAll(re)].some((m) => !check || check(m[0]));
+const secretIn = (line, re, check) => [...line.matchAll(re)].some((m) => !check || check(m));
 
-/** Finds strings that look like secrets. STACK.md must never contain one. */
+/** Finds strings that look like secrets, one hit per line. STACK.md must never contain one. */
 export function findSecrets(text) {
 	const hits = [];
 	text.split(/\r?\n/).forEach((line, idx) => {
-		for (const [kind, re, check] of SECRET_PATTERNS) if (secretIn(line, re, check)) hits.push({ line: idx + 1, kind });
+		const hit = SECRET_PATTERNS.find(([, re, check]) => secretIn(line, re, check));
+		if (hit) hits.push({ line: idx + 1, kind: hit[0] });
 	});
 	return hits;
 }
 
 export function scrubSecrets(text) {
 	let out = text;
-	for (const [, re, check] of SECRET_PATTERNS) out = out.replace(re, (m) => (!check || check(m) ? '[removed]' : m));
+	for (const [, re, check] of SECRET_PATTERNS) {
+		// replace() passes (match, ...groups, offset, input): rebuild the match object the checks expect.
+		out = out.replace(re, (...a) => {
+			const m = Object.assign(a.slice(0, -2), { index: a.at(-2), input: a.at(-1) });
+			return !check || check(m) ? '[removed]' : m[0];
+		});
+	}
 	return out;
 }
 
@@ -92,7 +120,7 @@ function splitComment(raw) {
 function scanSections(lines) {
 	const sections = [];
 	let current = null;
-	let fence = false;
+	let fence = null;
 	let comment = false;
 	lines.forEach((line, idx) => {
 		// Text inside <!-- --> is not part of the document (the template keeps its example there).
@@ -100,14 +128,24 @@ function scanSections(lines) {
 			if (line.includes('-->')) comment = false;
 			return;
 		}
-		if (/^\s*(```|~~~)/.test(line)) fence = !fence;
-		if (fence) return;
+		// A fence closes only with the same character, at least as long and with nothing after it (CommonMark), so
+		// a ``` line inside a ~~~ block or a ```` block does not end it.
+		const fm = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+		if (fence) {
+			if (fm && fm[1][0] === fence[0] && fm[1].length >= fence.length && !fm[2].trim()) fence = null;
+			return;
+		}
+		if (fm && !(fm[1][0] === '`' && fm[2].includes('`'))) {
+			fence = fm[1];
+			return;
+		}
 		// Only a line that starts with <!-- opens a comment block (as in Markdown); "<!--" inside a value is text.
 		if (/^\s*<!--/.test(line)) {
 			if (!line.includes('-->', line.indexOf('<!--') + 4)) comment = true;
 			return;
 		}
-		const h = /^##\s+(.+?)\s*#*\s*$/.exec(line);
+		// A closing run of # needs a space before it: "## Other: C#" names C#.
+		const h = /^##\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
 		if (h) {
 			const heading = h[1];
 			const rv = /^([A-Za-z][A-Za-z ]*?)\s*:\s*(.+)$/.exec(heading);
@@ -144,7 +182,7 @@ export function parseStackMd(text) {
 }
 
 // "Database:Supabase", "database :  supabase" and "Database: Supabase" name the same section.
-const normalizeHeading = (h) => String(h).trim().replace(/\s+/g, ' ').replace(/\s*:\s*/, ': ');
+const normalizeHeading = (h) => String(h).trim().replace(/^#+\s*/, '').replace(/\s+/g, ' ').replace(/\s*:\s*/, ': ');
 const sameHeading = (a, b) => normalizeHeading(a).toLowerCase() === normalizeHeading(b).toLowerCase();
 
 /**
@@ -156,6 +194,7 @@ export function setFields(text, heading, updates, comments = {}) {
 	if (/[\r\n]/.test(String(heading))) throw new Error('section name must be one line');
 	heading = normalizeHeading(heading);
 	if (!heading) throw new Error('section name is empty');
+	if (/^[^:]+:\s*$/.test(heading)) throw new Error(`section "${heading}" names no vendor after the colon`);
 	for (const [k, v] of Object.entries(updates)) {
 		if (!/^[a-z_][a-z0-9_]*$/.test(k)) throw new Error(`invalid key "${k}"`);
 		if (/[\r\n]/.test(String(v))) throw new Error(`value for ${k} must be one line`);
@@ -222,51 +261,89 @@ function insertionIndex(section, key) {
 	return section.headingLine + 1;
 }
 
+// Dates in a usage entry: "(2026-10-06)", "(as of 2026-10-6)", "(read 2026-10-06, dashboard)".
+const USAGE_DATE = /\(([^()]*?)\b(\d{4})-(\d{1,2})-(\d{1,2})\b([^()]*)\)/;
+
+// "41,200" groups thousands; "312 MB,+1.1 MB/day" separates parts.
+const USAGE_PARTS = /,(?!\d{3}(?!\d))\s*/;
+
+/** A quantity with an optional word after it: "41,200 emails", "+300 emails/day", "9k users". */
+function usageQuantity(text) {
+	try {
+		return parseQuantity(text);
+	} catch {
+		const m = /^(.*?\d[^A-Za-z/]*(?:\s?[KMGT]?B\b|[kKmM]\b)?)\s*[A-Za-z][A-Za-z ]*?\s*(\/\s*[A-Za-z]+)?$/.exec(text.trim());
+		if (!m) throw new Error(`cannot read "${text}"`);
+		return parseQuantity(`${m[1]}${m[2] ?? ''}`);
+	}
+}
+
 /**
- * Reads a `usage` value: "312 MB, +1.1 MB/day (2026-10-06)", optionally named
- * ("db_size 312 MB, ..."), several entries separated by ";".
- * Returns { metricName | "_": { value, dim, ratePerDay?, rateDim?, growthPerMonth?, asOf? } }.
- * An entry it cannot read is skipped; an impossible date is an error.
+ * Reads a `usage` value: "312 MB, +1.1 MB/day (2026-10-06)", optionally named ("db_size 312 MB, ..."),
+ * several entries separated by ";". Returns { metrics, problems }: metrics is
+ * { metricName | "_": { value, dim, ratePerDay?, rateDim?, growthPerMonth?, asOf? } }, problems lists what could
+ * not be read, so lint can say so instead of a check that quietly reports "ok". An impossible date is an error.
  */
-export function parseUsage(raw) {
+export function readUsage(raw) {
 	const metrics = {};
+	const problems = [];
+	let last = null;
 	for (const entry of String(raw ?? '').split(';')) {
 		let s = entry.trim();
 		if (!s) continue;
-		const d = /\((\d{4}-\d{2}-\d{2})\)/.exec(s);
-		const asOf = d ? d[1] : null;
-		if (asOf && !isIsoDate(asOf)) throw new Error(`usage: "${asOf}" is not a date (YYYY-MM-DD)`);
-		if (d) s = s.replace(d[0], '').trim();
-		let name = '_';
-		const n = /^([a-z_][a-z0-9_]*)(?:\s*[=:]\s*|\s+)(?=[+$\d.])/.exec(s);
+		let asOf = null;
+		const d = USAGE_DATE.exec(s);
+		if (d) {
+			asOf = `${d[2]}-${d[3].padStart(2, '0')}-${d[4].padStart(2, '0')}`;
+			if (!isIsoDate(asOf)) throw new Error(`usage: "${d[2]}-${d[3]}-${d[4]}" is not a date (YYYY-MM-DD)`);
+			s = s.replace(d[0], '').trim();
+		}
+		let name = null;
+		const n = /^([A-Za-z_][A-Za-z0-9_]*)(?:\s*[=:]\s*|\s+)(?=[+$\d.~])/.exec(s);
 		if (n) {
-			name = n[1];
+			name = n[1].toLowerCase();
 			s = s.slice(n[0].length);
 		}
-		const parts = s.split(/,\s+/).map((p) => p.trim()).filter(Boolean);
-		let base;
-		try {
-			base = parseQuantity(parts[0]);
-		} catch {
-			continue;
-		}
-		const m = { value: base.value, dim: base.dim, asOf };
-		for (const p of parts.slice(1)) {
-			let r;
+		const parts = s.split(USAGE_PARTS).map((p) => p.trim().replace(/^~\s*/, '')).filter(Boolean);
+		const rates = [];
+		let base = null;
+		for (const p of parts) {
+			let q;
 			try {
-				r = parseQuantity(p);
+				q = usageQuantity(p);
 			} catch {
+				problems.push(`cannot read "${p}"`);
 				continue;
 			}
-			if (r.dim === 'pct') m.growthPerMonth = (r.value / 100) * (30.4375 / (r.per ?? 30.4375));
+			if (q.per != null || q.dim === 'pct') rates.push(q);
+			else if (!base) base = q;
+			else problems.push(`"${p}" is a second reading; separate metrics with ";" and name them`);
+		}
+		// "312 MB; +1.1 MB/day (date)": a rate alone continues the reading before it.
+		const target = base ? { value: base.value, dim: base.dim, asOf } : !name && last ? last : null;
+		if (!target) {
+			if (parts.length) problems.push(`"${entry.trim()}" has a rate but no reading`);
+			continue;
+		}
+		if (!base && asOf && !target.asOf) target.asOf = asOf;
+		for (const r of rates) {
+			if (r.dim === 'pct') target.growthPerMonth = monthlyGrowth(r.value, r.per ?? undefined);
 			else if (r.per) {
-				m.ratePerDay = r.value / r.per;
-				if (r.dim !== base.dim) m.rateDim = r.dim;
+				target.ratePerDay = r.value / r.per;
+				if (r.dim !== target.dim) target.rateDim = r.dim;
 			}
 		}
-		metrics[name] = m;
+		if (base) {
+			metrics[name ?? '_'] = target;
+			last = target;
+		}
+		if ((target.ratePerDay != null || target.growthPerMonth != null) && !target.asOf) problems.push('a reading with a rate has no date; add (YYYY-MM-DD) so projections start from it');
 	}
-	return metrics;
+	return { metrics, problems: [...new Set(problems)] };
+}
+
+export function parseUsage(raw) {
+	return readUsage(raw).metrics;
 }
 
 /**
@@ -276,9 +353,17 @@ export function parseUsage(raw) {
 export function parseUsers(raw) {
 	const s = String(raw ?? '');
 	const re = /(?<![\w.$-])(?:~\s*)?(\d{1,3}(?:([ ,_])\d{3})(?:\2\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s*([km]|thousand|million|mln|bn|billion)(?![a-z]))?/gi;
-	const first = re.exec(s);
-	if (!first) return null;
-	const after = s.slice(first.index + first[0].length);
+	let first;
+	let after;
+	for (;;) {
+		first = re.exec(s);
+		if (!first) return null;
+		after = s.slice(first.index + first[0].length);
+		// "5x growth" is a multiplier; "launch in 2027" is a year, unless users follow ("2000 users").
+		if (/^\s*[x×](?![a-z])/i.test(after)) continue;
+		if (!first[3] && /^(19|20)\d\d$/.test(first[1]) && !/^\s*[-/.]\d/.test(after) && !/^\s*(?:users?|people|customers?|accounts?|seats?|mau|members?)\b/i.test(after)) continue;
+		break;
+	}
 	if (/^\s*(?:%|\$|[-/.]\d|(?:hours?|hrs?|days?|weeks?|wks?|months?|mos?|years?|yrs?|quarters?|[KMGT]?B)\b|\/)/i.test(after)) return null;
 	let value = Number(first[1].replace(/[ ,_]/g, ''));
 	if (first[3]) value *= /^(k|thousand)$/i.test(first[3]) ? 1e3 : /^(m|million|mln)$/i.test(first[3]) ? 1e6 : 1e9;
@@ -365,6 +450,8 @@ function inMetricUnit(metric, q) {
 	return out;
 }
 
+const nextDay = (iso) => new Date(Date.parse(iso + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+
 const latest = (dates) => dates.filter(Boolean).sort().at(-1) ?? null;
 const earliest = (dates) => dates.filter(Boolean).sort()[0] ?? null;
 
@@ -373,7 +460,8 @@ function evalRevisit(node, ctx) {
 	if (node.type === 'cmp') {
 		if (node.metric === 'date') {
 			const value = compare(ctx.today, node.op, node.date);
-			const due = !value && (node.op === '>' || node.op === '>=') ? node.date : null;
+			// "date > 2026-12-01" holds from Dec 2.
+			const due = !value && node.op === '>=' ? node.date : !value && node.op === '>' ? nextDay(node.date) : null;
 			return { value, eta: due, unknown: [], manual: [] };
 		}
 		const reading = ctx.metrics[node.metric];
@@ -463,7 +551,7 @@ export function lintStackMd(text) {
 		if (s.values.env && /=/.test(s.values.env)) errors.push({ line: s.line, message: 'env lists names only, without values' });
 		if (s.values.source && !/\d{4}-\d{2}-\d{2}/.test(`${s.values.source} ${s.comments.source ?? ''}`)) warnings.push({ line: s.line, message: 'source has no read date (add "# read YYYY-MM-DD")' });
 		try {
-			parseUsage(s.values.usage);
+			for (const p of readUsage(s.values.usage).problems) warnings.push({ line: s.line, message: `usage: ${p}. Write it as "312 MB, +1.1 MB/day (2026-10-06)"` });
 		} catch (e) {
 			errors.push({ line: s.line, message: e.message });
 		}
@@ -496,7 +584,8 @@ function keyValues(list, flag) {
 	const out = {};
 	for (const item of [].concat(list ?? [])) {
 		const eq = String(item).indexOf('=');
-		if (item === true || eq < 1) throw new Error(`${flag} expects key=value, got "${item === true ? '' : item}"`);
+		// The item is not echoed: a value pasted without its key may be the very secret set refuses to write.
+		if (item === true || eq < 1) throw new Error(`${flag} expects key=value`);
 		out[String(item).slice(0, eq).trim()] = String(item).slice(eq + 1).trim();
 	}
 	return out;
@@ -579,14 +668,28 @@ export function stackMdMain(argv) {
 			}
 			if (!Object.keys(updates).length && !Object.keys(comments).length) throw new Error('nothing to set: pass --json, --set or --comment');
 			const out = setFields(text, args.section, updates, comments);
+			// Lines this write adds must be clean; a line already in the file is lint's to report, so one old
+			// false alarm does not block every later update.
+			const before = new Set(text.split(/\r?\n/));
+			const outLines = out.split(/\r?\n/);
 			const secrets = findSecrets(out);
-			if (secrets.length) {
+			const added = secrets.filter((h) => !before.has(outLines[h.line - 1]));
+			if (added.length) {
 				process.exitCode = 2;
-				throw new Error(`refusing to write: lines ${secrets.map((s) => s.line).join(', ')} look like secrets`);
+				throw new Error(`refusing to write: lines ${[...new Set(added.map((h) => h.line))].join(', ')} look like secrets`);
 			}
 			ensureWorkDir(file);
-			writeFileSync(file, out);
-			printJson({ file, written: true, section: normalizeHeading(args.section) });
+			// Write a sibling file, then rename: an interrupted write never leaves half a STACK.md.
+			const tmp = `${file}.${process.pid}.tmp`;
+			try {
+				writeFileSync(tmp, out);
+				renameSync(tmp, file);
+			} catch (e) {
+				rmSync(tmp, { force: true });
+				throw e;
+			}
+			const elsewhere = [...new Set(secrets.filter((h) => before.has(outLines[h.line - 1])).map((h) => h.line))];
+			printJson({ file, written: true, section: normalizeHeading(args.section), ...(elsewhere.length ? { secrets_elsewhere: elsewhere } : {}) });
 		}
 	} catch (e) {
 		fail(e.message, process.exitCode || 1);

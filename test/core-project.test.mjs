@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, symlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, runNode, tempDir } from './helpers.mjs';
-import { parseQuantity, overage, eta, linearRate, costAt, approxMonth } from '../packages/core/src/project.mjs';
+import { parseQuantity, overage, eta, linearRate, costAt, approxMonth, monthlyGrowth } from '../packages/core/src/project.mjs';
 
 test('parseQuantity reads sizes, money, counts, rates and percents', () => {
 	assert.deepEqual(parseQuantity('312 MB'), { value: 312, dim: 'size', per: null });
@@ -191,4 +191,34 @@ test('project.mjs cost ignores .manifestack/tmp before reading, also for stdin a
 	symlinkSync(join(dir, 'target'), join(tmp, '.gitignore'));
 	assert.equal(runNode(script, ['cost', '-'], { cwd: dir, input: '{}' }).code, 0);
 	assert.ok(!existsSync(join(dir, 'target')));
+});
+
+test('growth rates compound when converted between periods', () => {
+	assert.ok(Math.abs(monthlyGrowth(10, 7) - (1.1 ** (30.4375 / 7) - 1)) < 1e-12);
+	assert.ok(Math.abs(monthlyGrowth(18) - 0.18) < 1e-12, 'a monthly rate stays as it is');
+	const P = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	const days = (growth) => JSON.parse(runNode(P, ['eta', '--current', '100', '--limit', '200', '--growth', growth, '--from', '2026-10-08']).stdout).days;
+	assert.equal(days('10%/week'), 51, 'doubling at 10% a week takes 7.27 weeks');
+	assert.equal(days('5%/day'), 14);
+	assert.equal(days('50%/yr'), 624);
+});
+
+test('project.mjs eta checks units of --rate, --points and --growth', () => {
+	const P = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	const err = (...a) => runNode(P, ['eta', ...a]).stderr;
+	assert.match(err('--current', '312 MB', '--limit', '500 MB', '--rate', '18%/mo'), /for a percentage use --growth/);
+	assert.match(err('--current', '312 MB', '--limit', '500 MB', '--rate', '$5/day'), /--rate is a money but --limit is a size/);
+	assert.match(err('--current', '312 MB', '--limit', '500 MB', '--rate', '1.1 MB'), /--rate needs a period/);
+	assert.match(err('--points', '2026-09-06=0.28;2026-10-06=0.312', '--limit', '0.5 GB'), /--points 2026-09-06 is a count but --limit is a size/);
+	assert.match(err('--current', '41200', '--limit', '50000', '--growth', '18'), /--growth is a percentage/);
+	assert.equal(runNode(P, ['eta', '--current', '41200', '--limit', '50000', '--growth', '0.18']).code, 0, 'a fraction still works');
+});
+
+test('parseQuantity stays fast on long input and rounds money half up', () => {
+	const t = Date.now();
+	assert.throws(() => parseQuantity('5' + ' '.repeat(5000) + 'x'));
+	assert.throws(() => parseQuantity('5 ' + 'MB '.repeat(40)), /too long/);
+	assert.ok(Date.now() - t < 200, `took ${Date.now() - t} ms`);
+	assert.equal(parseQuantity('5    MB').value, 5);
+	assert.equal(overage({ used: 1.005, price: 1 }).cost, 1.01);
 });

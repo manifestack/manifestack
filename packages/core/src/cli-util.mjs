@@ -33,7 +33,9 @@ export function parseArgs(argv) {
 		} else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
 			value = argv[++i];
 		}
-		if (key in args) args[key] = [].concat(args[key], value);
+		// --__proto__ or --constructor must not reach the object's prototype; no script has such an option.
+		if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+		if (Object.hasOwn(args, key)) args[key] = [].concat(args[key], value);
 		else args[key] = value;
 	}
 	return args;

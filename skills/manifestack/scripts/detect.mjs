@@ -37,7 +37,9 @@ function parseArgs(argv) {
 		} else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
 			value = argv[++i];
 		}
-		if (key in args) args[key] = [].concat(args[key], value);
+		// --__proto__ or --constructor must not reach the object's prototype; no script has such an option.
+		if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+		if (Object.hasOwn(args, key)) args[key] = [].concat(args[key], value);
 		else args[key] = value;
 	}
 	return args;
@@ -657,14 +659,53 @@ const HOOK_SETUPS = {
 // Files that do not make a repository "existing code" on their own.
 const NON_PROJECT_FILES = /^(readme|license|licence|changelog|contributing|code_of_conduct|security|stack|agents|claude|gemini)(\.[a-z]+)?$|^\.(gitignore|gitattributes|editorconfig|env.*)$/i;
 
-/** Variable names from a dotenv file. The value part of each line is discarded immediately. */
+/**
+ * Variable names from a dotenv file. The value part of each line is discarded immediately. A quoted value may
+ * span lines (a private key): its continuation lines are values too and are skipped, never read as names.
+ */
 export function readEnvNames(text) {
 	const names = [];
+	let open = null;
 	for (const line of text.split(/\r?\n/)) {
-		const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
-		if (m) names.push(m[1]);
+		if (open) {
+			if (closesQuote(line, open, 0)) open = null;
+			continue;
+		}
+		const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/.exec(line);
+		if (!m) continue;
+		names.push(m[1]);
+		const value = m[2].trimStart();
+		const q = value[0];
+		if ((q === '"' || q === "'" || q === '`') && !closesQuote(value, q, 1)) open = q;
 	}
 	return names;
+}
+
+// Whether `line` has the closing quote from `from` on; in "…" a backslash escapes it.
+function closesQuote(line, quote, from) {
+	for (let i = from; i < line.length; i++) {
+		if (line[i] === '\\' && quote === '"') i++;
+		else if (line[i] === quote) return true;
+	}
+	return false;
+}
+
+/** Top-level modules a Python file imports: `import stripe`, `from openai import OpenAI`, `import a.b, c`. */
+export function extractPythonModules(source) {
+	const mods = new Set();
+	for (const m of source.matchAll(/^[ \t]*(?:from[ \t]+([A-Za-z_][\w.]*)[ \t]+import\b|import[ \t]+([A-Za-z_][\w.]*(?:[ \t]+as[ \t]+\w+)?(?:[ \t]*,[ \t]*[A-Za-z_][\w.]*(?:[ \t]+as[ \t]+\w+)?)*))/gm)) {
+		const list = m[1] ? [m[1]] : m[2].split(',').map((x) => x.trim().split(/\s+/)[0]);
+		for (const x of list) mods.add(x.split('.')[0]);
+	}
+	return [...mods];
+}
+
+/** Import paths of a Go file, single (`import "x"`, `import alias "x"`) and grouped (`import ( ... )`). */
+export function extractGoImports(source) {
+	const paths = new Set();
+	for (const block of source.matchAll(/^import\s*\(([\s\S]*?)\)/gm)) for (const m of block[1].matchAll(/"([^"\n]+)"/g)) paths.add(m[1]);
+	for (const m of source.matchAll(/^import\s+(?:[\w.]+\s+)?"([^"\n]+)"/gm)) paths.add(m[1]);
+	return [...paths];
 }
 
 export function extractImports(source) {
@@ -699,9 +740,17 @@ export function importMatches(spec, patterns = []) {
 	return patterns.some((p) => (/[/:]$/.test(p) ? spec.startsWith(p) : spec === p || spec.startsWith(p + '/')));
 }
 
-/** Files of the repository, shallow ones first, so manifests at the top are listed before deep source trees. */
-function listFiles(root, limits) {
+/**
+ * Files of the repository worth reading, shallow ones first. `classify(rel, name)` says 'essential' (manifests, env,
+ * config and infrastructure files: always listed), 'candidate' (source and YAML: listed up to limits.maxListed) or
+ * null (not read, only counted). Past the limit the walk goes on for essential files, so a large tree loses
+ * imports, never dependencies. Returns the files and how many files look like the project's own.
+ */
+function listFiles(root, limits, classify) {
 	const files = [];
+	let candidates = 0;
+	let projectFiles = 0;
+	let walked = 0;
 	const queue = [root];
 	for (let q = 0; q < queue.length; q++) {
 		let entries;
@@ -721,14 +770,22 @@ function listFiles(root, limits) {
 			}
 			// Symlinks are followed to files only; a linked directory could loop.
 			if (!e.isFile() && !(e.isSymbolicLink() && isFileSync(full))) continue;
-			if (files.length >= limits.maxListed) {
+			if (++walked > limits.maxWalked) {
 				limits.truncated = true;
-				return files;
+				return { files, projectFiles };
+			}
+			const rel = relative(root, full).split(sep).join('/');
+			if (!(q === 0 && NON_PROJECT_FILES.test(e.name))) projectFiles++;
+			const kind = classify(rel, e.name);
+			if (!kind) continue;
+			if (kind === 'candidate' && ++candidates > limits.maxListed) {
+				limits.truncated = true;
+				continue;
 			}
 			files.push(full);
 		}
 	}
-	return files;
+	return { files, projectFiles };
 }
 
 function isFileSync(path) {
@@ -738,6 +795,14 @@ function isFileSync(path) {
 		return false;
 	}
 }
+
+// Folders that hold test data, mocks and examples rather than the product. A vendor seen only there is reported
+// under `samples`, not as part of the stack (a fixture repo inside tests is not the app's own Stripe).
+const SAMPLE_DIR = /(?:^|\/)(?:fixtures?|__fixtures__|__mocks__|mocks?|examples?|samples?|testdata|tests?|__tests__|e2e|cypress|playwright)\//i;
+const isSample = (rel) => SAMPLE_DIR.test(rel);
+
+// Infrastructure files read by name: always listed, even past the file limit.
+const INFRA_FILE = /^(Dockerfile(\..+)?|(docker-)?compose(\.[\w-]+)?\.ya?ml|.+\.tf|Chart\.yaml|(helmfile|skaffold|kustomization)\.ya?ml|Pulumi\.ya?ml|serverless\.ya?ml)$/;
 
 // Evidence kept per vendor, most telling first; every kind found keeps at least one slot.
 const EVIDENCE_ORDER = ['package', 'config', 'import', 'code', 'env'];
@@ -789,11 +854,16 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	const envNames = new Set();
 	const frameworks = new Map();
 	const infra = [];
-	let projectFiles = 0;
 	let scanned = 0;
 	// Paths are listed first, then read in two passes: env files and manifests always, YAML and source until maxFiles
 	// files were read. A large tree loses imports, never dependencies.
-	const limits = { maxListed: maxFiles * 20, truncated: false };
+	const limits = { maxListed: maxFiles * 20, maxWalked: maxFiles * 200, truncated: false };
+	const configNames = sigs.flatMap((sig) => sig.config_files);
+	const classify = (rel, name) => {
+		if (ENV_FILE.test(name) || manifestKind(rel) || INFRA_FILE.test(name)) return 'essential';
+		if (configNames.some((cfg) => rel === cfg || rel.endsWith('/' + cfg))) return 'essential';
+		return /\.ya?ml$/.test(name) || SOURCE_EXT.test(name) ? 'candidate' : null;
+	};
 
 	const hit = (sig, kind, file, match, role) => {
 		if (!found.has(sig.id)) found.set(sig.id, { sig, evidence: new Map(), roleHits: new Set() });
@@ -812,10 +882,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	for (const sig of sigs) for (const cfg of sig.config_files) if (isFileSync(join(root, cfg))) hit(sig, 'config', cfg, cfg);
 
 	const deferred = [];
-	for (const full of listFiles(root, limits)) {
+	const listing = listFiles(root, limits, classify);
+	for (const full of listing.files) {
 		const rel = relative(root, full).split(sep).join('/');
 		const name = basename(full);
-		if (!(rel.indexOf('/') === -1 && NON_PROJECT_FILES.test(name))) projectFiles++;
 
 		if (ENV_FILE.test(name)) {
 			let names = [];
@@ -823,7 +893,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 				names = readEnvNames(read(full));
 			} catch {}
 			for (const n of names) {
-				envNames.add(n);
+				if (!isSample(rel)) envNames.add(n);
 				for (const sig of sigs) {
 					const prefix = sig.env_prefixes.find((p) => n.startsWith(p));
 					if (prefix) hit(sig, 'env', rel, n);
@@ -851,6 +921,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 				if (!unmapped.has(u.name)) unmapped.set(u.name, { name: u.name, role: u.role, evidence: [] });
 				for (const p of u.packages) unmapped.get(u.name).evidence.push({ kind: 'package', file: rel, match: p });
 			}
+			if (isSample(rel)) continue;
 			for (const d of deps) {
 				const key = Object.keys(FRAMEWORKS[manifest]).find((k) => dependencyMatches(manifest, d, [k]));
 				const fw = key && FRAMEWORKS[manifest][key];
@@ -859,6 +930,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			continue;
 		}
 
+		if (INFRA_FILE.test(name) && isSample(rel)) continue;
 		if (name === 'Dockerfile' || /^Dockerfile\./.test(name)) infra.push({ kind: 'docker', file: rel });
 		else if (/^(docker-)?compose(\.[\w-]+)?\.ya?ml$/.test(name)) infra.push({ kind: 'docker-compose', file: rel });
 		else if (/\.tf$/.test(name)) infra.push({ kind: 'terraform', file: rel });
@@ -876,7 +948,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		}
 		if (/\.ya?ml$/.test(name)) {
 			try {
-				if (statSync(full).size < 256 * 1024 && isKubernetesManifest(read(full))) infra.push({ kind: 'kubernetes', file: rel });
+				if (!isSample(rel) && statSync(full).size < 256 * 1024 && isKubernetesManifest(read(full))) infra.push({ kind: 'kubernetes', file: rel });
 			} catch {}
 			continue;
 		}
@@ -888,6 +960,9 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			continue;
 		}
 		const specs = extractImports(src).map((spec) => [spec, normalizeSpecifier(spec)]);
+		// Python and Go imports name the package itself, so they match like dependencies.
+		const native = name.endsWith('.py') ? ['pypi', extractPythonModules(src)] : name.endsWith('.go') ? ['go', extractGoImports(src)] : null;
+		if (native) for (const v of matchDependencies(native[1], sigs, native[0]).vendors) for (const p of v.packages) hit(sigs.find((x) => x.id === v.id), 'import', rel, p);
 		for (const sig of sigs) {
 			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports)) hit(sig, 'import', rel, spec);
 			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
@@ -897,31 +972,43 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		}
 	}
 
-	const vendors = [...found.values()]
+	const all = [...found.values()]
+		// A role signal (".storage.from(") only says how a vendor found otherwise is used; on its own it is too generic.
+		.filter(({ evidence }) => [...evidence.values()].some((e) => e.kind !== 'code'))
 		.map(({ sig, evidence, roleHits }) => {
 			// Roles with signals count only when a signal matched; other roles count once the vendor is present.
 			const signalled = Object.keys(sig.role_signals ?? {});
 			const roles_used = sig.roles.filter((r) => !signalled.includes(r) || roleHits.has(r));
-			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence: pickEvidence(evidence.values()) };
+			// Product code needs its own non-code evidence; a vendor that is a dependency only in fixtures is a sample.
+			const product = [...evidence.values()].filter((e) => !isSample(e.file));
+			const sample = !product.some((e) => e.kind !== 'code');
+			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence: pickEvidence(sample ? evidence.values() : product), sample };
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));
+	const vendors = all.filter((v) => !v.sample).map(({ sample, ...v }) => v);
+	const samples = [
+		...all.filter((v) => v.sample).map((v) => ({ id: v.id, name: v.name, evidence: v.evidence })),
+		...[...unmapped.values()].filter((u) => u.evidence.every((e) => isSample(e.file))).map((u) => ({ name: u.name, evidence: u.evidence })),
+	];
+	const unmappedInProduct = [...unmapped.values()].filter((u) => !u.evidence.every((e) => isSample(e.file)));
 
 	const byRole = new Map();
 	for (const v of vendors) for (const r of v.roles_used) byRole.set(r, [...(byRole.get(r) ?? []), v.id]);
-	for (const u of unmapped.values()) if (u.role !== 'other') byRole.set(u.role, [...(byRole.get(u.role) ?? []), u.name]);
+	for (const u of unmappedInProduct) if (u.role !== 'other') byRole.set(u.role, [...(byRole.get(u.role) ?? []), u.name]);
 	const overlaps = [...byRole].filter(([, ids]) => ids.length > 1).map(([role, ids]) => ({ role, vendors: ids }));
 
 	return {
 		root,
-		empty: projectFiles === 0,
+		empty: listing.projectFiles === 0,
 		scanned_files: scanned,
 		truncated: limits.truncated,
 		vendors,
-		unmapped: [...unmapped.values()],
+		unmapped: unmappedInProduct,
 		overlaps,
 		frameworks: [...frameworks.values()],
 		infra,
 		env_names: [...envNames].sort(),
+		samples,
 		hook: hookStatus(root, { plugin }),
 	};
 }
@@ -951,8 +1038,8 @@ export function detectMain(argv) {
 	}
 	const vendorsDir = args.vendors || defaultVendorsDir();
 	if (!vendorsDir) fail('vendor maps not found; pass --vendors <dir>');
-	const signatures = vendorSignatures(loadCatalog(vendorsDir));
 	try {
+		const signatures = vendorSignatures(loadCatalog(vendorsDir));
 		printJson(detectVendors(args._[0] ?? '.', { signatures, maxFiles: Number(args['max-files']) || 5000, plugin: runsFromPlugin() }));
 	} catch (e) {
 		fail(e.message);

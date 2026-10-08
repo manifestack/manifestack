@@ -37,7 +37,9 @@ function parseArgs(argv) {
 		} else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
 			value = argv[++i];
 		}
-		if (key in args) args[key] = [].concat(args[key], value);
+		// --__proto__ or --constructor must not reach the object's prototype; no script has such an option.
+		if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+		if (Object.hasOwn(args, key)) args[key] = [].concat(args[key], value);
 		else args[key] = value;
 	}
 	return args;
@@ -156,7 +158,9 @@ export const METRIC_UNIT_MB = { mb: 1, gb: 1e3, tb: 1e6 };
  */
 export function parseQuantity(input) {
 	if (typeof input === 'number') return { value: input, dim: 'count', per: null };
-	const s = String(input).trim();
+	// Runs of spaces become one, so the optional parts below cannot backtrack over a long gap.
+	const s = String(input).trim().replace(/\s+/g, ' ');
+	if (s.length > 64) throw new Error(`cannot read quantity "${s.slice(0, 24)}…": too long`);
 	const m = /^([+-])?\s*(\$)?\s*(\d{1,3}(?:([, _])\d{3})(?:\4\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)\s*([kKmM](?![bB]))?\s*(%|[KMGT]?B\b)?\s*(?:\/\s*(day|d|week|wk|w|month|mo|year|yr))?$/i.exec(s);
 	if (!m) throw new Error(`cannot read quantity "${input}"`);
 	const [, sign, dollar, num, , mult, unit, period] = m;
@@ -179,9 +183,15 @@ export function formatSize(mb) {
 	return `${round(mb, 2)} MB`;
 }
 
+// The factor nudges values like 1.005, stored as 1.00499…, to round half up as written.
 function round(n, digits = 2) {
 	const f = 10 ** digits;
-	return Math.round(n * f) / f;
+	return Math.round(n * f * (1 + Number.EPSILON)) / f;
+}
+
+/** A compounding rate over `perDays` as a monthly fraction: 10%/week is (1.1^(30.4375/7) − 1), about 51% a month, not 43%. */
+export function monthlyGrowth(pct, perDays = PERIOD_DAYS.mo) {
+	return (1 + pct / 100) ** (PERIOD_DAYS.mo / perDays) - 1;
 }
 
 // null past year 9999: such a date means "not on this trend", and toISOString cannot write it as YYYY-MM-DD.
@@ -355,9 +365,14 @@ function readPoints(list) {
 		const eq = p.indexOf('=');
 		const date = p.slice(0, Math.max(eq, 0)).trim();
 		if (eq < 1 || !isIsoDate(date)) throw new Error(`--points expects YYYY-MM-DD=value, got "${p}"`);
-		return { date, value: parseQuantity(p.slice(eq + 1)).value };
+		const qv = parseQuantity(p.slice(eq + 1));
+		return { date, value: qv.value, dim: qv.dim };
 	});
 }
+
+const sameKind = (what, a, limit) => {
+	if (a.dim !== limit.dim) throw new Error(`${what} is a ${a.dim} but --limit is a ${limit.dim}: give both in the same kind of unit`);
+};
 
 const USAGE = `usage:
   node project.mjs eta --current "312 MB" --limit "500 MB" --rate "1.1 MB/day" [--from 2026-10-06]
@@ -384,6 +399,7 @@ export function projectMain(argv) {
 			if (args.points != null) {
 				if (args.points === true) throw new Error('--points needs YYYY-MM-DD=value pairs');
 				input.points = readPoints(args.points);
+				for (const p of input.points) sameKind(`--points ${p.date}`, p, limit);
 			} else {
 				const current = q(args, 'current');
 				if (!current) throw new Error('--current or --points is required');
@@ -391,10 +407,16 @@ export function projectMain(argv) {
 				input.current = current.value;
 				if (args.growth) {
 					const g = q(args, 'growth');
-					input.growthPerMonth = (g.dim === 'pct' ? g.value / 100 : g.value) * (PERIOD_DAYS.mo / (g.per ?? PERIOD_DAYS.mo));
+					// "18%/mo" or the fraction 0.18; a bare 18 would be 1800% a month.
+					if (g.dim === 'pct') input.growthPerMonth = monthlyGrowth(g.value, g.per ?? PERIOD_DAYS.mo);
+					else if (g.dim === 'count' && g.value > 0 && g.value < 1 && g.per == null) input.growthPerMonth = g.value;
+					else throw new Error('--growth is a percentage with a period, such as "18%/mo" or "4%/week"');
 				} else if (args.rate) {
 					const r = q(args, 'rate');
-					input.ratePerDay = r.value / (r.per ?? 1);
+					if (r.dim === 'pct') throw new Error('--rate is an amount per period ("1.1 MB/day"); for a percentage use --growth');
+					if (r.per == null) throw new Error('--rate needs a period, such as "1.1 MB/day" or "300/week"');
+					sameKind('--rate', r, limit);
+					input.ratePerDay = r.value / r.per;
 				}
 			}
 			printJson(eta(input));

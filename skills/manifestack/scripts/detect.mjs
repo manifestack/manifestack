@@ -234,6 +234,9 @@ const UNMAPPED_SDKS = [
 	{ name: 'AWS', role: 'other', packages: ['@aws-sdk/', 'aws-sdk', 'aws-cdk-lib'], pypi: ['boto3', 'botocore', 'aws-cdk-lib'], go: ['github.com/aws/aws-sdk-go-v2', 'github.com/aws/aws-sdk-go'] },
 	{ name: 'Google Cloud', role: 'other', packages: ['@google-cloud/'], pypi: ['google-cloud-*'], go: ['cloud.google.com/go'] },
 	{ name: 'Azure', role: 'other', packages: ['@azure/'], pypi: ['azure-*'], go: ['github.com/Azure/azure-sdk-for-go'] },
+	{ name: 'Auth.js', role: 'auth', packages: ['next-auth', '@auth/'] },
+	{ name: 'Better Auth', role: 'auth', packages: ['better-auth'] },
+	{ name: 'OpenRouter', role: 'ai', packages: ['@openrouter/ai-sdk-provider', '@openrouter/sdk'] },
 	{ name: 'Mailgun', role: 'email', packages: ['mailgun.js', 'mailgun-js'] },
 	{ name: 'Loops', role: 'email', packages: ['loops'] },
 	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
@@ -586,7 +589,9 @@ function validateVendorMap(v) {
 	}
 	if (!/^https:\/\//.test(String(v.pages?.pricing ?? ''))) errors.push('pages.pricing must be an https URL');
 	for (const [k, url] of Object.entries(v.pages ?? {})) if (!/^https:\/\//.test(String(url))) errors.push(`pages.${k} must be an https URL`);
-	if (!v.read?.length) errors.push('read must list what to extract from the pages');
+	// "- Terms: …" in YAML is a mapping, not text: every item must stay a plain string.
+	if (!isStringList(v.read) || !v.read.length) errors.push('read must be a list of plain strings (quote an item that starts with "Word:")');
+	if (!isStringList(v.common_fixes)) errors.push('common_fixes must be a list of plain strings');
 	for (const q of v.usage_questions ?? []) if (!q.metric || !q.ask || !q.where) errors.push('each usage question needs metric, ask and where');
 	if (v.mcp?.official && v.mcp.readonly_flag && !v.mcp.allowed_tools?.length) errors.push('mcp.allowed_tools is required when read-only MCP use is allowed');
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v.verified ?? ''))) errors.push('verified must be a YYYY-MM-DD date');
@@ -716,12 +721,21 @@ export function extractImports(source) {
 	return [...specs];
 }
 
-/** Which mapped vendors and unmapped SDKs a list of dependencies of one ecosystem (npm, pypi, go) contains. */
+// A pattern that is a whole package name, not a scope or prefix ("@vercel/kv", not "@vercel/").
+const exactPattern = (p) => !/[/*]$/.test(p);
+
+/**
+ * Which mapped vendors and unmapped SDKs a list of dependencies of one ecosystem (npm, pypi, go) contains.
+ * When one map names a package exactly and another only matches it by prefix, the exact one owns it:
+ * @vercel/kv is Upstash's, even though Vercel's map claims the whole @vercel/ scope.
+ */
 export function matchDependencies(deps, signatures, kind = 'npm') {
 	const field = ECOSYSTEM_FIELDS[kind];
+	const exactOwner = new Map();
+	for (const d of deps) for (const sig of signatures) if ((sig[field] ?? []).some((p) => exactPattern(p) && dependencyMatches(kind, d, [p]) && (kind !== 'npm' || d === p))) exactOwner.set(d, [...(exactOwner.get(d) ?? []), sig.id]);
 	const vendors = [];
 	for (const sig of signatures) {
-		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]));
+		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]) && (!exactOwner.has(d) || exactOwner.get(d).includes(sig.id)));
 		if (hits.length) vendors.push({ id: sig.id, name: sig.name, roles: sig.roles, packages: hits });
 	}
 	const unmapped = [];
@@ -963,8 +977,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		// Python and Go imports name the package itself, so they match like dependencies.
 		const native = name.endsWith('.py') ? ['pypi', extractPythonModules(src)] : name.endsWith('.go') ? ['go', extractGoImports(src)] : null;
 		if (native) for (const v of matchDependencies(native[1], sigs, native[0]).vendors) for (const p of v.packages) hit(sigs.find((x) => x.id === v.id), 'import', rel, p);
+		// As for dependencies, a map that names the package beats one that only claims its scope (@vercel/kv is Upstash).
+		const owners = new Map(specs.map(([, pkg]) => [pkg, sigs.filter((sig) => sig.imports.some((p) => !/[/:]$/.test(p) && (pkg === p || pkg.startsWith(p + '/')))).map((sig) => sig.id)]));
 		for (const sig of sigs) {
-			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports)) hit(sig, 'import', rel, spec);
+			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports) && (!owners.get(pkg).length || owners.get(pkg).includes(sig.id))) hit(sig, 'import', rel, spec);
 			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
 				const needle = needles.find((n) => src.includes(n));
 				if (needle) hit(sig, 'code', rel, needle, role);

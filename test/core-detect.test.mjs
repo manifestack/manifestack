@@ -306,3 +306,25 @@ test('the file limit drops source files, never manifests', (t) => {
 	assert.deepEqual(ids(r), ['stripe']);
 	assert.equal(r.empty, false);
 });
+
+test('a map that names a package beats one that claims its scope', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@vercel/kv': '3', '@vercel/postgres': '0.10' } }));
+	writeFileSync(join(dir, 'db.ts'), "import { kv } from '@vercel/kv';\nimport { sql } from '@vercel/postgres';\n");
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['neon', 'upstash'], 'no Vercel hosting from its deprecated storage SDKs');
+});
+
+test('detection: React Native SDKs, specific Cloudflare and Paddle env names, self-hosted auth libraries', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@react-native-firebase/app': '20', '@react-native-firebase/auth': '20', 'react-native-auth0': '4', 'next-auth': '5' } }));
+	writeFileSync(join(dir, '.env.example'), 'CF_DISTRIBUTION_ID=\nCF_INSTANCE_GUID=\nPADDLE_TRAINER_ID=\n');
+	writeFileSync(join(dir, 'login.ts'), "import auth from '@react-native-firebase/auth';\n");
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['auth0', 'firebase'], 'CloudFront and PaddlePaddle variables are not Cloudflare or Paddle');
+	assert.ok(r.vendors.find((v) => v.id === 'firebase').roles_used.includes('auth'));
+	assert.deepEqual(r.unmapped.map((u) => u.name), ['Auth.js']);
+	assert.ok(r.overlaps.some((o) => o.role === 'auth' && o.vendors.includes('Auth.js')));
+	writeFileSync(join(dir, '.env.example'), 'CF_API_TOKEN=\nPADDLE_API_KEY=\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['auth0', 'cloudflare', 'firebase', 'paddle']);
+});

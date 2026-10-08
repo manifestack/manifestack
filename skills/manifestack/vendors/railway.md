@@ -17,7 +17,6 @@ pages:
   regions: https://docs.railway.com/deployments/regions
   postgres: https://docs.railway.com/databases/postgresql
   security: https://docs.railway.com/enterprise/compliance
-  trust: https://trust.railway.com
   dpa: https://railway.com/legal/dpa
 read:
   - plan names (Trial, Free, Hobby, Pro, Enterprise), the monthly fee of each and the usage credit it includes
@@ -54,7 +53,7 @@ common_fixes:
   - connect services and databases over private networking to avoid egress charges
   - put the app and its database in the same region, near the users
   - serve static assets and large media from a CDN or object storage
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Railway usually has no SDK in `package.json`. It is detected from `railway.json` / `railway.toml` and `RAILWAY_*` names in `.env` files. A repo deployed from the dashboard only may show nothing: ask the user where the app runs.

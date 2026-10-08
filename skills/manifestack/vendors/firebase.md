@@ -5,17 +5,17 @@ id: firebase
 name: Firebase
 roles: [database, auth, hosting, storage]
 detect:
-  packages: ["firebase", "firebase-admin", "firebase-functions", "firebase-tools", "@firebase/", "reactfire", "react-firebase-hooks", "@angular/fire", "vuefire", "@apphosting/"]
+  packages: ["firebase", "firebase-admin", "firebase-functions", "firebase-tools", "@firebase/", "@react-native-firebase/", "reactfire", "react-firebase-hooks", "@angular/fire", "vuefire", "@apphosting/"]
   pypi: ["firebase-admin", "firebase-functions"]
   go: ["firebase.google.com/go"]
-  imports: ["firebase/", "firebase-admin", "firebase-functions", "@firebase/", "reactfire", "react-firebase-hooks", "@angular/fire", "vuefire"]
+  imports: ["firebase/", "firebase-admin", "firebase-functions", "@firebase/", "@react-native-firebase/", "reactfire", "react-firebase-hooks", "@angular/fire", "vuefire"]
   env_prefixes: ["FIREBASE_", "NEXT_PUBLIC_FIREBASE_", "VITE_FIREBASE_", "EXPO_PUBLIC_FIREBASE_"]
   config_files: ["firebase.json", ".firebaserc", "firestore.rules", "database.rules.json", "storage.rules", "apphosting.yaml"]
   role_signals:
-    database: ["firebase/firestore", "firebase/database", "firebase-admin/firestore", "firebase-admin/database", "@firebase/firestore", "@firebase/database", "getFirestore(", "admin.firestore()", "admin.database()"]
-    auth: ["firebase/auth", "firebase-admin/auth", "@firebase/auth", "react-firebase-hooks/auth", "onAuthStateChanged(", "signInWithPopup(", "admin.auth()"]
+    database: ["@react-native-firebase/firestore", "@react-native-firebase/database", "firebase/firestore", "firebase/database", "firebase-admin/firestore", "firebase-admin/database", "@firebase/firestore", "@firebase/database", "getFirestore(", "admin.firestore()", "admin.database()"]
+    auth: ["@react-native-firebase/auth", "firebase/auth", "firebase-admin/auth", "@firebase/auth", "react-firebase-hooks/auth", "onAuthStateChanged(", "signInWithPopup(", "admin.auth()"]
     hosting: ["firebase-functions", "@apphosting/"]
-    storage: ["firebase/storage", "firebase-admin/storage", "@firebase/storage", "admin.storage()"]
+    storage: ["@react-native-firebase/storage", "firebase/storage", "firebase-admin/storage", "@firebase/storage", "admin.storage()"]
 pages:
   pricing: https://firebase.google.com/pricing
   plans: https://firebase.google.com/docs/projects/billing/firebase-pricing-plans
@@ -31,6 +31,7 @@ pages:
   storage_blaze: https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024
   firestore_locations: https://firebase.google.com/docs/firestore/locations
   regions: https://firebase.google.com/docs/projects/locations
+  functions: https://firebase.google.com/docs/functions/get-started
   security: https://firebase.google.com/support/privacy
   dpa: https://firebase.google.com/terms/data-processing-terms
 read:
@@ -38,7 +39,7 @@ read:
   - what happens when a Spark quota runs out (usage of that product is shut off for the rest of the period; Hosting sites are disabled when transfer runs out)
   - Blaze is pay-as-you-go on top of the same no-cost quotas, billed through Google Cloud per unit used
   - budget alerts do not cap usage or charges; spend caps exist only for some services (AI Logic, App Hosting, Cloud Functions, Extensions), are not instant, and do not cover Firestore, Hosting, Storage or Auth
-  - services that require Blaze (Cloud Storage for Firebase, even default buckets; App Hosting; phone/SMS sign-in)
+  - services that require Blaze (Cloud Functions, Cloud Storage for Firebase even for default buckets, App Hosting, phone/SMS sign-in)
   - Authentication limits (daily active user tiers on Spark, SMS on Blaze only) and the per-MAU pricing if the project upgrades to Identity Platform
   - commercial-use terms on Spark (none stated on the pricing pages at last check)
   - Firestore location choice (multi-region or regional) and that a database location cannot be changed after it is created; locations of Realtime Database, Storage buckets and Functions
@@ -68,10 +69,10 @@ common_fixes:
   - set spend caps on Cloud Functions and App Hosting where available
   - serve images through Hosting's CDN or a resized copy instead of downloading full files from Storage
   - create the production Firestore database in the region the requirements ask for, because it cannot be moved later
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Blaze surprise bills are a known trap: budget alerts only email, and the services most likely to spike (Firestore reads, Storage egress) have no spend cap. A Blaze project with no alert at all is a Bill finding.
-- The Firebase MCP server (`npx firebase-tools mcp`) is official but has no read-only mode. `--only` limits it to feature groups, and those groups still contain write tools (deploy, add/update/delete documents, set Realtime Database data, update users). `firebase_get_sdk_config` returns app config including the API key. Do not use it in the MVP; ask the user for numbers instead.
+- The Firebase MCP server (`npx firebase-tools mcp`) is official but has no read-only mode. `--only` limits it to feature groups, and those groups still contain write tools (deploy, add/update/delete documents, set Realtime Database data, update users). `firebase_get_sdk_config` returns app config including the API key. Do not use it; ask the user for numbers instead.
 - Firebase Hosting without Cloud Functions or App Hosting leaves no code signal. If `firebase.json` has a `hosting` section, count hosting by hand; otherwise Firebase is probably only the backend (for example behind Vercel).
 - Firebase Auth and another auth provider (Clerk, Supabase Auth, Auth0) in the same code is an Overlap finding. So is Firestore or Realtime Database next to another database (Supabase, Neon, D1).

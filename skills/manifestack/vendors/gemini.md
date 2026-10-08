@@ -5,10 +5,10 @@ id: gemini
 name: Google Gemini
 roles: [ai]
 detect:
-  packages: ["@google/genai", "@google/generative-ai", "@ai-sdk/google", "@langchain/google-genai"]
-  pypi: ["google-genai", "google-generativeai", "langchain-google-genai"]
+  packages: ["@google/genai", "@google/generative-ai", "@ai-sdk/google", "@langchain/google-genai", "@genkit-ai/google-genai"]
+  pypi: ["google-genai", "google-generativeai", "langchain-google-genai", "llama-index-llms-gemini"]
   go: ["google.golang.org/genai", "github.com/google/generative-ai-go"]
-  imports: ["@google/genai", "@google/generative-ai", "@langchain/google-genai"]
+  imports: ["@google/genai", "@google/generative-ai", "@ai-sdk/google", "@langchain/google-genai", "@genkit-ai/google-genai"]
   env_prefixes: ["GEMINI_", "NEXT_PUBLIC_GEMINI_", "VITE_GEMINI_", "GOOGLE_GENERATIVE_AI_"]
   config_files: []
 pages:
@@ -20,7 +20,6 @@ pages:
   terms: https://ai.google.dev/gemini-api/terms
   abuse_monitoring: https://ai.google.dev/gemini-api/docs/usage-policies
   available_regions: https://ai.google.dev/gemini-api/docs/available-regions
-  regions: https://firebase.google.com/docs/ai-logic/locations
   dpa: https://business.safety.google/processorterms/
   dpa_services: https://business.safety.google/services/
 read:
@@ -30,10 +29,10 @@ read:
   - rate limits per model and tier (RPM, TPM, RPD), that they apply per project and not per API key, when RPD resets, and which preview models have tighter limits
   - usage tiers (Free, Tier 1 to 3), what moves a project up (billing linked, cumulative spend, days since first payment), and the monthly spend limit per tier
   - Prepay versus Postpay billing, project-level monthly spend caps, what a cap pauses, and the enforcement delay during which overage can still accrue (Batch and agent sessions can run past the cap)
-  - Terms: Unpaid versus Paid Services data use, and the rule that apps offered to users in the EEA, Switzerland or the UK must use Paid Services
+  - the terms on Unpaid versus Paid Services data use, and the rule that apps offered to users in the EEA, Switzerland or the UK must use Paid Services
   - abuse-monitoring retention of prompts and outputs on the Paid tier, and whether any zero-retention option exists for the Developer API
   - processing location: the Developer API serves from a global pool with no region choice (region-pinned processing is a Vertex AI feature); the available-regions page lists only countries where the API may be used
-  - DPA: whether "Gemini API Paid Services" is listed as a processor service; certifications are published for Vertex AI and Google Cloud, not separately for the Developer API, so check scope before claiming SOC 2 or ISO 27001
+  - in the DPA, whether "Gemini API Paid Services" is listed as a processor service; certifications are published for Vertex AI and Google Cloud, not separately for the Developer API, so check scope before claiming SOC 2 or ISO 27001
 usage_questions:
   - metric: billing_plan
     ask: Is Cloud Billing linked to the project that holds the production API key (Paid tier), or is it on the Free tier? Which billing tier does it show?
@@ -60,7 +59,7 @@ common_fixes:
   - cap max output tokens and thinking budget per call
   - split traffic across projects only where limits allow it, since all keys in one project share the same rate limits
   - pin a stable model version rather than a preview or alias and track its shutdown date
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Free and Paid tiers have different data terms, not just different limits. On the Free tier Google may use prompts and responses to improve its products and human reviewers may read them; on the Paid tier it does not, and keeps them only for abuse monitoring for a limited period. Under the Terms, apps serving users in the EEA, Switzerland or the UK must use Paid Services. A production app with personal data on a Free-tier key is a Requirement finding. Quote the current wording from the Terms page.

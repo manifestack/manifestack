@@ -17,7 +17,7 @@ pages:
   billing_faq: https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/billing-faq-for-credit-based-plans/
   paused_projects: https://docs.netlify.com/manage/accounts-and-billing/billing/resume-paused-projects/
   legacy_plans: https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-legacy-plans/billing-for-legacy-plans/
-  regions: https://docs.netlify.com/build/functions/optional-configuration/
+  regions: https://docs.netlify.com/build/functions/configuration/
   security: https://www.netlify.com/trust-center/
   dpa: https://www.netlify.com/pdf/netlify-dpa.pdf
 read:
@@ -52,10 +52,10 @@ common_fixes:
   - set the functions region next to the database
   - decide on auto recharge on purpose: off means projects pause at the limit, on means the bill grows with traffic
   - move a launched project off Free before the expected traffic, since Free cannot buy extra credits
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Running out of credits pauses every project on the team, not just the busy one. For a commercial site on Free or on a paid plan with auto recharge off, that is a Requirement or Bill finding.
 - Legacy-plan teams are billed on bandwidth, build minutes and function quotas with automatic add-ons. Ask which model the team uses before reading the pricing page.
-- The Netlify MCP server (`@netlify/mcp`, remote at `netlify-mcp.netlify.app`) is official but has no read-only mode: it creates and deploys projects, changes access controls and manages environment variables and secrets. Do not use it in the MVP; ask the user for numbers instead.
+- The Netlify MCP server (`@netlify/mcp`, remote at `netlify-mcp.netlify.app`) is official but has no read-only mode: it creates and deploys projects, changes access controls and manages environment variables and secrets. Do not use it; ask the user for numbers instead.
 - Netlify also offers Blobs and a database product. This map covers hosting only; if `@netlify/blobs` or Netlify Database is used, treat it as storage or database through Netlify and check for Overlap with other vendors.

@@ -16,8 +16,9 @@ pages:
   security: https://clerk.com/security
   dpa: https://clerk.com/legal/dpa
 read:
-  - the billed user metric and how it is counted (Clerk bills monthly retained users, MRU, not every sign-up)
-  - users included on the free plan and on Pro, and the price per extra user
+  - the billed user metric and how it is counted (monthly retained users, MRU: when a user counts as retained), and whether it is counted per application
+  - users included on the free plan and on Pro, the price per extra user, and what happens on the free plan past its limit
+  - enterprise SSO connections included and the price per extra connection
   - which features need a paid plan or add-on (MFA, enterprise SSO, removing branding, organizations)
   - Backend API rate limits per plan (they matter on launch day)
   - where user data is hosted and whether data residency is offered
@@ -37,7 +38,7 @@ common_fixes:
   - confirm which paid features are actually used before upgrading
   - remove a second auth provider from the code if Clerk is the one you keep (or the other way round)
   - check data residency against the requirements before launch, not after
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Clerk publishes no region page. If Requirements say "EU data", treat the region as unverified and point the user to the DPA and Clerk support; do not assume.

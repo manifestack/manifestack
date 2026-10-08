@@ -12,9 +12,7 @@ detect:
   env_prefixes: ["UPSTASH_", "QSTASH_", "KV_REST_API_"]
   config_files: []
 pages:
-  pricing: https://upstash.com/pricing
-  redis_pricing: https://upstash.com/pricing/redis
-  redis_pricing_docs: https://upstash.com/docs/redis/overall/pricing
+  pricing: https://upstash.com/pricing/redis
   vector_pricing: https://upstash.com/pricing/vector
   qstash_pricing: https://upstash.com/pricing/qstash
   workflow_pricing: https://upstash.com/pricing/workflow
@@ -24,7 +22,6 @@ pages:
   regions: https://upstash.com/docs/redis/features/globaldatabase
   usage: https://upstash.com/docs/redis/howto/metrics-and-charts
   security: https://upstash.com/docs/common/help/compliance
-  trust: https://trust.upstash.com/
   dpa: https://upstash.com/static/trust/dpa.pdf
 read:
   - Redis Free plan quota kinds (data size, monthly commands, monthly bandwidth, database count) and the request limit the "max daily request limit exceeded" error refers to
@@ -59,7 +56,7 @@ common_fixes:
   - set a monthly budget on Pay as you go databases, or compare a Fixed plan when traffic is steady
   - keep read regions only where readers are, since every write is billed again per read region
   - create the database in the primary region the requirements ask for while data is small
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Upstash bills each database and product separately. Redis, Vector, QStash and Workflow each have their own plan and quotas, so read the pricing page for every product the code uses. Workflow runs on QStash and is billed per step.

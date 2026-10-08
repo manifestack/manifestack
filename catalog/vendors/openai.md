@@ -6,7 +6,7 @@ roles: [ai]
 detect:
   packages: ["openai", "@openai/agents", "@ai-sdk/openai", "@langchain/openai"]
   pypi: ["openai", "openai-agents", "langchain-openai", "llama-index-llms-openai", "llama-index-embeddings-openai"]
-  go: ["github.com/openai/openai-go"]
+  go: ["github.com/openai/openai-go", "github.com/sashabaranov/go-openai"]
   imports: ["openai", "@openai/agents", "@ai-sdk/openai", "@langchain/openai"]
   env_prefixes: ["OPENAI_"]
   config_files: []
@@ -53,9 +53,10 @@ common_fixes:
   - set a monthly budget alert and a hard limit per project
   - check the usage tier and request or prepay into a higher tier before launch
   - pin a model snapshot and track its deprecation date
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
+- The `openai` SDK also talks to other providers (OpenRouter, Groq, DeepSeek, a local model) when `OPENAI_BASE_URL` or a `baseURL` option points elsewhere: if one is set, ask which provider it is before reading OpenAI's pages.
 - `openai` is also an English word in imports and comments; trust the package.json entry first. Azure OpenAI (`@azure/openai`, `AZURE_OPENAI_*`) is billed by Azure, not by this map.
 - Cost grows per user and per request (tokens in and out), not as a flat plan. Estimate tokens per request × requests per user × users, and read prices for the exact model. Rate limits follow the usage tier, and a new organization starts low. A launch spike can hit RPM or TPM limits before any budget; flag it as a Risk.
 - Training use, retention (ZDR) and data residency are Requirement questions: compare them with the project's data rules, not with the bill.

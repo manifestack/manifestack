@@ -19,7 +19,7 @@ pages:
   account_review: https://www.twilio.com/docs/sendgrid/ui/account-and-settings/account-under-review
   dedicated_ips: https://www.twilio.com/docs/sendgrid/ui/account-and-settings/dedicated-ip-addresses
   regions: https://www.twilio.com/docs/sendgrid/data-residency/faq
-  security: https://security.twilio.com/
+  security: https://www.twilio.com/en-us/security
   dpa: https://www.twilio.com/en-us/legal/data-protection-addendum
 read:
   - the free trial terms: its length, the daily sending limit and contact limit during the trial, that it runs once, and that sending stops when it ends unless the plan is upgraded (the permanent free plan was retired)
@@ -52,7 +52,7 @@ common_fixes:
   - keep bounce and spam rates low (verify lists, double opt-in, honor suppressions) to avoid account review
   - for EU data, create an EU subuser with an EU dedicated IP and send through the EU endpoint
   - move marketing sends to Marketing Campaigns or a separate subuser so transactional reputation is kept apart
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - SendGrid retired its permanent free plan in 2025. New accounts get a one-time free trial; when it ends, sending stops until a paid plan is chosen. A project still on the trial at launch is a Risk finding. Upgrading ends the trial at once.

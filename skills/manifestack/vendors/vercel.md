@@ -62,10 +62,10 @@ common_fixes:
   - set the function region next to the database
   - turn on Spend Management with a limit and alerts on Pro
   - move a commercial project from Hobby to Pro before launch
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Usage is per team; filter the Usage page by project to see one app.
 - Overage rates differ by region. Note the region of the traffic when you compute a Bill finding.
-- Vercel MCP (`mcp.vercel.com`) has write tools (deployments, file uploads, purchases) and no read-only mode. Do not use it in the MVP; ask the user for numbers instead.
+- Vercel MCP (`mcp.vercel.com`) has write tools (deployments, file uploads, purchases) and no read-only mode. Do not use it; ask the user for numbers instead.
 - `@vercel/kv` and `@vercel/postgres` are deprecated and now backed by Upstash and Neon. If you see them, the database vendor is Upstash or Neon, billed through Vercel Marketplace.

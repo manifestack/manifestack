@@ -45,8 +45,8 @@ common_fixes:
   - warm up and schedule launch-day sends within the daily quota
   - keep bounce and spam rates under the thresholds (verify lists, double opt-in)
   - plan the next tier before the month the quota runs out
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - `resend` matches a common English word in imports; trust the package.json entry first.
-- Resend MCP sends email and manages keys and domains, and has no read-only mode. Do not use it in the MVP; ask the user for numbers instead.
+- Resend MCP sends email and manages keys and domains, and has no read-only mode. Do not use it; ask the user for numbers instead.

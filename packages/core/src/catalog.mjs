@@ -70,7 +70,9 @@ export function validateVendorMap(v) {
 	}
 	if (!/^https:\/\//.test(String(v.pages?.pricing ?? ''))) errors.push('pages.pricing must be an https URL');
 	for (const [k, url] of Object.entries(v.pages ?? {})) if (!/^https:\/\//.test(String(url))) errors.push(`pages.${k} must be an https URL`);
-	if (!v.read?.length) errors.push('read must list what to extract from the pages');
+	// "- Terms: …" in YAML is a mapping, not text: every item must stay a plain string.
+	if (!isStringList(v.read) || !v.read.length) errors.push('read must be a list of plain strings (quote an item that starts with "Word:")');
+	if (!isStringList(v.common_fixes)) errors.push('common_fixes must be a list of plain strings');
 	for (const q of v.usage_questions ?? []) if (!q.metric || !q.ask || !q.where) errors.push('each usage question needs metric, ask and where');
 	if (v.mcp?.official && v.mcp.readonly_flag && !v.mcp.allowed_tools?.length) errors.push('mcp.allowed_tools is required when read-only MCP use is allowed');
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v.verified ?? ''))) errors.push('verified must be a YYYY-MM-DD date');

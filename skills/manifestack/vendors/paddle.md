@@ -9,7 +9,7 @@ detect:
   pypi: ["paddle-python-sdk"]
   go: ["github.com/PaddleHQ/paddle-go-sdk"]
   imports: ["@paddle/"]
-  env_prefixes: ["PADDLE_", "NEXT_PUBLIC_PADDLE_", "VITE_PADDLE_"]
+  env_prefixes: ["PADDLE_API_KEY", "PADDLE_CLIENT_TOKEN", "PADDLE_WEBHOOK_SECRET", "PADDLE_NOTIFICATION_WEBHOOK_SECRET", "PADDLE_ENVIRONMENT", "PADDLE_VENDOR_ID", "PADDLE_SELLER_ID", "NEXT_PUBLIC_PADDLE_", "VITE_PADDLE_"]
   config_files: []
 pages:
   pricing: https://www.paddle.com/pricing
@@ -19,7 +19,6 @@ pages:
   payouts: https://www.paddle.com/help/manage/get-paid/when-and-how-do-i-get-paid
   merchant_of_record: https://www.paddle.com/help/start/intro-to-paddle/the-legal-relationship-between-paddle-and-you
   acceptable_use: https://www.paddle.com/help/start/intro-to-paddle/what-am-i-not-allowed-to-sell-on-paddle
-  security: https://trust.paddle.com/
   soc2: https://www.paddle.com/legal/soc-2-compliance
   dpa: https://www.paddle.com/legal/data-processing-addendum
 read:
@@ -52,7 +51,7 @@ common_fixes:
   - set the payout threshold and currency on purpose and plan cash flow around the monthly payout
   - localize checkout prices in supported currencies instead of converting at the bank
   - use webhooks instead of polling the API, and back off on rate limit errors using the Retry-After header
-verified: 2026-10-07
+verified: 2026-10-08
 ---
 
 - Paddle is a merchant of record: it is the seller to the customer and handles sales tax and VAT. For "EU VAT handled for us" this covers the Requirement. The trade-off is a product scope limit (software and digital products only) and a monthly payout schedule; check both against the product and cash-flow needs before proposing it.

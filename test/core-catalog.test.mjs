@@ -105,3 +105,9 @@ test('two maps cannot claim the same package', () => {
 	const copy = { id: 'copy', detect: { packages: ['@clerk/'], pypi: ['Clerk_Backend.API'], go: [] } };
 	assert.deepEqual(packageClashes([...vendors, copy]), ['clerk.md and copy.md both claim detect.packages "@clerk/"', 'clerk.md and copy.md both claim detect.pypi "Clerk_Backend.API"']);
 });
+
+test('read and common_fixes items must be plain strings', () => {
+	const map = (read) => parseVendorMap(`---\nschema: 1\nid: x\nname: X\nroles: [ai]\ndetect:\n  packages: ["x"]\npages:\n  pricing: https://x.example/pricing\nread:\n${read}\nverified: 2026-10-08\n---\n`);
+	assert.deepEqual(validateVendorMap(map('  - price per token')), []);
+	assert.match(validateVendorMap(map('  - Terms: data use rules')).join(), /read must be a list of plain strings/);
+});

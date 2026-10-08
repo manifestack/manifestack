@@ -351,6 +351,12 @@ async function main(argv) {
 	throw new UserError(`unknown command "${cmd}". Run: npx manifestack --help`);
 }
 
+// npx ignores "engines", so an older Node gets a clear message instead of a syntax or API error later.
+if (Number(process.versions.node.split('.')[0]) < 22) {
+	console.error(`manifestack: Node.js 22 or newer is required (this is ${process.versions.node}). Update Node.js and run it again.`);
+	process.exit(1);
+}
+
 main(process.argv.slice(2)).catch((e) => {
 	const message = e instanceof ConfigError ? `${e.message}. Fix it first; manifestack will not overwrite it.` : e instanceof UserError ? e.message : e.stack ?? e.message;
 	console.error(`manifestack: ${message}`);

@@ -16,4 +16,11 @@ Include what you ran, what happened, and what you expected. We aim to reply with
 
 ## Supported versions
 
-The latest 0.x release.
+| Version | Supported |
+| --- | --- |
+| latest 0.x release | yes |
+| older releases | no: update with `npx manifestack@latest` |
+
+## Verifying the package
+
+Releases are published from GitHub Actions with npm provenance. `npm audit signatures` in a project that installed `manifestack` checks the signature and the provenance, and the npm page links each version to the commit and workflow run that built it.

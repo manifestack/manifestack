@@ -42,7 +42,7 @@ npm run smoke                # packs the npm package and runs it in an empty pro
 4. If the vendor was in `packages/core/src/known-sdks.mjs` (unmapped SDKs), remove it there.
 5. Add a fixture in `test/fixtures/` that uses the vendor's SDK, and a detection test in `test/core-detect.test.mjs`.
 6. Run `node tools/sync.mjs && npm test`.
-7. Add a line to `CHANGELOG.md` under Unreleased: `Vendor map: <Name>`.
+7. Add the vendor to the vendor maps line under `[Unreleased]` → Added in `CHANGELOG.md`.
 
 ## Change the scripts
 
@@ -64,11 +64,13 @@ Code lives in `packages/core/src/`. `tools/sync.mjs` bundles each script into on
 
 ## Versions
 
-One version for everything in 0.x: `packages/cli/package.json`, `packages/core/package.json`, `.claude-plugin/plugin.json` and `metadata.version` in every `SKILL.md`. A test checks they agree.
+One version for everything in 0.x: `packages/cli/package.json`, `packages/core/package.json`, `.claude-plugin/plugin.json`, `metadata.version` in every `SKILL.md`, and the `npx manifestack@<version> hook` command in `skills/manifestack/SKILL.md`. A test checks they agree.
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): user-facing changes go under `## [Unreleased]` in Added, Changed or Fixed. At release, that section becomes `## [X.Y.Z] - YYYY-MM-DD` and is the GitHub release text.
 
 ## Before a release
 
-1. Bump the version everywhere (see Versions) and add the CHANGELOG entry.
+1. Bump the version everywhere (see Versions). In `CHANGELOG.md`, rename `[Unreleased]` to `[X.Y.Z] - <date>`, start a new empty `[Unreleased]`, and update the links at the bottom; `release.yml` stops when the section is missing.
 2. `node tools/sync.mjs --check && npm test`.
 3. `agentskills validate skills/manifestack` and `skills/manifestack-guard`; `claude plugin validate . --strict`.
 4. Check what can drift outside this repo:
@@ -79,4 +81,4 @@ One version for everything in 0.x: `packages/cli/package.json`, `packages/core/p
    - the vendor pages listed in each map still load, and `verified` dates are recent.
 5. Run the manual scenarios in `test/evals/README.md` in Claude Code, Cursor and Codex; every finding needs a `source` with a date.
 6. `npx skills add ./ --list` shows both skills.
-7. Tag `vX.Y.Z` and push the tag; `release.yml` publishes to npm.
+7. Tag `vX.Y.Z` on `main` and push the tag; `release.yml` runs the full CI, publishes to npm with provenance and creates the GitHub release from the CHANGELOG section.

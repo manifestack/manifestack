@@ -3,7 +3,9 @@
   "owner": {
     "name": "Manifestack"
   },
-  "description": "Manifestack: an Agent Skill that fits your stack to your project and keeps it fitting as it changes.",
+  "metadata": {
+    "description": "Manifestack: an Agent Skill that fits your stack to your project and keeps it fitting as it changes."
+  },
   "plugins": [
     {
       "name": "manifestack",

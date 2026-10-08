@@ -29,7 +29,8 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 - Secrets: AWS secret keys, `redis://:password@host` and `key: value` forms are caught; commit hashes or UUIDs in URLs and Stripe ids are not flagged. `set` writes atomically and never echoes a rejected value.
 - Hook: no false alarms when git is missing, for upgrades of packages already there, or from quoted text and heredocs; each vendor once per session; only one of the plugin and project hooks reports.
 - Detection: environment variables of other tools (`CF_`, `PADDLE_`), `@vercel/kv` and `@vercel/postgres` (Upstash and Neon), a role signal alone, the file limit dropping manifests, multi-line values in `.env`.
-- STACK.md: code fences, headings such as `## Other: C#`, `date > X`, and parsing time on very long lines.
+- STACK.md: code fences, headings such as `## Other: C#` and `date > X`.
+- Parsing time on very long lines in STACK.md, `pyproject.toml`, `requirements.txt`, `go.mod` and `--points`: a crafted `pyproject.toml` could hang detection and the hook.
 
 ## [0.3.0] - 2026-10-08
 

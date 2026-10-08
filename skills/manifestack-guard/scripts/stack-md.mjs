@@ -364,6 +364,7 @@ function q(args, key) {
 }
 
 // "2026-09-06=41,200;2026-10-06=43,000": a comma separates points only when a date follows it.
+/** "2026-09-06=41,200;2026-10-06=43,000" → one string per point; a comma inside a number stays in it. */
 function splitPoints(s) {
 	const parts = String(s).split(/([;,])/); // pieces and separators, alternating
 	const out = [];

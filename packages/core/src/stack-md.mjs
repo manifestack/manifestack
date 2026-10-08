@@ -1,15 +1,21 @@
 // Reads and updates .manifestack/STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
 // Updates touch only the named fields: other lines, unknown keys and user comments stay as they are.
 import { readFileSync, writeFileSync, existsSync, renameSync, rmSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { isMain, parseArgs, printJson, fail, todayIso, isIsoDate, dateArg } from './cli-util.mjs';
 import { parseQuantity, eta, approxMonth, monthlyGrowth, METRIC_UNIT_MB } from './project.mjs';
-import { STACK_FILE, ensureWorkDir, withinCwd } from './workdir.mjs';
+import { STACK_FILE, ensureWorkDir, ignoreTmpDir, withinCwd } from './workdir.mjs';
 
 export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'AI', 'Other'];
 export const STACK_KEYS = ['plan', 'limit', 'source', 'usage', 'decided', 'revisit_when', 'next', 'env'];
 export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid', 'priority'];
 export const PRIORITIES = ['lowest cost', 'balanced', 'least ops', 'control'];
-export const REVISIT_METRICS = ['db_size', 'monthly_sent', 'daily_peak', 'transfer_tb', 'mau', 'users', 'monthly_bill', 'date'];
+// Metrics lint knows without a reading in `usage`; the numeric usage metrics of the vendor maps are among them.
+export const REVISIT_METRICS = [
+	'db_size', 'monthly_sent', 'daily_peak', 'transfer_tb', 'mau', 'users', 'monthly_bill', 'date',
+	'egress_gb', 'storage_gb', 'cdn_requests', 'function_invocations', 'compute_hours', 'cpu_hours', 'seats', 'logs_ingested_gb',
+	'monthly_events', 'monthly_errors', 'monthly_spans', 'monthly_replays', 'monthly_recordings', 'monthly_tokens', 'monthly_revenue', 'monthly_volume', 'monthly_commands', 'transactions',
+];
 
 // Env var names (NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL) and URL slugs (2024-11-05-pro-plan-pricing-update) are made of
 // words, numbers and short parts like R2 or v2. A key has at least one long part that mixes letters and digits.
@@ -580,7 +586,8 @@ export function lintStackMd(text) {
 		if (s.kind !== 'service') continue;
 		if (!STACK_ROLES.includes(s.role)) warnings.push({ line: s.line, message: `role "${s.role}" is not one of ${STACK_ROLES.join(', ')}` });
 		if (s.values.env && /=/.test(s.values.env)) errors.push({ line: s.line, message: 'env lists names only, without values' });
-		if (s.values.source && !/\d{4}-\d{2}-\d{2}/.test(`${s.values.source} ${s.comments.source ?? ''}`)) warnings.push({ line: s.line, message: 'source has no read date (add "# read YYYY-MM-DD")' });
+		// "user" (an answer) and "unverified" (not read yet) have no page to date.
+		if (s.values.source && !/^(user|unverified)\b/i.test(s.values.source) && !/\d{4}-\d{2}-\d{2}/.test(`${s.values.source} ${s.comments.source ?? ''}`)) warnings.push({ line: s.line, message: 'source has no read date (add "# read YYYY-MM-DD")' });
 		try {
 			for (const p of readUsage(s.values.usage).problems) warnings.push({ line: s.line, message: `usage: ${p}. Write it as "312 MB, +1.1 MB/day (2026-10-06)"` });
 		} catch (e) {
@@ -588,7 +595,9 @@ export function lintStackMd(text) {
 		}
 		if (s.values.revisit_when) {
 			try {
-				for (const m of revisitMetrics(parseRevisit(s.values.revisit_when))) if (!REVISIT_METRICS.includes(m)) warnings.push({ line: s.line, message: `revisit_when metric "${m}" is not a standard metric` });
+				// A metric outside the list is fine when this section's usage names it; otherwise it may be a typo.
+				const named = Object.keys(parseUsage(s.values.usage));
+				for (const m of revisitMetrics(parseRevisit(s.values.revisit_when))) if (!REVISIT_METRICS.includes(m) && !named.includes(m)) warnings.push({ line: s.line, message: `revisit_when metric "${m}" is not a standard metric and usage does not name it` });
 			} catch (e) {
 				errors.push({ line: s.line, message: e.message });
 			}
@@ -601,13 +610,11 @@ const STACK_USAGE = `usage:
   node stack-md.mjs parse [file]
   node stack-md.mjs check [file] [--today YYYY-MM-DD] [--metric db_size="420 MB"]...
   node stack-md.mjs lint [file]
-  node stack-md.mjs set [file] --section "Email: Resend" --json - <<'EOF'
-{"plan": "Free", "limit": "3,000 emails/mo", "source": {"value": "resend.com/pricing", "comment": "read 2026-10-06"}}
-EOF
-  node stack-md.mjs set [file] --section "Database: Supabase" --set "plan=free" [--set ...] [--comment "source=read 2026-10-06"]
+  node stack-md.mjs set [file] --section "Database: Acme DB" --json .manifestack/tmp/set.json
+  node stack-md.mjs set [file] --section "Database: Acme DB" --set "plan=Starter" [--set ...] [--comment "source=read 2026-10-06"]
 file defaults to .manifestack/STACK.md and must be inside the current directory. Prints JSON.
 set --json reads a JSON object from a file or - (stdin): {"key": "value"} or {"key": {"value": "...", "comment": "..."}}.
-Use it with a quoted heredoc (<<'EOF') for text copied from a page: the shell expands $(...) and backticks inside "...".
+Write text copied from a page to that file (or a quoted heredoc, <<'EOF'), never into --set "...": the shell expands $(...) and backticks there.
 A comment without a value comments the existing line; an empty comment removes it.
 set refuses values that look like secrets and keeps every other line as it is.`;
 
@@ -693,6 +700,8 @@ export function stackMdMain(argv) {
 			const updates = keyValues(args.set, '--set');
 			const comments = keyValues(args.comment, '--comment');
 			if (args.json != null) {
+				// A JSON file the agent wrote into .manifestack/tmp stays out of git like the other working files.
+				if (typeof args.json === 'string' && args.json !== '-') ignoreTmpDir(dirname(args.json));
 				const j = jsonFields(args.json);
 				mergeOnce(updates, j.updates, 'a value');
 				mergeOnce(comments, j.comments, 'a comment');

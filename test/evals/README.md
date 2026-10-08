@@ -7,6 +7,8 @@ Inputs and expected behaviour for the skills, to run with `skill-creator` before
 | `manifestack.triggers.json` | Queries that should and should not trigger `manifestack` |
 | `manifestack-guard.triggers.json` | The same for `manifestack-guard` (must fire on "add Stripe", not on CSS work) |
 | `scenarios.json` | End-to-end runs on `test/fixtures/*` with the expected results |
+| `manifestack.evals.json`, `manifestack-guard.evals.json` | Graded runs for `skill-creator`: a prompt per fixture and the expectations an answer must meet |
+| `description-optimization.json` | Results of the last description optimization run, kept to compare the next one |
 
 ## How to run
 

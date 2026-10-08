@@ -9,7 +9,7 @@
       "expectations": [
         "Findings carry explicit kind labels, including a Limit finding for the Supabase Free database size with an ETA (Dec 2026 at 400 MB or Mar 2027 at 500 MB)",
         "A Bill finding for Vercel data transfer gives ~$360/mo overage computed from a published per-GB rate",
-        "Every finding has when, cost, fix and a source dated 2026-10-07 (or marked unverified)",
+        "Every finding has when, cost, fix and a source dated the day of the run (or marked unverified)",
         "Requirements are checked, including Vercel functions pinned to iad1 (US) against the EU database rule, with a not-a-legal-guarantee note",
         "The summary gives the nearest deadline, spend to review per month and per year, and the number of pages read",
         "The answer mentions at least one non-pricing blocker visible in the repo (next 15.5.0/react 19.1.0 security advisory, no lockfile, anon key used for server writes, or an unverifiable sender domain)",

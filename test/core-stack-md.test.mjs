@@ -477,3 +477,21 @@ test('long runs of spaces stay linear: headings, comments and usage', () => {
 	assert.deepEqual(parseStackMd('## Database: Supabase ##\nplan: free  # since May\n').sections[0], { heading: 'Database: Supabase', kind: 'service', role: 'Database', vendor: 'Supabase', line: 1, values: { plan: 'free' }, comments: { plan: 'since May' } });
 	assert.equal(parseUsage('3.4 TB of transfer, +0.3 TB/mo (2026-10-01)')._.value, 3.4e6);
 });
+
+test('lint: map metrics are standard, other metrics need a reading, user and unverified sources need no date', () => {
+	const warn = (text) => lintStackMd(`## Requirements\nbudget: $50\n\n${text}`).warnings.map((w) => w.message);
+	assert.deepEqual(warn('## Hosting: Acme\nsource: acme.example/pricing  # read 2026-10-08\nrevisit_when: egress_gb > 100 OR cdn_requests > 8M\n'), []);
+	assert.deepEqual(warn('## Hosting: Acme\nsource: acme.example/pricing  # read 2026-10-08\nusage: build_minutes 4,000 (2026-10-08)\nrevisit_when: build_minutes > 5000\n'), [], 'named in usage');
+	assert.match(warn('## Hosting: Acme\nsource: acme.example/pricing  # read 2026-10-08\nrevisit_when: db_sise > 400 MB\n').join(), /"db_sise" is not a standard metric and usage does not name it/);
+	assert.deepEqual(warn('## Other: Cron service\nsource: user\n\n## Email: Acme Mail\nsource: unverified  # added by guard\n'), []);
+});
+
+test('set --json from a file in .manifestack/tmp keeps that folder out of git', (t) => {
+	const dir = tempDir(t);
+	mkdirSync(join(dir, '.manifestack/tmp'), { recursive: true });
+	writeFileSync(join(dir, '.manifestack/tmp/set.json'), JSON.stringify({ plan: { value: 'Starter', comment: 'user 2026-10-08' }, note: 'costs $(echo x) or `y`' }));
+	const r = runNode(join(ROOT, 'skills/manifestack/scripts/stack-md.mjs'), ['set', '--section', 'Database: Acme DB', '--json', '.manifestack/tmp/set.json'], { cwd: dir });
+	assert.equal(r.code, 0, r.stderr);
+	assert.equal(readFileSync(join(dir, '.manifestack/tmp/.gitignore'), 'utf8'), '*\n');
+	assert.match(readFileSync(join(dir, '.manifestack/STACK.md'), 'utf8'), /plan: Starter  # user 2026-10-08\nnote: costs \$\(echo x\) or `y`/);
+});

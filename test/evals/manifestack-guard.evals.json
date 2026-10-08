@@ -24,7 +24,7 @@
       "expectations": [
         "Says there is no STACK.md and suggests `/manifestack` (not `/manifestack audit`)",
         "Names Resend's send limits (daily and/or monthly caps) as things to check, without quoting numbers from memory",
-        "Flags that the repo has two auth providers (Clerk and Supabase Auth) and asks which one owns signup",
+        "Does not claim to have checked overlaps or limits it cannot see without STACK.md; points to /manifestack for that",
         "Carries out the user's request: resend in package.json and the welcome-email code",
         "Does not create STACK.md without asking",
         "Uses RESEND_API_KEY only as an env var name; no value is written"

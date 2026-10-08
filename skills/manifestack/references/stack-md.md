@@ -2,23 +2,26 @@
 
 STACK.md lives in `.manifestack/STACK.md` at the repository root. People read it; agents parse it. Keep it short. Scripts use that path when no file is given.
 
+An example with a made-up vendor (the limits and prices of a real one come from its page, never from here):
+
 ```markdown
 ## Requirements
-budget: ~$600/mo
-users: 9k now, 50k by Q3
+budget: ~$600/mo  # user 2026-10-06
+users: 9k now, 50k by Q3  # user 2026-10-06
 requires: EU database, SOC 2 vendors
 prefer: Postgres, Next.js
 avoid: Kubernetes, MongoDB
+priority: balanced  # user 2026-10-06
 
-## Database: Supabase
-plan: free
-limit: 500 MB database, pauses after 7 days idle
-source: supabase.com/pricing  # read 2026-10-06
+## Database: Acme DB
+plan: Starter
+limit: 500 MB database, read-only above it
+source: acme.example/pricing  # read 2026-10-06
 usage: 312 MB, +1.1 MB/day (2026-10-06)
-decided: stay on Free until first paying user
+decided: stay on Starter until the first paying user
 revisit_when: db_size > 400 MB OR date >= 2027-02-01
-next: Pro, $25/mo
-env: SUPABASE_URL, SUPABASE_ANON_KEY  # names only
+next: Team, $49/mo
+env: ACME_DB_URL, ACME_DB_KEY  # names only
 ```
 
 ## Sections
@@ -36,14 +39,14 @@ env: SUPABASE_URL, SUPABASE_ANON_KEY  # names only
 | `usage` | Current reading, optional rate, and the date: `312 MB, +1.1 MB/day (2026-10-06)`. |
 | `decided` | What was chosen on purpose and why. Written by people; change only when asked. |
 | `revisit_when` | When to look again (grammar below). |
-| `next` | Next plan and its price: `Pro, $25/mo`. |
+| `next` | Next plan and its price, from the page: `Team, $49/mo`. |
 | `env` | Env var names the service uses. Names only, never values. |
 
-Unknown keys are allowed and must be kept when updating. A comment starts at two or more spaces followed by `#` (`source: supabase.com/pricing  # read 2026-10-06`); a `#` after a single space is part of the value (`decided: use plan #2 for now`). Comments belong to the user; keep them. Text inside `<!-- -->` is ignored.
+Unknown keys are allowed and must be kept when updating. A comment starts at two or more spaces followed by `#` (`source: acme.example/pricing  # read 2026-10-06`); a `#` after a single space is part of the value (`decided: use plan #2 for now`). Comments belong to the user; keep them. Text inside `<!-- -->` is ignored.
 
 ## Who changes what
 
-| Fields | Kind | An audit or init may |
+| Fields | Kind | init, audit, compare and the guard may |
 | --- | --- | --- |
 | `usage`, `limit`, `source`, `env` | facts read today | write them, with the date |
 | `plan`, `decided`, `revisit_when`, `next` | decisions of the team | propose new lines; write them only after a yes (a plan the user stated in an answer is that yes) |
@@ -75,7 +78,7 @@ and_expr   := primary ( "AND" primary )*
 primary    := "(" expr ")" | comparison | "before launch"
 comparison := metric op value
 op         := ">" | ">=" | "<" | "<="
-metric     := db_size | monthly_sent | daily_peak | transfer_tb | mau | users | monthly_bill | date
+metric     := a snake_case name: db_size, monthly_sent, daily_peak, transfer_tb, mau, users, monthly_bill, date, or a usage metric of a vendor map (egress_gb, cdn_requests, seats, …)
 value      := quantity (same forms as usage) | YYYY-MM-DD (for date)
 ```
 
@@ -85,7 +88,7 @@ value      := quantity (same forms as usage) | YYYY-MM-DD (for date)
 - `users` comes from `Requirements` → `users` (the first number: `9k now, 50k by Q3` is 9,000; `9 000` and `~9k` work) unless usage says otherwise. If that first number is not a user count (`12 months out, 3k`), `users` is unknown.
 - A reading with a rate is projected from its date: if the projection crossed the threshold on or before today, the section is `triggered` with `projected: <date>`, not `ok`. Refresh `usage` to confirm.
 - `before launch` cannot be evaluated by a script: ask the user whether the product has launched.
-- Other snake_case metric names work if `usage` provides them; lint warns about them.
+- Other snake_case metric names work if `usage` names them; lint warns only about a metric that is neither standard nor in that section's `usage` (often a typo).
 
 Examples:
 
@@ -102,15 +105,20 @@ revisit_when: before launch
 node <skill-dir>/scripts/stack-md.mjs parse .manifestack/STACK.md
 node <skill-dir>/scripts/stack-md.mjs check .manifestack/STACK.md --metric db_size="420 MB"
 node <skill-dir>/scripts/stack-md.mjs lint .manifestack/STACK.md
-node <skill-dir>/scripts/stack-md.mjs set --section "Email: Resend" --json - <<'EOF'
-{"plan": "Free", "limit": "3,000 emails/mo"}
-EOF
-node <skill-dir>/scripts/stack-md.mjs set .manifestack/STACK.md --section "Database: Supabase" --json - <<'EOF'
-{"usage": "312 MB, +1.1 MB/day (2026-10-06)", "source": {"value": "supabase.com/pricing", "comment": "read 2026-10-06"}}
-EOF
+node <skill-dir>/scripts/stack-md.mjs set --section "Database: Acme DB" --json .manifestack/tmp/set.json
 ```
 
-Write values with `set --json`: it reads a JSON object from a file or from `-` (stdin), `{"key": "value"}` or `{"key": {"value": "...", "comment": "..."}}`. Pass it in a heredoc with a quoted delimiter (`<<'EOF'`) as above: text copied from a vendor page can contain `$(...)`, backticks or `$VAR`, which the shell runs or expands inside `"..."` but leaves alone in a quoted heredoc. `--set "key=value"` and `--comment "key=text"` still work for short values you typed yourself; they combine with `--json`, but a key may be given only once.
+## Writing
+
+Write values with `set --json`. It reads a JSON object, `{"key": "value"}` or `{"key": {"value": "...", "comment": "..."}}`:
+
+1. Write the object with your file tool to `.manifestack/tmp/set.json` (any name in that folder; it is a working file):
+   ```json
+   {"usage": "312 MB, +1.1 MB/day (2026-10-06)", "source": {"value": "acme.example/pricing", "comment": "read 2026-10-06"}}
+   ```
+2. Run `node <skill-dir>/scripts/stack-md.mjs set --section "Database: Acme DB" --json .manifestack/tmp/set.json`.
+
+This works in every shell, PowerShell included, and nothing in the text is expanded: a value copied from a vendor page can contain `$(...)`, backticks or `$VAR`. In bash or zsh, `--json -` with a heredoc whose delimiter is quoted (`<<'EOF'`) does the same; never put page text inside `--set "..."`, where the shell runs `$(...)`. `--set "key=value"` and `--comment "key=text"` are fine for short values you typed yourself (a plan name, a date); they combine with `--json`, but a key may be given only once.
 
 `set` changes only the given keys (and creates the section if needed), keeps all other lines and line endings, and refuses values or comments that look like secrets or span lines. A comment without a value (`{"plan": {"comment": "checked 2026-10-08"}}`) comments the existing line, and is an error if the section has no such key; an empty comment removes it. `--section` matches the heading regardless of case and of spaces around `:`. The file must be inside the current directory. `stack-md.mjs <command> --help` prints the usage.
 

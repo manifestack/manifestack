@@ -70,3 +70,31 @@ jobs:
       # Packs the CLI as `npm publish` would and runs the tarball in an empty project.
       - name: npm package installs and works
         run: npm run smoke
+
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # On a pull request the same benchmark runs on the base branch, so the summary shows the change.
+      - name: Measure the base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "$BASE_SHA"
+          node tools/bench.mjs all --root "$RUNNER_TEMP/base" --json > "$RUNNER_TEMP/base.json" || rm -f "$RUNNER_TEMP/base.json"
+      # Tokens and speed against bench/budgets.json; the table goes to the job summary.
+      - name: Benchmarks
+        run: |
+          compare=()
+          if [ -f "$RUNNER_TEMP/base.json" ]; then compare=(--compare "$RUNNER_TEMP/base.json"); fi
+          node tools/bench.mjs all --check --markdown "${compare[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+          exit "${PIPESTATUS[0]}"

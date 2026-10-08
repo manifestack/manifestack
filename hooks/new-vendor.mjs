@@ -296,7 +296,10 @@ function manifestKind(path) {
 	if (name === 'package.json' || name === 'deno.json' || name === 'deno.jsonc') return 'npm';
 	if (name === 'go.mod') return 'go';
 	if (name === 'pyproject.toml' || name === 'Pipfile') return 'pypi';
-	if (/^[\w.-]*requirements[\w.-]*\.(txt|in)$/i.test(name)) return 'pypi';
+	// requirements.txt, dev-requirements.in, requirements-test.txt: checked piece by piece, not with one pattern
+	// that could backtrack over a long name.
+	const lower = name.toLowerCase();
+	if (/^[\w.-]+$/.test(name) && /\.(txt|in)$/.test(lower) && lower.slice(0, lower.lastIndexOf('.')).includes('requirements')) return 'pypi';
 	if (parts.at(-2) === 'requirements' && /\.(txt|in)$/.test(name)) return 'pypi';
 	return null;
 }
@@ -386,10 +389,18 @@ function requirementName(spec) {
 	return m ? m[1] : null;
 }
 
+// A comment starts at "#" at the start of a line or after a blank ("stripe==7  # pinned"); "#egg=" in a URL is not one.
+function stripHashComment(line) {
+	for (let i = line.indexOf('#'); i !== -1; i = line.indexOf('#', i + 1)) {
+		if (i === 0 || /\s/.test(line[i - 1])) return line.slice(0, i);
+	}
+	return line;
+}
+
 function requirementsTxt(text) {
 	const names = [];
 	for (let line of text.split(/\r?\n/)) {
-		line = line.replace(/(^|\s)#.*$/, '').trim();
+		line = stripHashComment(line).trim();
 		// A VCS or URL requirement names its package in "#egg=" (also after -e).
 		const egg = /[#&]egg=([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(line);
 		if (egg) {
@@ -452,6 +463,18 @@ const requirementArray = (table, key) =>
 	['project.optional-dependencies', 'dependency-groups', 'tool.pdm.dev-dependencies'].includes(table);
 const packageKeyTable = (table) => /^tool\.poetry(\.group\.[^.]+)?\.(dev-)?dependencies$/.test(table) || table === 'packages' || table === 'dev-packages';
 
+/** "[tool.poetry.dependencies]" or "[[tool.uv.index]]", with blanks, quotes or a comment after it → the table name. */
+function tomlHeader(line) {
+	const t = line.trim();
+	if (!t.startsWith('[')) return null;
+	const open = t.startsWith('[[') ? 2 : 1;
+	const close = t.indexOf(']', open);
+	if (close === -1) return null;
+	const name = t.slice(open, close).trim();
+	const rest = t.slice(t[close + 1] === ']' ? close + 2 : close + 1).trim();
+	return name && (!rest || rest.startsWith('#')) ? name : null;
+}
+
 /** Dependencies from pyproject.toml (PEP 621, PEP 735 groups, uv, PDM, Poetry) and Pipfile. */
 function pythonToml(text) {
 	const names = [];
@@ -468,9 +491,9 @@ function pythonToml(text) {
 			scanTomlValue(line, st, onString);
 			continue;
 		}
-		const header = /^\s*\[{1,2}\s*([^\]]+?)\s*\]{1,2}\s*(#.*)?$/.exec(line);
+		const header = tomlHeader(line);
 		if (header) {
-			table = header[1].replace(/["'\s]/g, '');
+			table = header.replace(/["'\s]/g, '');
 			continue;
 		}
 		const m = /^\s*(["']?)([A-Za-z0-9_.-]+)\1\s*=/.exec(line);
@@ -487,8 +510,10 @@ function goMod(text) {
 	const names = [];
 	let block = false;
 	for (const raw of text.split(/\r?\n/)) {
-		const indirect = /\/\/\s*indirect\b/.test(raw);
-		const line = raw.replace(/\/\/.*$/, '').trim();
+		const c = raw.indexOf('//');
+		// go mod writes "// indirect" as the comment of a dependency it pulled in for another one.
+		const indirect = c !== -1 && /^\s*indirect\b/.test(raw.slice(c + 2));
+		const line = (c === -1 ? raw : raw.slice(0, c)).trim();
 		if (block) {
 			if (line === ')') block = false;
 			else if (line && !indirect) names.push(line.split(/\s+/)[0]);
@@ -1353,8 +1378,23 @@ function q(args, key) {
 }
 
 // "2026-09-06=41,200;2026-10-06=43,000": a comma separates points only when a date follows it.
+/** "2026-09-06=41,200;2026-10-06=43,000" → one string per point; a comma inside a number stays in it. */
+function splitPoints(s) {
+	const parts = String(s).split(/([;,])/); // pieces and separators, alternating
+	const out = [];
+	let current = parts[0];
+	for (let i = 1; i < parts.length; i += 2) {
+		if (/^\s*\d{4}-\d{2}-\d{2}\s*=/.test(parts[i + 1])) {
+			out.push(current.trim());
+			current = parts[i + 1];
+		} else current += parts[i] + parts[i + 1];
+	}
+	out.push(current.trim());
+	return out;
+}
+
 function readPoints(list) {
-	return [].concat(list).flatMap((s) => String(s).split(/\s*[;,]\s*(?=\d{4}-\d{2}-\d{2}\s*=)/)).map((p) => {
+	return [].concat(list).flatMap(splitPoints).map((p) => {
 		const eq = p.indexOf('=');
 		const date = p.slice(0, Math.max(eq, 0)).trim();
 		if (eq < 1 || !isIsoDate(date)) throw new Error(`--points expects YYYY-MM-DD=value, got "${p}"`);
@@ -1899,8 +1939,8 @@ function parseRevisit(expr) {
 		}
 		if (t === ')' || t === 'AND' || t === 'OR') throw new Error(`revisit_when: unexpected ${t}`);
 		if (/^before\s+launch$/i.test(t)) return { type: 'manual', text: 'before launch' };
-		const m = /^([a-z_][a-z0-9_]*)\s*(>=|<=|>|<)\s*(.+)$/i.exec(t);
-		if (!m) throw new Error(`revisit_when: cannot read "${t}"`);
+		const m = /^([a-z_][a-z0-9_]*)[ \t]*(>=|<=|>|<)(.+)$/i.exec(t);
+		if (!m || !m[3].trim()) throw new Error(`revisit_when: cannot read "${t}"`);
 		const [, metric, op, rawValue] = m;
 		if (metric === 'date') {
 			if (!isIsoDate(rawValue.trim())) throw new Error(`revisit_when: date needs a real YYYY-MM-DD, got "${rawValue}"`);

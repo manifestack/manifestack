@@ -146,7 +146,8 @@ async function chooseAgents(opts, project, { forUninstall = false, pool = AGENTS
 function sameSkill(skillDir, name) {
 	try {
 		const head = readFileSync(join(skillDir, 'SKILL.md'), 'utf8').split(/^---\s*$/m)[1] ?? '';
-		return new RegExp(`^name:\\s*["']?${name}["']?\\s*$`, 'm').test(head);
+		// Compared as text, not built into a pattern: a name is data.
+		return head.split(/\r?\n/).some((line) => line.startsWith('name:') && line.slice(5).trim().replace(/^["']|["']$/g, '') === name);
 	} catch {
 		return false;
 	}

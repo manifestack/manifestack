@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, symlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, runNode, tempDir } from './helpers.mjs';
-import { parseQuantity, overage, eta, linearRate, costAt, approxMonth, monthlyGrowth } from '../packages/core/src/project.mjs';
+import { parseQuantity, overage, eta, linearRate, costAt, approxMonth, monthlyGrowth, splitPoints } from '../packages/core/src/project.mjs';
 
 test('parseQuantity reads sizes, money, counts, rates and percents', () => {
 	assert.deepEqual(parseQuantity('312 MB'), { value: 312, dim: 'size', per: null });
@@ -236,4 +236,18 @@ test('costAt: plan credit pays for overage, never for the base price; seats go i
 	const [more] = costAt(model(500));
 	assert.equal(more.monthly, 20, 'credit never brings the base price down');
 	assert.throws(() => costAt(model(-1)), /credit must not be negative/);
+});
+
+test('--points: commas in numbers, ; or , between points, and no slow split on long input', () => {
+	const P = join(ROOT, 'skills/manifestack/scripts/project.mjs');
+	const eta = (...a) => runNode(P, ['eta', ...a]);
+	const r = eta('--points', '2026-09-06=41,200, 2026-10-06=43,000', '--limit', '50000');
+	assert.equal(r.code, 0, r.stderr);
+	assert.equal(JSON.parse(r.stdout).current, 43000);
+	assert.deepEqual(splitPoints('2026-09-06=41,200;2026-10-06 = 43,000, 2026-11-06=44 MB'), ['2026-09-06=41,200', '2026-10-06 = 43,000', '2026-11-06=44 MB']);
+	// Long input is checked in this process: Windows caps a command line at 32,767 characters.
+	const t = Date.now();
+	splitPoints(`2026-09-06=1${' ;'.repeat(50000)}x`);
+	assert.ok(Date.now() - t < 200, `took ${Date.now() - t} ms`);
+	assert.equal(eta('--points', `2026-09-06=1${' ;'.repeat(100)}x`, '--limit', '5').code, 1);
 });

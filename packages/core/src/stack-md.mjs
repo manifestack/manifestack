@@ -446,8 +446,8 @@ export function parseRevisit(expr) {
 		}
 		if (t === ')' || t === 'AND' || t === 'OR') throw new Error(`revisit_when: unexpected ${t}`);
 		if (/^before\s+launch$/i.test(t)) return { type: 'manual', text: 'before launch' };
-		const m = /^([a-z_][a-z0-9_]*)\s*(>=|<=|>|<)\s*(.+)$/i.exec(t);
-		if (!m) throw new Error(`revisit_when: cannot read "${t}"`);
+		const m = /^([a-z_][a-z0-9_]*)[ \t]*(>=|<=|>|<)(.+)$/i.exec(t);
+		if (!m || !m[3].trim()) throw new Error(`revisit_when: cannot read "${t}"`);
 		const [, metric, op, rawValue] = m;
 		if (metric === 'date') {
 			if (!isIsoDate(rawValue.trim())) throw new Error(`revisit_when: date needs a real YYYY-MM-DD, got "${rawValue}"`);

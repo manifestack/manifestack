@@ -158,7 +158,7 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 
 | Role | Vendors |
 | --- | --- |
-| Hosting | Vercel, Netlify, Cloudflare, Railway, Render, Fly.io, Heroku, DigitalOcean |
+| Hosting | Vercel, Netlify, Cloudflare, Railway, Render, Fly.io, Heroku, DigitalOcean, Vultr |
 | Database | Supabase, Neon, Firebase, PlanetScale, MongoDB Atlas, Upstash, Convex |
 | Auth | Clerk, Auth0, WorkOS |
 | Email | Resend, Postmark, SendGrid |

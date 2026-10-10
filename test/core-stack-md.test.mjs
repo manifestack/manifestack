@@ -375,6 +375,11 @@ test('lint warns about a priority outside the four known values', () => {
 	assert.deepEqual(warn('lowest cost  # user 2026-10-08'), []);
 });
 
+test('lint accepts every role, Analytics and Search included', () => {
+	for (const role of ['Analytics', 'Search', 'AI', 'Other']) assert.deepEqual(lintStackMd(`## ${role}: Acme\nplan: free\n`).warnings.filter((w) => /role/.test(w.message)), [], role);
+	assert.ok(lintStackMd('## Realtime: Acme\nplan: free\n').warnings.some((w) => /role "Realtime" is not one of/.test(w.message)));
+});
+
 test('readUsage: separators, dates and words people write, and what it cannot read', () => {
 	const semi = readUsage('312 MB; +1.1 MB/day (2026-10-06)');
 	assert.deepEqual(semi.metrics, { _: { value: 312, dim: 'size', asOf: '2026-10-06', ratePerDay: 1.1 } }, 'a rate after ; continues the reading');

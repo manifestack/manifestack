@@ -16,7 +16,7 @@ export const UNMAPPED_SDKS = [
 	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
 	{ name: 'Better Stack', role: 'monitoring', packages: ['@logtail/'] },
-	{ name: 'Algolia', role: 'other', packages: ['algoliasearch', '@algolia/'] },
+	{ name: 'Algolia', role: 'search', packages: ['algoliasearch', '@algolia/'] },
 	{ name: 'Pusher', role: 'other', packages: ['pusher', 'pusher-js'] },
 	{ name: 'Ably', role: 'other', packages: ['ably'] },
 	{ name: 'Liveblocks', role: 'other', packages: ['@liveblocks/'] },

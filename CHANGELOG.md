@@ -4,6 +4,14 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Added
+
+- Roles `Analytics` and `Search` for STACK.md sections and vendor maps. PostHog is `Analytics`, and counts for `Monitoring` only when the code uses its error tracking.
+
+### Fixed
+
+- Two vendors in the `Other` role (for example SMS and a CMS) are no longer reported as an Overlap.
+
 ## [0.4.0] - 2026-10-08
 
 To update an installed project: `npx manifestack@latest`, then `npx manifestack hook` so the Claude Code hook gets the command that also works on Windows.

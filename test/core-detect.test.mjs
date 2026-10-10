@@ -234,6 +234,19 @@ test('importMatches: package names match themselves and subpaths, "/" and ":" pa
 	assert.ok(!importMatches('anything', []));
 });
 
+test('analytics and other roles: PostHog counts for monitoring only with its error tracking, "other" never overlaps', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { 'posthog-js': '1', '@sentry/nextjs': '8', expo: '52', 'acme-sms': '1', twilio: '5' } }));
+	const acme = { id: 'acme-sms', name: 'Acme SMS', roles: ['other'], packages: ['acme-sms'], pypi: [], go: [], imports: [], env_prefixes: [], config_files: [], role_signals: {} };
+	writeFileSync(join(dir, 'a.ts'), "import posthog from 'posthog-js';\nimport * as Sentry from '@sentry/nextjs';\nSentry.captureException(new Error('x'));\n");
+	let r = detectVendors(dir, { signatures: [...signatures, acme] });
+	assert.deepEqual(r.vendors.find((v) => v.id === 'posthog').roles_used, ['analytics'], 'Sentry.captureException is not a PostHog signal');
+	assert.deepEqual(r.overlaps, [], 'two mapped "other" vendors (Expo, Acme SMS) and an unmapped one are not an Overlap');
+	writeFileSync(join(dir, 'b.ts'), "import posthog from 'posthog-js';\nposthog.captureException(new Error('y'));\n");
+	r = detectVendors(dir, { signatures });
+	assert.deepEqual(r.overlaps, [{ role: 'monitoring', vendors: ['posthog', 'sentry'] }]);
+});
+
 test('evidence cap keeps the package evidence when many env names match', (t) => {
 	const dir = tempDir(t);
 	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { stripe: '1' } }));

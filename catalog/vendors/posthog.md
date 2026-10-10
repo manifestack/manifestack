@@ -2,7 +2,7 @@
 schema: 1
 id: posthog
 name: PostHog
-roles: [monitoring]
+roles: [analytics, monitoring]
 detect:
   packages: ["posthog-js", "posthog-node", "posthog-react-native", "posthog-js-lite", "@posthog/"]
   pypi: ["posthog", "posthoganalytics"]
@@ -10,6 +10,8 @@ detect:
   imports: ["posthog-js", "posthog-node", "posthog-react-native", "posthog-js-lite", "@posthog/"]
   env_prefixes: ["POSTHOG_", "NEXT_PUBLIC_POSTHOG_", "VITE_POSTHOG_", "VITE_PUBLIC_POSTHOG_", "EXPO_PUBLIC_POSTHOG_", "PUBLIC_POSTHOG_", "REACT_APP_POSTHOG_"]
   config_files: []
+  role_signals:
+    monitoring: ["posthog.captureException", "posthog.capture_exception"]
 pages:
   pricing: https://posthog.com/pricing
   billing: https://posthog.com/docs/billing/estimating-usage-costs
@@ -60,5 +62,5 @@ verified: 2026-10-08
 - At the free allowance or a billing limit, extra events are dropped for good and feature flags return a quota-limited response, so the app falls back to flag defaults. Treat a limit hit mid-month as both a blind spot and a product behavior change.
 - Free organizations get one project; a separate staging project needs a paid plan. Cross-region project moves (US ↔ EU) are only done by PostHog engineers on higher tiers, so the region must match a data-region requirement from the start.
 - MCP read-only mode is real: `readonly=true` (or the `x-posthog-read-only` header) removes every create, update and delete tool. Always pair it with the `tools` filter above so only billing and organization tools load; billing tools have no feature category, so `features=` alone does not expose them. Do not use `execute-sql`, `projects-get` (not needed, and project objects can include the project token) or `posthog-connection-forward`.
-- PostHog error tracking next to Sentry, PostHog session replay next to Sentry Session Replay, or PostHog feature flags next to another flag service is a candidate Overlap. Confirm in the code that both tools do the same job (PostHog is often there only for product analytics) and ask the user before reporting it.
+- The `monitoring` role counts only when the code calls PostHog error tracking (`posthog.captureException`); next to Sentry that is a candidate Overlap. PostHog session replay next to Sentry Session Replay, or PostHog feature flags next to another flag service, leaves no such signal: confirm in the code that both tools do the same job and ask the user before reporting it.
 - A BAA does not cover the managed reverse proxy or PostHog AI features; a HIPAA requirement means those stay off.

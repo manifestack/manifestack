@@ -239,6 +239,31 @@ test('Upstash counts for jobs only when the code uses QStash or Workflow', (t) =
 	assert.deepEqual(detectVendors(dir, { signatures }).vendors[0].roles_used, ['database', 'jobs']);
 });
 
+test('video-push-app: Mux for video, OneSignal for push and, when the code sends it, email', () => {
+	const r = detect('video-push-app');
+	assert.deepEqual(ids(r), ['mux', 'onesignal', 'resend']);
+	const onesignal = r.vendors.find((v) => v.id === 'onesignal');
+	assert.ok(onesignal.evidence.some((e) => e.kind === 'config' && e.file === 'public/OneSignalSDKWorker.js'));
+	assert.deepEqual(onesignal.roles_used, ['other', 'email']);
+	assert.deepEqual(r.overlaps, [{ role: 'email', vendors: ['onesignal', 'resend'] }]);
+});
+
+test('Hetzner from hcloud and HCLOUD_ names, storage only with an Object Storage endpoint; mux look-alikes are not Mux', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'requirements.txt'), 'hcloud==2.27.0\nboto3==1.35.0\n');
+	writeFileSync(join(dir, '.env'), 'HCLOUD_TOKEN=x\nMUX_ROOT=/tmp\n');
+	writeFileSync(join(dir, 'deploy.py'), 'import hcloud\nclient = hcloud.Client(token="x")\n');
+	let r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['hetzner']);
+	assert.deepEqual(r.vendors[0].roles_used, ['hosting']);
+	writeFileSync(join(dir, 'files.py'), 'import boto3\ns3 = boto3.client("s3", endpoint_url="https://fsn1.your-objectstorage.com")\n');
+	r = detectVendors(dir, { signatures });
+	assert.deepEqual(r.vendors[0].roles_used, ['hosting', 'storage']);
+	writeFileSync(join(dir, 'go.mod'), 'module example.com/x\n\ngo 1.23\n\nrequire (\n\tgithub.com/gorilla/mux v1.8.1\n\tgithub.com/hetznercloud/hcloud-go/v2 v2.52.0\n)\n');
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { mux: '0.5' } }));
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['hetzner']);
+});
+
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);

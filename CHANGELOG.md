@@ -9,6 +9,7 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 - Vendor maps: Vultr (Cloud Compute, Bare Metal, Object Storage, Managed Databases, Serverless Inference), with its read-only MCP server.
 - Vendor maps: Turso, Prisma Postgres, Pinecone, OpenRouter and Mailgun, which were detected before but had no page map. Turso counts as a database only when the code points to Turso Cloud, and the Prisma ORM alone is not Prisma Postgres.
 - Vendor maps: Pusher, Ably, Inngest and Trigger.dev. Pusher counts as realtime only when the code points to Pusher's service, so Laravel projects on Reverb or the old `.env.example` names are not mistaken for it.
+- Vendor maps: Mux, OneSignal and Hetzner. OneSignal counts for email only when the code sends email through it; Hetzner counts for storage only with an Object Storage endpoint in the code.
 - Roles `Analytics` and `Search` for STACK.md sections and vendor maps. PostHog is `Analytics`, and counts for `Monitoring` only when the code uses its error tracking.
 - Roles `Realtime` and `Jobs`, so two realtime services or two job runners are reported as an Overlap. Upstash counts for `Jobs` when the code uses QStash or Workflow.
 

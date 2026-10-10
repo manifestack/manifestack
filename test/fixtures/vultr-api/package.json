@@ -1,0 +1,9 @@
+{
+  "name": "vultr-api",
+  "private": true,
+  "dependencies": {
+    "@vultr/vultr-node": "2.8.0",
+    "@aws-sdk/client-s3": "3.700.0",
+    "express": "4.21.0"
+  }
+}

@@ -4,6 +4,10 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Added
+
+- Vendor maps: Vultr (Cloud Compute, Bare Metal, Object Storage, Managed Databases, Serverless Inference), with its read-only MCP server.
+
 ## [0.4.0] - 2026-10-08
 
 To update an installed project: `npx manifestack@latest`, then `npx manifestack hook` so the Claude Code hook gets the command that also works on Windows.

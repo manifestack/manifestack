@@ -155,6 +155,25 @@ test('go-worker: vendors from go.mod (major-version paths), DigitalOcean from it
 	assert.deepEqual(r.frameworks.map((f) => f.name), ['Gin']);
 });
 
+test('vultr-api: Vultr from its npm SDK and env names, roles only where the code reaches the service', () => {
+	const r = detect('vultr-api');
+	assert.deepEqual(ids(r), ['vultr']);
+	const vultr = r.vendors[0];
+	assert.ok(vultr.evidence.some((e) => e.kind === 'package' && e.match === '@vultr/vultr-node'));
+	assert.ok(vultr.evidence.some((e) => e.kind === 'env' && e.match === 'VULTR_INFERENCE_API_KEY'));
+	assert.deepEqual(vultr.roles_used, ['hosting', 'storage', 'ai'], 'no vultrdb.com host, so no database role');
+	assert.deepEqual(r.unmapped.map((u) => u.name), ['AWS'], 'Object Storage goes through an S3 client');
+});
+
+test('Vultr from govultr (major-version path) and a Managed Database host in Go code', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'go.mod'), 'module example.com/x\n\ngo 1.23\n\nrequire github.com/vultr/govultr/v3 v3.33.2\n');
+	writeFileSync(join(dir, 'main.go'), 'package main\n\nconst dsn = "postgres://vultradmin@vultr-prod-1.vultrdb.com:16751/app"\n\nfunc main() {}\n');
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['vultr']);
+	assert.deepEqual(r.vendors[0].roles_used, ['hosting', 'database']);
+});
+
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);

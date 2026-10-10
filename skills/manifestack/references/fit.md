@@ -57,9 +57,19 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 
 ### Monitoring
 
-- Error tracking first; product analytics and session replay when someone will look at them.
+- Error tracking first; session replay when someone will look at it.
 - Free plans cap events per month; past the cap events are dropped or billed. Set sampling and filters before launch, not after the first spike.
 - Pick the data region at sign-up when requirements name one; it is usually fixed per organization.
+
+### Analytics
+
+- Product analytics when someone will act on it; one tool, not one per team.
+- Billed by events or tracked users: anonymous visitors, autocapture and server events grow the bill. Decide what to track before launch.
+
+### Search
+
+- Database full-text search (Postgres, the database's own search) first; a search service when relevance, typo tolerance or scale need it.
+- Billed by records and search requests: search-as-you-type sends a request per keystroke. Debounce, and index only the fields that are searched.
 
 ### AI APIs
 

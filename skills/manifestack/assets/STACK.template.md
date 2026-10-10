@@ -12,7 +12,7 @@ avoid:
 priority: 
 
 <!--
-One section per service, "## <Role>: <Vendor>". Roles: Hosting, Database, Auth, Email, Storage, Payments, Monitoring, AI, Other.
+One section per service, "## <Role>: <Vendor>". Roles: Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Analytics, Search, AI, Other.
 
 Example with a made-up vendor; real limits and prices come from the vendor's page:
 

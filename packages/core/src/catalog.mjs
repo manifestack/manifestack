@@ -6,7 +6,7 @@ import { parseFrontmatter } from './yaml.mjs';
 import { normalizePypi } from './manifests.mjs';
 
 export const VENDOR_SCHEMA = 1;
-export const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'ai', 'other'];
+export const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'analytics', 'search', 'ai', 'other'];
 
 /** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
 function upgradeVendorMap(data) {

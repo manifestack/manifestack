@@ -376,7 +376,8 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	const unmappedInProduct = [...unmapped.values()].filter((u) => !u.evidence.every((e) => isSample(e.file)));
 
 	const byRole = new Map();
-	for (const v of vendors) for (const r of v.roles_used) byRole.set(r, [...(byRole.get(r) ?? []), v.id]);
+	// "other" groups different jobs (SMS, feature flags, a CMS), so two vendors in it are not an Overlap.
+	for (const v of vendors) for (const r of v.roles_used) if (r !== 'other') byRole.set(r, [...(byRole.get(r) ?? []), v.id]);
 	for (const u of unmappedInProduct) if (u.role !== 'other') byRole.set(u.role, [...(byRole.get(u.role) ?? []), u.name]);
 	const overlaps = [...byRole].filter(([, ids]) => ids.length > 1).map(([role, ids]) => ({ role, vendors: ids }));
 

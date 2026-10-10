@@ -242,7 +242,7 @@ const UNMAPPED_SDKS = [
 	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
 	{ name: 'Better Stack', role: 'monitoring', packages: ['@logtail/'] },
-	{ name: 'Algolia', role: 'other', packages: ['algoliasearch', '@algolia/'] },
+	{ name: 'Algolia', role: 'search', packages: ['algoliasearch', '@algolia/'] },
 	{ name: 'Pusher', role: 'other', packages: ['pusher', 'pusher-js'] },
 	{ name: 'Ably', role: 'other', packages: ['ably'] },
 	{ name: 'Liveblocks', role: 'other', packages: ['@liveblocks/'] },
@@ -550,7 +550,7 @@ function dependencyMatches(kind, dep, patterns = []) {
 // A map says where to look and what to extract, never the prices themselves.
 
 const VENDOR_SCHEMA = 1;
-const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'ai', 'other'];
+const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'analytics', 'search', 'ai', 'other'];
 
 /** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
 function upgradeVendorMap(data) {
@@ -1034,7 +1034,8 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	const unmappedInProduct = [...unmapped.values()].filter((u) => !u.evidence.every((e) => isSample(e.file)));
 
 	const byRole = new Map();
-	for (const v of vendors) for (const r of v.roles_used) byRole.set(r, [...(byRole.get(r) ?? []), v.id]);
+	// "other" groups different jobs (SMS, feature flags, a CMS), so two vendors in it are not an Overlap.
+	for (const v of vendors) for (const r of v.roles_used) if (r !== 'other') byRole.set(r, [...(byRole.get(r) ?? []), v.id]);
 	for (const u of unmappedInProduct) if (u.role !== 'other') byRole.set(u.role, [...(byRole.get(u.role) ?? []), u.name]);
 	const overlaps = [...byRole].filter(([, ids]) => ids.length > 1).map(([role, ids]) => ({ role, vendors: ids }));
 

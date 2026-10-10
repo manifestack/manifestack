@@ -165,7 +165,8 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Storage | Cloudinary, UploadThing |
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar |
 | Mobile | RevenueCat, Adapty, Expo EAS |
-| Monitoring | Sentry, PostHog, Datadog |
+| Monitoring | Sentry, Datadog |
+| Analytics | PostHog |
 | AI | OpenAI, Anthropic, Google Gemini |
 
 [Request a map](https://github.com/manifestack/manifestack/issues/new?template=vendor-map.yml).

@@ -5,7 +5,7 @@
 schema: 1
 id: example                     # lowercase a-z, 0-9, hyphens; same as the file name
 name: Example
-roles: [database, auth]         # hosting, database, auth, email, storage, payments, monitoring, ai, other
+roles: [database, auth]         # hosting, database, auth, email, storage, payments, monitoring, analytics, search, ai, other
 detect:
   packages: ["example-sdk", "@example/"]   # exact npm names; a trailing "/" matches the whole scope
   pypi: ["example-sdk"]                     # PyPI names (case-insensitive, - _ . equal); a trailing "*" is a prefix

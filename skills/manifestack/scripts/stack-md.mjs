@@ -485,7 +485,7 @@ function projectMain(argv) {
 // Reads and updates .manifestack/STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
 // Updates touch only the named fields: other lines, unknown keys and user comments stay as they are.
 
-export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'AI', 'Other'];
+export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'Analytics', 'Search', 'AI', 'Other'];
 export const STACK_KEYS = ['plan', 'limit', 'source', 'usage', 'decided', 'revisit_when', 'next', 'env'];
 export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid', 'priority'];
 export const PRIORITIES = ['lowest cost', 'balanced', 'least ops', 'control'];

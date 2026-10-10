@@ -158,15 +158,15 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 
 | Role | Vendors |
 | --- | --- |
-| Hosting | Vercel, Netlify, Cloudflare, Railway, Render, Fly.io, Heroku, DigitalOcean, Vultr |
+| Hosting | Vercel, Netlify, Cloudflare, Railway, Render, Fly.io, Heroku, DigitalOcean, Vultr, Hetzner |
 | Database | Supabase, Neon, Firebase, PlanetScale, MongoDB Atlas, Upstash, Convex, Turso, Prisma Postgres, Pinecone |
 | Auth | Clerk, Auth0, WorkOS |
 | Email | Resend, Postmark, SendGrid, Mailgun |
-| Storage | Cloudinary, UploadThing |
+| Storage | Cloudinary, UploadThing, Mux |
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar |
 | Realtime | Pusher, Ably |
 | Jobs | Inngest, Trigger.dev |
-| Mobile | RevenueCat, Adapty, Expo EAS |
+| Mobile | RevenueCat, Adapty, Expo EAS, OneSignal |
 | Monitoring | Sentry, Datadog |
 | Analytics | PostHog |
 | AI | OpenAI, Anthropic, Google Gemini, OpenRouter |

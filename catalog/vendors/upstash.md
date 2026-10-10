@@ -2,7 +2,7 @@
 schema: 1
 id: upstash
 name: Upstash
-roles: [database]
+roles: [database, jobs]
 detect:
   packages: ["@upstash/", "@vercel/kv"]
   pypi: ["upstash-*", "qstash"]
@@ -10,6 +10,8 @@ detect:
   imports: ["@upstash/", "@vercel/kv"]
   env_prefixes: ["UPSTASH_", "QSTASH_", "KV_REST_API_"]
   config_files: []
+  role_signals:
+    jobs: ["@upstash/qstash", "@upstash/workflow", "from qstash", "import qstash"]
 pages:
   pricing: https://upstash.com/pricing/redis
   vector_pricing: https://upstash.com/pricing/vector
@@ -62,4 +64,5 @@ verified: 2026-10-08
 - Only the Free plan has request-count limits. Pay as you go has none, but the budget, when set, rate-limits the database instead of stopping the bill from growing. Queue libraries and job runners that poll Redis (BullMQ, Sidekiq, Celery) can use up a Free plan's commands with no user traffic.
 - `@vercel/kv` and `KV_REST_API_*` env vars come from Vercel KV, which is now Upstash Redis billed through Vercel Marketplace; usage is in the Upstash console reached from Vercel. Upstash Redis over the Redis protocol (`ioredis`, `redis`, `go-redis`, `redis-py` with a `REDIS_URL`) leaves no Upstash signal; ask where Redis runs.
 - MCP: `redis_database_get_details` is read-only but returns the database password and REST tokens, so do not call it. Do not call `redis_database_run_redis_commands` (reads stored values), `qstash_logs_get`, `qstash_dlq_get`, `workflow_logs_get` (message bodies), `qstash_get_user_token`, or `redis_database_start_free` (creates a database and returns credentials). Without a read-only key, do not use the MCP server.
+- The `jobs` role counts only when the code uses QStash or Workflow; next to Inngest or Trigger.dev that is a candidate Overlap.
 - Upstash Redis next to another key-value store (Cloudflare KV, Vercel Edge Config, a self-hosted Redis) can be an Overlap; ask what each one holds.

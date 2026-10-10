@@ -1,0 +1,15 @@
+{
+  "name": "live-jobs-app",
+  "private": true,
+  "dependencies": {
+    "next": "15.5.0",
+    "pusher": "5.3.4",
+    "pusher-js": "8.6.0",
+    "ably": "2.29.0",
+    "inngest": "4.23.0",
+    "@trigger.dev/sdk": "4.7.3"
+  },
+  "devDependencies": {
+    "trigger.dev": "4.7.3"
+  }
+}

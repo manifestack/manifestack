@@ -71,6 +71,16 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 - Database full-text search (Postgres, the database's own search) first; a search service when relevance, typo tolerance or scale need it.
 - Billed by records and search requests: search-as-you-type sends a request per keystroke. Debounce, and index only the fields that are searched.
 
+### Realtime
+
+- Polling or server-sent events from your own backend first; a realtime service when many clients need live updates or presence.
+- Billed by connections and messages: one publish to a channel with many subscribers counts once per subscriber, and presence adds more. Close connections in hidden tabs.
+
+### Background jobs
+
+- A queue or cron on the platform you already use first; a jobs service when work needs retries, long waits or steps that survive deploys.
+- Billed by runs, steps or compute time: fan-out, frequent schedules and retries of a failing job multiply the bill. Set concurrency and retry limits.
+
 ### AI APIs
 
 - Cost grows with every request and every user: price per token by model, not a flat plan. Estimate tokens per user action before picking a model.

@@ -3,15 +3,11 @@
 // npm prefix entries end with `/` and match every package in that scope or path. `pypi` and `go` follow the rules in
 // manifests.mjs (PyPI names normalized, trailing `*` = prefix; Go module path prefixes).
 export const UNMAPPED_SDKS = [
-	{ name: 'Turso', role: 'database', packages: ['@libsql/', '@tursodatabase/'] },
-	{ name: 'Prisma Postgres', role: 'database', packages: ['@prisma/ppg', '@prisma/extension-accelerate'] },
 	{ name: 'AWS', role: 'other', packages: ['@aws-sdk/', 'aws-sdk', 'aws-cdk-lib'], pypi: ['boto3', 'botocore', 'aws-cdk-lib'], go: ['github.com/aws/aws-sdk-go-v2', 'github.com/aws/aws-sdk-go'] },
 	{ name: 'Google Cloud', role: 'other', packages: ['@google-cloud/'], pypi: ['google-cloud-*'], go: ['cloud.google.com/go'] },
 	{ name: 'Azure', role: 'other', packages: ['@azure/'], pypi: ['azure-*'], go: ['github.com/Azure/azure-sdk-for-go'] },
 	{ name: 'Auth.js', role: 'auth', packages: ['next-auth', '@auth/'] },
 	{ name: 'Better Auth', role: 'auth', packages: ['better-auth'] },
-	{ name: 'OpenRouter', role: 'ai', packages: ['@openrouter/ai-sdk-provider', '@openrouter/sdk'] },
-	{ name: 'Mailgun', role: 'email', packages: ['mailgun.js', 'mailgun-js'] },
 	{ name: 'Loops', role: 'email', packages: ['loops'] },
 	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
@@ -27,7 +23,6 @@ export const UNMAPPED_SDKS = [
 	{ name: 'Cohere', role: 'ai', packages: ['cohere-ai'], pypi: ['cohere', 'langchain-cohere'] },
 	{ name: 'Replicate', role: 'ai', packages: ['replicate'], pypi: ['replicate'], go: ['github.com/replicate/replicate-go'] },
 	{ name: 'Together AI', role: 'ai', packages: ['together-ai'], pypi: ['together'] },
-	{ name: 'Pinecone', role: 'database', packages: ['@pinecone-database/'], pypi: ['pinecone', 'pinecone-client'], go: ['github.com/pinecone-io/go-pinecone'] },
 ];
 
 // Frameworks: inputs for Overbuilt findings, not vendors. Keys are matched like vendor patterns of that ecosystem.

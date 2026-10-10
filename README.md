@@ -159,15 +159,15 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Role | Vendors |
 | --- | --- |
 | Hosting | Vercel, Netlify, Cloudflare, Railway, Render, Fly.io, Heroku, DigitalOcean, Vultr |
-| Database | Supabase, Neon, Firebase, PlanetScale, MongoDB Atlas, Upstash, Convex |
+| Database | Supabase, Neon, Firebase, PlanetScale, MongoDB Atlas, Upstash, Convex, Turso, Prisma Postgres, Pinecone |
 | Auth | Clerk, Auth0, WorkOS |
-| Email | Resend, Postmark, SendGrid |
+| Email | Resend, Postmark, SendGrid, Mailgun |
 | Storage | Cloudinary, UploadThing |
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar |
 | Mobile | RevenueCat, Adapty, Expo EAS |
 | Monitoring | Sentry, Datadog |
 | Analytics | PostHog |
-| AI | OpenAI, Anthropic, Google Gemini |
+| AI | OpenAI, Anthropic, Google Gemini, OpenRouter |
 
 [Request a map](https://github.com/manifestack/manifestack/issues/new?template=vendor-map.yml).
 

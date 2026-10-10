@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
 import { detectVendors, readEnvNames, extractImports, extractPythonModules, extractGoImports, hookStatus, importMatches } from '../packages/core/src/detect.mjs';
@@ -77,13 +77,13 @@ test('extractImports covers import, require and dynamic import', () => {
 
 test('unmapped SDKs are reported and count for overlaps; dot-folders are skipped', (t) => {
 	const dir = tempDir(t);
-	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { 'mailgun.js': '1', inngest: '1', resend: '1' } }));
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { loops: '1', inngest: '1', resend: '1' } }));
 	mkdirSync(join(dir, '.claude/skills/x'), { recursive: true });
 	writeFileSync(join(dir, '.claude/skills/x/a.mjs'), "import x from '@supabase/supabase-js'; supabase.auth.getUser()");
 	const r = detectVendors(dir, { signatures });
 	assert.deepEqual(ids(r), ['resend']);
-	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['Inngest', 'Mailgun']);
-	assert.deepEqual(r.overlaps, [{ role: 'email', vendors: ['resend', 'Mailgun'] }]);
+	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['Inngest', 'Loops']);
+	assert.deepEqual(r.overlaps, [{ role: 'email', vendors: ['resend', 'Loops'] }]);
 });
 
 test('hookStatus: off, on once config and script are both there, plugin for Claude Code', (t) => {
@@ -172,6 +172,39 @@ test('Vultr from govultr (major-version path) and a Managed Database host in Go 
 	const r = detectVendors(dir, { signatures });
 	assert.deepEqual(ids(r), ['vultr']);
 	assert.deepEqual(r.vendors[0].roles_used, ['hosting', 'database']);
+});
+
+test('rag-app: Turso, Pinecone, OpenRouter and Mailgun from npm SDKs and env names', () => {
+	const r = detect('rag-app');
+	assert.deepEqual(ids(r), ['mailgun', 'openrouter', 'pinecone', 'turso']);
+	assert.deepEqual(r.vendors.find((v) => v.id === 'turso').roles_used, ['database'], 'TURSO_ names in the code mark the cloud');
+	assert.deepEqual(r.overlaps, [{ role: 'database', vendors: ['pinecone', 'turso'] }], 'reported; the Pinecone map tells the auditor when it is not one');
+	assert.deepEqual(r.unmapped, []);
+});
+
+test('libSQL as a local file is Turso without the database role; Prisma ORM alone is not Prisma Postgres', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@libsql/client': '0.18', prisma: '7', '@prisma/client': '7', '@prisma/adapter-pg': '7' } }));
+	writeFileSync(join(dir, '.env'), 'PRISMA_DISABLE_TELEMETRY=1\nDATABASE_URL=x\n');
+	writeFileSync(join(dir, 'db.ts'), "import { createClient } from '@libsql/client';\nexport const db = createClient({ url: 'file:local.db' });\n");
+	let r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['turso']);
+	assert.deepEqual(r.vendors[0].roles_used, []);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { prisma: '7', '@prisma/client': '7', '@prisma/adapter-ppg': '7' } }));
+	rmSync(join(dir, 'db.ts'));
+	r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['prisma-postgres']);
+});
+
+test('Python and Go: Pinecone, Mailgun, OpenRouter and Turso SDKs, major-version and vanity paths', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'requirements.txt'), 'pinecone==10.0.0\nmailgun==1.9.1\nopenrouter==1.3.42\nlibsql==0.1.11\n');
+	let r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['mailgun', 'openrouter', 'pinecone', 'turso']);
+	rmSync(join(dir, 'requirements.txt'));
+	writeFileSync(join(dir, 'go.mod'), 'module example.com/x\n\ngo 1.23\n\nrequire (\n\tgithub.com/pinecone-io/go-pinecone/v7 v7.0.0\n\tgithub.com/mailgun/mailgun-go/v5 v5.19.3\n\tgithub.com/OpenRouterTeam/go-sdk v0.9.41\n\tturso.tech/database/tursogo-serverless v0.1.0\n)\n');
+	r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['mailgun', 'openrouter', 'pinecone', 'turso']);
 });
 
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {

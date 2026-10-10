@@ -7,6 +7,7 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 ### Added
 
 - Vendor maps: Vultr (Cloud Compute, Bare Metal, Object Storage, Managed Databases, Serverless Inference), with its read-only MCP server.
+- Vendor maps: Turso, Prisma Postgres, Pinecone, OpenRouter and Mailgun, which were detected before but had no page map. Turso counts as a database only when the code points to Turso Cloud, and the Prisma ORM alone is not Prisma Postgres.
 - Roles `Analytics` and `Search` for STACK.md sections and vendor maps. PostHog is `Analytics`, and counts for `Monitoring` only when the code uses its error tracking.
 
 ### Fixed

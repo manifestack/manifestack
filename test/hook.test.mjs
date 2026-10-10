@@ -60,12 +60,12 @@ test('Write compares with the committed version when there is one', (t) => {
 	git('init', '-q');
 	git('-c', 'user.email=t@example.test', '-c', 'user.name=t', 'add', '.');
 	git('-c', 'user.email=t@example.test', '-c', 'user.name=t', 'commit', '-qm', 'init');
-	writeFileSync(join(dir, 'package.json'), pkg({ '@supabase/supabase-js': '2', 'mailgun.js': '10' }));
+	writeFileSync(join(dir, 'package.json'), pkg({ '@supabase/supabase-js': '2', loops: '6' }));
 	const r = run({ cwd: dir, tool_name: 'Write', tool_input: { file_path: 'package.json', content: '' } });
 	const msg = JSON.parse(r.stdout).hookSpecificOutput.additionalContext;
-	assert.match(msg, /Mailgun \(email\) was added/);
+	assert.match(msg, /Loops \(email\) was added/);
 	assert.ok(!/Supabase/.test(msg), 'Supabase was already committed');
-	assert.match(msg, /no page map for Mailgun/);
+	assert.match(msg, /no page map for Loops/);
 });
 
 function gitRepo(t, files) {

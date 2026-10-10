@@ -16,6 +16,8 @@ Only if the user already connected it. Never ask the user to connect one with wr
 | MongoDB Atlas | local server with `--readOnly` and `--disabledTools create,update,delete,read` | Database and collection sizes and indexes; never `find`, `aggregate` or the remote server |
 | Vultr | read-only by design (hosted `https://mcp.vultr.com/mcp`, OAuth, one organization per sign-in) | Billing, invoices, bandwidth, and instance, database and storage lists; keys and passwords are stripped |
 | Turso | read-only permission for a single group at OAuth consent (`https://mcp.turso.ai/mcp`); the organization option grants full access | Database and branch lists only; no usage tools, never `read_database` or `database_analytics` |
+| Trigger.dev | `--readonly` in the server args (`npx trigger.dev@latest mcp --readonly`) | Projects, runs and deploys lists; never run details, spans or queries (payloads and output); no spend tools |
+| Inngest | read permissions only, one environment, at OAuth consent (`https://api.inngest.com/mcp`) or a read-only API key | Apps, functions and run lists; never run details, traces, insights queries or key tools; no usage tools |
 | Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
 
 Rules:

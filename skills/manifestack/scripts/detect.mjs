@@ -239,11 +239,7 @@ const UNMAPPED_SDKS = [
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
 	{ name: 'Better Stack', role: 'monitoring', packages: ['@logtail/'] },
 	{ name: 'Algolia', role: 'search', packages: ['algoliasearch', '@algolia/'] },
-	{ name: 'Pusher', role: 'other', packages: ['pusher', 'pusher-js'] },
-	{ name: 'Ably', role: 'other', packages: ['ably'] },
-	{ name: 'Liveblocks', role: 'other', packages: ['@liveblocks/'] },
-	{ name: 'Inngest', role: 'other', packages: ['inngest'] },
-	{ name: 'Trigger.dev', role: 'other', packages: ['@trigger.dev/'] },
+	{ name: 'Liveblocks', role: 'realtime', packages: ['@liveblocks/'] },
 	{ name: 'Mistral', role: 'ai', packages: ['@mistralai/mistralai', '@ai-sdk/mistral'], pypi: ['mistralai', 'langchain-mistralai'] },
 	{ name: 'Groq', role: 'ai', packages: ['groq-sdk', '@ai-sdk/groq'], pypi: ['groq', 'langchain-groq'] },
 	{ name: 'Cohere', role: 'ai', packages: ['cohere-ai'], pypi: ['cohere', 'langchain-cohere'] },
@@ -545,7 +541,7 @@ function dependencyMatches(kind, dep, patterns = []) {
 // A map says where to look and what to extract, never the prices themselves.
 
 const VENDOR_SCHEMA = 1;
-const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'analytics', 'search', 'ai', 'other'];
+const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'analytics', 'search', 'realtime', 'jobs', 'ai', 'other'];
 
 /** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
 function upgradeVendorMap(data) {

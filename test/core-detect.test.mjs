@@ -77,12 +77,12 @@ test('extractImports covers import, require and dynamic import', () => {
 
 test('unmapped SDKs are reported and count for overlaps; dot-folders are skipped', (t) => {
 	const dir = tempDir(t);
-	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { loops: '1', inngest: '1', resend: '1' } }));
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { loops: '1', '@liveblocks/client': '1', resend: '1' } }));
 	mkdirSync(join(dir, '.claude/skills/x'), { recursive: true });
 	writeFileSync(join(dir, '.claude/skills/x/a.mjs'), "import x from '@supabase/supabase-js'; supabase.auth.getUser()");
 	const r = detectVendors(dir, { signatures });
 	assert.deepEqual(ids(r), ['resend']);
-	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['Inngest', 'Loops']);
+	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['Liveblocks', 'Loops']);
 	assert.deepEqual(r.overlaps, [{ role: 'email', vendors: ['resend', 'Loops'] }]);
 });
 
@@ -205,6 +205,38 @@ test('Python and Go: Pinecone, Mailgun, OpenRouter and Turso SDKs, major-version
 	writeFileSync(join(dir, 'go.mod'), 'module example.com/x\n\ngo 1.23\n\nrequire (\n\tgithub.com/pinecone-io/go-pinecone/v7 v7.0.0\n\tgithub.com/mailgun/mailgun-go/v5 v5.19.3\n\tgithub.com/OpenRouterTeam/go-sdk v0.9.41\n\tturso.tech/database/tursogo-serverless v0.1.0\n)\n');
 	r = detectVendors(dir, { signatures });
 	assert.deepEqual(ids(r), ['mailgun', 'openrouter', 'pinecone', 'turso']);
+});
+
+test('live-jobs-app: two realtime and two job services overlap; Trigger.dev also from its config file', () => {
+	const r = detect('live-jobs-app');
+	assert.deepEqual(ids(r), ['ably', 'inngest', 'pusher', 'trigger-dev']);
+	assert.ok(r.vendors.find((v) => v.id === 'trigger-dev').evidence.some((e) => e.kind === 'config' && e.match === 'trigger.config.ts'));
+	assert.deepEqual(r.overlaps, [{ role: 'realtime', vendors: ['ably', 'pusher'] }, { role: 'jobs', vendors: ['inngest', 'trigger-dev'] }]);
+});
+
+test('Laravel: the 8-10 .env.example alone is not Pusher; pusher-js for Reverb is Pusher without the realtime role', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, '.env.example'), 'BROADCAST_DRIVER=log\nPUSHER_APP_ID=\nPUSHER_APP_KEY=\nPUSHER_APP_SECRET=\nPUSHER_HOST=\nPUSHER_APP_CLUSTER=mt1\nVITE_PUSHER_APP_KEY="${PUSHER_APP_KEY}"\nMIX_PUSHER_APP_KEY="${PUSHER_APP_KEY}"\n');
+	mkdirSync(join(dir, 'resources/js'), { recursive: true });
+	writeFileSync(join(dir, 'resources/js/bootstrap.js'), "// import Pusher from 'pusher-js';\n// window.Pusher = Pusher;\n");
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ devDependencies: { 'laravel-echo': '2', 'pusher-js': '8' } }));
+	writeFileSync(join(dir, 'resources/js/echo.js'), "import Echo from 'laravel-echo';\nimport Pusher from 'pusher-js';\nwindow.Pusher = Pusher;\nwindow.Echo = new Echo({ broadcaster: 'reverb', key: import.meta.env.VITE_REVERB_APP_KEY });\n");
+	let r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['pusher']);
+	assert.deepEqual(r.vendors[0].roles_used, []);
+	writeFileSync(join(dir, 'resources/js/echo.js'), "import Echo from 'laravel-echo';\nimport Pusher from 'pusher-js';\nwindow.Pusher = Pusher;\nwindow.Echo = new Echo({ broadcaster: 'pusher', key: import.meta.env.VITE_PUSHER_APP_KEY });\n");
+	r = detectVendors(dir, { signatures });
+	assert.deepEqual(r.vendors[0].roles_used, ['realtime']);
+});
+
+test('Upstash counts for jobs only when the code uses QStash or Workflow', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@upstash/redis': '1', '@upstash/qstash': '2' } }));
+	writeFileSync(join(dir, 'a.ts'), "import { Redis } from '@upstash/redis';\nexport const redis = Redis.fromEnv();\n");
+	assert.deepEqual(detectVendors(dir, { signatures }).vendors[0].roles_used, ['database']);
+	writeFileSync(join(dir, 'b.ts'), "import { Client } from '@upstash/qstash';\nexport const q = new Client({ token: process.env.QSTASH_TOKEN! });\n");
+	assert.deepEqual(detectVendors(dir, { signatures }).vendors[0].roles_used, ['database', 'jobs']);
 });
 
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {

@@ -13,7 +13,7 @@ body:
     id: role
     attributes:
       label: Role
-      options: [Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Analytics, Search, AI, Other]
+      options: [Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Analytics, Search, Realtime, Jobs, AI, Other]
     validations:
       required: true
   - type: textarea

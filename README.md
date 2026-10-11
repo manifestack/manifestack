@@ -170,7 +170,8 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Jobs | Inngest, Trigger.dev |
 | Mobile | RevenueCat, Adapty, Expo EAS, OneSignal |
 | Monitoring | Sentry, Datadog |
-| Analytics | PostHog |
+| Analytics | PostHog, Mixpanel, Amplitude, Segment |
+| Flags | LaunchDarkly |
 | AI | OpenAI, Anthropic, Google Gemini, OpenRouter |
 
 [Request a map](https://github.com/manifestack/manifestack/issues/new?template=vendor-map.yml).

@@ -22,7 +22,8 @@ Only if the user already connected it. Never ask the user to connect one with wr
 | Contentful | every tool category set to read-only in the Contentful MCP app for the environment (remote `https://mcp.contentful.com/mcp`); the local server has none | Spaces, environments, locales, content types and usage; never entries, assets, previews or `export_space` |
 | Storyblok | read-only permissions at OAuth consent (`https://mcp.storyblok.com/mcp`) or a read-scoped token | `execute_readonly` for statistics only; never API keys, the space object or collaborators |
 | Strapi | built into the user's Strapi (`mcp.enabled`), Admin token with only upload read permission | Media list tools only; never content tools |
-| Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres, Mux, OneSignal, Sanity | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
+| LaunchDarkly | local `@launchdarkly/mcp-server` with `--scope read` and a Reader-role token | Flag lists, status and code references; never `get-environments` (SDK keys); no usage tools |
+| Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres, Mux, OneSignal, Sanity, Mixpanel, Amplitude | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
 
 Rules:
 

@@ -47,7 +47,7 @@ Short versions. The full rules are in [references/security.md](references/securi
 
 ## 3. Vendor maps
 
-`<skill-dir>/vendors/<id>.md` says, for each known vendor, which pages to open, what to extract from them, which usage questions to ask and where the numbers are in the dashboard. List `<skill-dir>/vendors/` to see which vendors have a map. In `detect.mjs` output, every entry in `vendors` has a map; entries in `unmapped` do not.
+`<skill-dir>/vendors/<id>.md` says, for each known vendor, which pages to open, what to extract from them, which usage questions to ask and where the numbers are in the dashboard. List `<skill-dir>/vendors/` to see which vendors have a map. In `detect.mjs` output, every entry in `vendors` has a map; entries in `unmapped` do not. An entry with `family` is one service of a larger vendor (`aws-s3` of `aws`): also read `vendors/<family>.md` once, for the account-wide billing, limits and regions.
 
 A map never contains prices. Open the pages it lists and read the current numbers.
 

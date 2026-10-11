@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './helpers.mjs';
-import { loadCatalog, parseVendorMap, validateVendorMap, packageClashes } from '../packages/core/src/catalog.mjs';
+import { loadCatalog, parseVendorMap, validateVendorMap, packageClashes, familyErrors, vendorSignatures } from '../packages/core/src/catalog.mjs';
 import { parseYaml, parseFrontmatter } from '../packages/core/src/yaml.mjs';
 
 const VENDORS_DIR = join(ROOT, 'catalog/vendors');
@@ -110,4 +110,17 @@ test('read and common_fixes items must be plain strings', () => {
 	const map = (read) => parseVendorMap(`---\nschema: 1\nid: x\nname: X\nroles: [ai]\ndetect:\n  packages: ["x"]\npages:\n  pricing: https://x.example/pricing\nread:\n${read}\nverified: 2026-10-08\n---\n`);
 	assert.deepEqual(validateVendorMap(map('  - price per token')), []);
 	assert.match(validateVendorMap(map('  - Terms: data use rules')).join(), /read must be a list of plain strings/);
+});
+
+test('families: service signals need a family, the family must have its own map, families do not nest', () => {
+	const map = (extra) => parseVendorMap(`---\nschema: 1\nid: acme-store\nname: Acme Store\nroles: [storage]\n${extra}detect:\n  packages: ["@acme/store"]\n  service_signals: ["acme_store_bucket"]\npages:\n  pricing: https://acme.example/pricing\nread:\n  - storage per GB\nverified: 2026-10-11\n---\n`);
+	assert.ok(validateVendorMap(map('')).some((e) => /service_signals needs a family/.test(e)));
+	assert.deepEqual(validateVendorMap(map('family: acme\n')), []);
+	assert.ok(validateVendorMap(map('family: acme-store\n')).some((e) => /another map/.test(e)));
+	const store = map('family: acme\n');
+	assert.match(familyErrors([store])[0], /family "acme" has no map/);
+	assert.deepEqual(familyErrors([{ id: 'cloud' }, { id: 'acme', family: 'cloud' }, store]), ['acme-store.md: family "acme" belongs to family "cloud"; families do not nest']);
+	assert.deepEqual(familyErrors([{ id: 'acme' }, store]), []);
+	assert.equal(vendorSignatures([store])[0].family, 'acme');
+	assert.equal('family' in vendorSignatures([{ id: 'x', name: 'X', roles: [], detect: {} }])[0], false);
 });

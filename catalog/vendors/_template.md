@@ -5,6 +5,7 @@
 schema: 1
 id: example                     # lowercase a-z, 0-9, hyphens; same as the file name
 name: Example
+# family: example                # optional: this map is one service of a larger vendor (aws-s3 of aws); the skill also reads the family's map
 roles: [database, auth]         # hosting, database, auth, email, storage, payments, monitoring, analytics, search, realtime, jobs, cms, flags, ai, other
 detect:
   packages: ["example-sdk", "@example/"]   # exact npm names; a trailing "/" matches the whole scope
@@ -13,6 +14,7 @@ detect:
   imports: ["@example/", "example-sdk"]    # a package name also matches its subpaths; a trailing "/" or ":" is a prefix
   env_prefixes: ["EXAMPLE_"]               # env var NAME prefixes (values are never read)
   config_files: ["example.config.json"]    # repo-relative paths or file names
+  service_signals: []                      # family members only: strings in code, Terraform or YAML (boto3.client('s3'), aws_s3_bucket) that find this service once its family is found
   role_signals:                            # optional: a role counts only if one of these strings is in the code
     auth: ["example.auth."]
 pages:

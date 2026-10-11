@@ -338,6 +338,54 @@ test('Braintree is found as PayPal from Python and env names; Twilio from its se
 	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
 });
 
+// A made-up vendor family: one SDK for every service (like boto3), plus a service map with its own package.
+const acme = { id: 'acme', name: 'Acme Cloud', roles: ['other'], packages: ['acme-sdk'], pypi: ['acme'], go: [], imports: ['acme-sdk'], env_prefixes: ['ACME_'], config_files: [], service_signals: [], role_signals: {} };
+const acmeStore = { id: 'acme-store', name: 'Acme Store', family: 'acme', roles: ['storage'], packages: ['@acme/store'], pypi: [], go: [], imports: ['@acme/store'], env_prefixes: [], config_files: [], service_signals: ["acme.client('store')", 'acme_store_bucket', 'Acme::Store::Bucket'], role_signals: {} };
+const withAcme = [...signatures, acme, acmeStore];
+
+test('families: a service signal finds the service once its family is found, in code, Terraform or SAM', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'app.py'), "s3 = acme.client('store')\n");
+	assert.deepEqual(ids(detectVendors(dir, { signatures: withAcme })), [], 'a service signal alone finds nothing');
+	writeFileSync(join(dir, 'requirements.txt'), 'acme==2.0\n');
+	let r = detectVendors(dir, { signatures: withAcme });
+	assert.deepEqual(ids(r), ['acme', 'acme-store']);
+	const store = r.vendors.find((v) => v.id === 'acme-store');
+	assert.equal(store.family, 'acme');
+	assert.deepEqual(store.evidence, [{ kind: 'service', file: 'app.py', match: "acme.client('store')" }]);
+	assert.deepEqual(store.roles_used, ['storage']);
+	assert.equal('family' in r.vendors.find((v) => v.id === 'acme'), false);
+
+	rmSync(join(dir, 'app.py'));
+	mkdirSync(join(dir, 'infra'));
+	writeFileSync(join(dir, 'infra/main.tf'), '# resource "acme_store_bucket" "old" {}\nresource "acme_network" "main" {}\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures: withAcme })), ['acme'], 'a commented-out resource is not used');
+	writeFileSync(join(dir, 'infra/main.tf'), 'resource "acme_store_bucket" "files" {}\n');
+	r = detectVendors(dir, { signatures: withAcme });
+	assert.deepEqual(ids(r), ['acme', 'acme-store']);
+	assert.ok(r.infra.some((i) => i.kind === 'terraform'));
+
+	rmSync(join(dir, 'infra/main.tf'));
+	writeFileSync(join(dir, 'template.yaml'), 'Resources:\n  Files:\n    Type: Acme::Store::Bucket\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures: withAcme })), ['acme', 'acme-store']);
+});
+
+test('families: a service found by its own package makes the family present for its siblings', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@acme/store': '1' } }));
+	writeFileSync(join(dir, 'serverless.yml'), 'resources:\n  Resources:\n    Bucket:\n      Type: Acme::Store::Bucket\n');
+	const r = detectVendors(dir, { signatures: withAcme });
+	assert.deepEqual(ids(r), ['acme-store'], 'the family map needs its own evidence to be listed');
+	assert.ok(r.vendors[0].evidence.some((e) => e.kind === 'service' && e.file === 'serverless.yml'));
+});
+
+test('role signals are read from infrastructure-as-code files too', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, '.env'), 'HCLOUD_TOKEN=x\n');
+	writeFileSync(join(dir, 'storage.tf'), 'locals { endpoint = "https://fsn1.your-objectstorage.com" }\n');
+	assert.deepEqual(detectVendors(dir, { signatures }).vendors.find((v) => v.id === 'hetzner').roles_used, ['hosting', 'storage']);
+});
+
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);

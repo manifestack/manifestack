@@ -186,7 +186,7 @@ const isSample = (rel) => SAMPLE_DIR.test(rel);
 const INFRA_FILE = /^(Dockerfile(\..+)?|(docker-)?compose(\.[\w-]+)?\.ya?ml|.+\.tf|Chart\.yaml|(helmfile|skaffold|kustomization)\.ya?ml|Pulumi\.ya?ml|serverless\.ya?ml)$/;
 
 // Evidence kept per vendor, most telling first; every kind found keeps at least one slot.
-const EVIDENCE_ORDER = ['package', 'config', 'import', 'code', 'env'];
+const EVIDENCE_ORDER = ['package', 'config', 'import', 'service', 'code', 'env'];
 
 function pickEvidence(all) {
 	const sorted = [...all].sort((a, b) => EVIDENCE_ORDER.indexOf(a.kind) - EVIDENCE_ORDER.indexOf(b.kind));
@@ -258,6 +258,25 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		scanned++;
 		return text;
 	};
+	// Role signals say how a found vendor is used; service signals say which service of a vendor family is used
+	// (boto3.client('s3'), resource "aws_s3_bucket"). Both are read from source and infrastructure-as-code files.
+	const scanSignals = (src, rel) => {
+		for (const sig of sigs) {
+			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
+				const needle = needles.find((n) => src.includes(n));
+				if (needle) hit(sig, 'code', rel, needle, role);
+			}
+			const service = (sig.service_signals ?? []).find((n) => src.includes(n));
+			if (service) hit(sig, 'service', rel, service);
+		}
+	};
+	// Terraform, serverless.yml, SAM and CloudFormation name services the application code may never import.
+	const scanInfraCode = (full, rel, text) => {
+		try {
+			if (text === undefined && statSync(full).size > MAX_SOURCE_BYTES) return;
+			scanSignals(stripComments(text ?? read(full), { hash: true }), rel);
+		} catch {}
+	};
 
 	// Config files are also checked at their exact path: the walk skips dot-directories such as .do/.
 	for (const sig of sigs) for (const cfg of sig.config_files) if (isFileSync(join(root, cfg))) hit(sig, 'config', cfg, cfg);
@@ -314,11 +333,17 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		if (INFRA_FILE.test(name) && isSample(rel)) continue;
 		if (name === 'Dockerfile' || /^Dockerfile\./.test(name)) infra.push({ kind: 'docker', file: rel });
 		else if (/^(docker-)?compose(\.[\w-]+)?\.ya?ml$/.test(name)) infra.push({ kind: 'docker-compose', file: rel });
-		else if (/\.tf$/.test(name)) infra.push({ kind: 'terraform', file: rel });
+		else if (/\.tf$/.test(name)) {
+			infra.push({ kind: 'terraform', file: rel });
+			scanInfraCode(full, rel);
+		}
 		else if (name === 'Chart.yaml') infra.push({ kind: 'helm', file: rel });
 		else if (/^(helmfile|skaffold|kustomization)\.ya?ml$/.test(name)) infra.push({ kind: 'kubernetes', file: rel });
 		else if (/^Pulumi\.ya?ml$/.test(name)) infra.push({ kind: 'pulumi', file: rel });
-		else if (/^serverless\.ya?ml$/.test(name)) infra.push({ kind: 'serverless-framework', file: rel });
+		else if (/^serverless\.ya?ml$/.test(name)) {
+			infra.push({ kind: 'serverless-framework', file: rel });
+			scanInfraCode(full, rel);
+		}
 		else if (/\.ya?ml$/.test(name) || SOURCE_EXT.test(name)) deferred.push({ full, rel, name });
 	}
 
@@ -329,7 +354,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		}
 		if (/\.ya?ml$/.test(name)) {
 			try {
-				if (!isSample(rel) && statSync(full).size < 256 * 1024 && isKubernetesManifest(read(full))) infra.push({ kind: 'kubernetes', file: rel });
+				if (statSync(full).size >= 256 * 1024) continue;
+				const text = read(full);
+				if (!isSample(rel) && isKubernetesManifest(text)) infra.push({ kind: 'kubernetes', file: rel });
+				scanInfraCode(full, rel, text);
 			} catch {}
 			continue;
 		}
@@ -346,18 +374,19 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		if (native) for (const v of matchDependencies(native[1], sigs, native[0]).vendors) for (const p of v.packages) hit(sigs.find((x) => x.id === v.id), 'import', rel, p);
 		// As for dependencies, a map that names the package beats one that only claims its scope (@vercel/kv is Upstash).
 		const owners = new Map(specs.map(([, pkg]) => [pkg, sigs.filter((sig) => sig.imports.some((p) => !/[/:]$/.test(p) && (pkg === p || pkg.startsWith(p + '/')))).map((sig) => sig.id)]));
-		for (const sig of sigs) {
-			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports) && (!owners.get(pkg).length || owners.get(pkg).includes(sig.id))) hit(sig, 'import', rel, spec);
-			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
-				const needle = needles.find((n) => src.includes(n));
-				if (needle) hit(sig, 'code', rel, needle, role);
-			}
-		}
+		for (const sig of sigs) for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports) && (!owners.get(pkg).length || owners.get(pkg).includes(sig.id))) hit(sig, 'import', rel, spec);
+		scanSignals(src, rel);
 	}
+
+	// A vendor is found by a package, import, config file or env name. A service signal also counts once its family is
+	// found, by the family's own map or another of its services: boto3 plus boto3.client('s3') is S3.
+	const direct = (evidence) => [...evidence.values()].some((e) => e.kind !== 'code' && e.kind !== 'service');
+	const families = new Set();
+	for (const { sig, evidence } of found.values()) if (direct(evidence)) families.add(sig.family ?? sig.id);
 
 	const all = [...found.values()]
 		// A role signal (".storage.from(") only says how a vendor found otherwise is used; on its own it is too generic.
-		.filter(({ evidence }) => [...evidence.values()].some((e) => e.kind !== 'code'))
+		.filter(({ sig, evidence }) => direct(evidence) || (sig.family && families.has(sig.family) && [...evidence.values()].some((e) => e.kind === 'service')))
 		.map(({ sig, evidence, roleHits }) => {
 			// Roles with signals count only when a signal matched; other roles count once the vendor is present.
 			const signalled = Object.keys(sig.role_signals ?? {});
@@ -365,7 +394,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			// Product code needs its own non-code evidence; a vendor that is a dependency only in fixtures is a sample.
 			const product = [...evidence.values()].filter((e) => !isSample(e.file));
 			const sample = !product.some((e) => e.kind !== 'code');
-			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence: pickEvidence(sample ? evidence.values() : product), sample };
+			return { id: sig.id, name: sig.name, ...(sig.family ? { family: sig.family } : {}), roles: sig.roles, roles_used, evidence: pickEvidence(sample ? evidence.values() : product), sample };
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));
 	const vendors = all.filter((v) => !v.sample).map(({ sample, ...v }) => v);

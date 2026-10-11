@@ -37,6 +37,7 @@ export function parseVendorMap(text, file = '<vendor map>') {
 			imports: detect.imports ?? [],
 			env_prefixes: detect.env_prefixes ?? [],
 			config_files: detect.config_files ?? [],
+			service_signals: detect.service_signals ?? [],
 			role_signals: detect.role_signals ?? {},
 		},
 		pages: data.pages ?? {},
@@ -47,7 +48,7 @@ export function parseVendorMap(text, file = '<vendor map>') {
 	};
 }
 
-const DETECT_LISTS = ['packages', 'pypi', 'go', 'imports', 'env_prefixes', 'config_files'];
+const DETECT_LISTS = ['packages', 'pypi', 'go', 'imports', 'env_prefixes', 'config_files', 'service_signals'];
 const isStringList = (x) => Array.isArray(x) && x.every((s) => typeof s === 'string' && s.trim() !== '');
 
 export function validateVendorMap(v) {
@@ -60,6 +61,10 @@ export function validateVendorMap(v) {
 	// Detection calls .some() on these and an empty pattern matches everything, so the shape is checked here.
 	for (const field of DETECT_LISTS) if (!isStringList(d[field])) errors.push(`detect.${field} must be a list of non-empty strings`);
 	if (!DETECT_LISTS.some((field) => Array.isArray(d[field]) && d[field].length)) errors.push('detect needs at least one signature');
+	// A service of a larger vendor (aws-s3 of aws): its service signals count only when the family is found.
+	if (v.family !== undefined && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(v.family))) errors.push('family must be the id of another map');
+	if (v.family === v.id) errors.push('family must be another map, not this one');
+	if ((d.service_signals ?? []).length && !v.family) errors.push('detect.service_signals needs a family');
 	const signals = d.role_signals ?? {};
 	if (typeof signals !== 'object' || Array.isArray(signals)) errors.push('detect.role_signals must map roles to lists');
 	else {
@@ -93,7 +98,22 @@ export function loadCatalog(dir) {
 	}
 	const clash = packageClashes(vendors)[0];
 	if (clash) throw new Error(clash);
+	const family = familyErrors(vendors)[0];
+	if (family) throw new Error(family);
 	return vendors;
+}
+
+/** Each family must be a map of its own, and a family map cannot belong to another family. */
+export function familyErrors(vendors) {
+	const byId = new Map(vendors.map((v) => [v.id, v]));
+	const errors = [];
+	for (const v of vendors) {
+		if (!v.family) continue;
+		const parent = byId.get(v.family);
+		if (!parent) errors.push(`${v.id}.md: family "${v.family}" has no map`);
+		else if (parent.family) errors.push(`${v.id}.md: family "${v.family}" belongs to family "${parent.family}"; families do not nest`);
+	}
+	return errors;
 }
 
 /** Package patterns that two maps both claim: the dependency would be reported as two vendors. */
@@ -115,5 +135,5 @@ export function packageClashes(vendors) {
 
 /** The part of a map that detection needs; embedded into the hook so it runs without the catalog. */
 export function vendorSignatures(vendors) {
-	return vendors.map((v) => ({ id: v.id, name: v.name, roles: v.roles, ...v.detect }));
+	return vendors.map((v) => ({ id: v.id, name: v.name, roles: v.roles, ...(v.family ? { family: v.family } : {}), ...v.detect }));
 }

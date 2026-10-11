@@ -291,14 +291,17 @@ const MANIFESTS = { npm: ['package.json', 'deno.json', 'deno.jsonc'], pypi: ['py
 /**
  * Dependencies the project already had before the command: from the committed manifests in the nearest
  * folder that has one. The working copy is no help, because npm, uv or go get have already written to it.
+ * Null when git cannot tell (missing, slow): an upgrade would look like a new vendor. Git calls of one run share `deadline`.
  */
-function committedDependencies(kind, cwd, gitTimeout) {
+function committedDependencies(kind, cwd, deadline) {
 	for (let dir = cwd; ; dir = dirname(dir)) {
 		const files = MANIFESTS[kind].map((name) => join(dir, name)).filter((f) => existsSync(f));
 		if (files.length) {
 			const deps = [];
 			for (const file of files) {
-				const text = committedContent(file, gitTimeout);
+				const left = deadline - Date.now();
+				const text = left > 0 ? committedContent(file, left) : null;
+				if (text === null) return null;
 				if (text) deps.push(...manifestDependencies(manifestKind(file), text, file));
 			}
 			return deps;
@@ -310,10 +313,13 @@ function committedDependencies(kind, cwd, gitTimeout) {
 /** Vendors and unmapped SDKs that package-manager commands add, each once; upgrades of packages already there are not news. */
 function commandAdditions(event, signatures, gitTimeout) {
 	const found = { vendors: [], unmapped: [] };
+	const deadline = Date.now() + gitTimeout;
 	for (const { kind, names } of event.installs) {
 		let m = matchDependencies(names, signatures, kind);
 		if (!m.vendors.length && !m.unmapped.length) continue;
-		const before = matchDependencies(committedDependencies(kind, event.cwd, gitTimeout), signatures, kind);
+		const committed = committedDependencies(kind, event.cwd, deadline);
+		if (committed === null) continue;
+		const before = matchDependencies(committed, signatures, kind);
 		m = { vendors: m.vendors.filter((v) => !before.vendors.some((b) => b.id === v.id)), unmapped: m.unmapped.filter((u) => !before.unmapped.some((b) => b.name === u.name)) };
 		found.vendors.push(...m.vendors.filter((v) => !found.vendors.some((f) => f.id === v.id)));
 		found.unmapped.push(...m.unmapped.filter((u) => !found.unmapped.some((f) => f.name === u.name)));
@@ -332,7 +338,7 @@ function findStackMd(dir) {
 	}
 }
 
-const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const norm = (s) => String(s).normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // "Stripe Billing", "stripe.com" and "Stripe (Billing)" in STACK.md all name Stripe: a prefix either way is
 // enough, from 3 characters so that short names do not match by accident.
@@ -388,8 +394,25 @@ export function newVendorMessage(event, { signatures, gitTimeout = 2000 }) {
 		for (const s of parseStackMd(readFileSync(stackFile, 'utf8')).sections) if (s.vendor) listed.push(norm(s.vendor));
 	}
 	const known = (...names) => names.some((n) => listed.some((l) => sameVendor(l, norm(n ?? ''))));
+	// A service of a cloud is known only by its own name: "## Hosting: AWS" does not cover a new DynamoDB table, while
+	// "## Database: DynamoDB" or "Amazon DynamoDB" does (the id without the family prefix, then the name).
+	const familyOf = new Map((signatures ?? []).map((s) => [s.id, s.family]));
+	// Names a service goes by: its id without the family prefix, the id, and each product of a combined name
+	// ("Amazon SQS, SNS, EventBridge and Step Functions"). A slice that is another vendor's id (azure-openai → openai)
+	// says nothing. A cloud's own name ("AWS", "Amazon", "Google Cloud") never covers a service.
+	const plain = new Set((signatures ?? []).filter((s) => !s.family).flatMap((s) => [norm(s.id), norm(s.name)]));
+	const brands = new Set(['aws', 'amazon', 'amazonwebservices', 'google', 'googlecloud', 'gcp', 'azure', 'microsoft', 'microsoftazure', ...plain]);
+	const serviceNames = (v, family) => {
+		const slice = v.id.startsWith(family + '-') ? norm(v.id.slice(family.length + 1)) : '';
+		return [slice && !plain.has(slice) ? slice : '', norm(v.id), ...v.name.split(/,\s*|\s+and\s+|\s+on\s+/).map(norm)].filter(Boolean);
+	};
+	const knownService = (v, family) => {
+		const names = serviceNames(v, family);
+		return listed.some((l) => names.some((n) => l === n || (Math.min(l.length, n.length) >= 3 && (l.startsWith(n) || (!brands.has(l) && n.startsWith(l))))));
+	};
+	const isKnown = (v) => (familyOf.get(v.id) ? knownService(v, familyOf.get(v.id)) : known(v.id, v.name));
 	let added = [
-		...found.vendors.filter((v) => !known(v.id, v.name)).map((v) => ({ key: v.id, label: `${v.name} (${v.roles.join(', ')})`, mapped: true })),
+		...found.vendors.filter((v) => !isKnown(v)).map((v) => ({ key: v.id, label: `${v.name} (${v.roles.join(', ')})`, mapped: true })),
 		...found.unmapped.filter((u) => !known(u.name)).map((u) => ({ key: `sdk:${u.name}`, label: `${u.name} (${u.role})`, mapped: false })),
 	];
 	if (!added.length) return null;
@@ -403,7 +426,7 @@ export function newVendorMessage(event, { signatures, gitTimeout = 2000 }) {
 	// message says what to check even if the manifestack-guard skill is never loaded.
 	let msg = `Manifestack: ${names} was added ${where}. Before you finish, tell the user in two or three lines`;
 	if (stackFile) {
-		msg += ` how it fits STACK.md (${toPosix(relative(dir, stackFile))}): the "requires" line (data region, certifications), the "avoid" line (vendors or tech the team rules out), the budget, any section with the same role, and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
+		msg += ` how it fits STACK.md (${toPosix(relative(dir, stackFile))}): the "requires" line (data region, certifications), the "avoid" line (vendors or tech the team rules out), the budget, any section with the same role (not "Other", not two services of one cloud), and any "decided" line it touches. Use the manifestack-guard skill if it is available. Do not edit STACK.md without the user's yes.`;
 	} else {
 		msg += ` which plan limits to check for it (send caps, billed users, storage, rate limits), and suggest running /manifestack to record the stack in ${STACK_FILE}.`;
 	}

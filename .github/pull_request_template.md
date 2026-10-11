@@ -5,4 +5,4 @@
 - [ ] `node tools/sync.mjs` run, generated files committed
 - [ ] `npm test` passes
 - [ ] CHANGELOG.md updated under `[Unreleased]` (if users notice the change)
-- [ ] Vendor maps: no prices or quotas, every page opened, `verified` is today
+- [ ] Vendor maps: no prices or quotas, every page opened, `verified` is today, listed in the README table and `references/mcp.md`

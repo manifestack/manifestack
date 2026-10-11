@@ -10,7 +10,7 @@ detect:
   pypi: ["boto3", "botocore", "aiobotocore", "aws-cdk-lib", "aws-cdk*", "awscli", "pulumi-aws"]
   go: ["github.com/aws/aws-sdk-go-v2", "github.com/aws/aws-sdk-go", "github.com/aws/aws-cdk-go/awscdk", "github.com/pulumi/pulumi-aws/sdk"]
   env_prefixes: ["AWS_PROFILE", "AWS_DEFAULT_REGION", "AWS_ACCOUNT_ID", "AWS_ROLE_ARN", "CDK_DEFAULT_"]
-  service_signals: ['provider "aws"', "hashicorp/aws", "AWSTemplateFormatVersion", "AWS::Serverless-2016-10-31", "sst.aws."]
+  service_signals: ['provider "aws"', "AnthropicBedrock", "hashicorp/aws", "AWSTemplateFormatVersion", "AWS::Serverless-2016-10-31", "sst.aws."]
   config_files: ["cdk.json", "samconfig.toml", "samconfig.yaml", "samconfig.yml", "buildspec.yml", "appspec.yml", "Dockerrun.aws.json"]
 pages:
   pricing: https://aws.amazon.com/pricing/
@@ -35,7 +35,7 @@ pages:
   gdpr: https://aws.amazon.com/compliance/gdpr-center/
 read:
   - pay-as-you-go per service and Region; the service maps say how each service bills
-  - "account plan: Free plan (credits only, a reduced service list, ends at the earlier of its time limit or credit exhaustion, then the account is suspended and erased after a grace period unless upgraded) versus Paid plan; sign-up credit and activity credits, their expiry, and the Always Free and short-term trial offers"
+  - "account plan: Free plan (credits only, a reduced service list, ends at the earlier of its time limit or credit exhaustion, then the account is closed and erased after a 90-day window to upgrade) versus Paid plan; sign-up credit and activity credits, their expiry, and the Always Free and short-term trial offers"
   - "sign-up type: the new experience (projects, a fixed home Region by contact country, spend limits, reduced service list) versus advanced sign-up or activated advanced features (all Regions, Budgets, no spend limit)"
   - "spend limit on a Paid-plan project: minimum, notification thresholds, optional early controls (stop new launches, pause idle, pause top cost drivers) and that the project is paused at the limit; otherwise nothing caps spend"
   - Budgets alert on actual or forecast cost and are not a cap; budget actions can apply an IAM policy or SCP or stop chosen EC2 and RDS instances; free action-enabled budgets and report charges; data refreshes several times a day
@@ -67,10 +67,10 @@ usage_questions:
     where: Console Home → Cost and usage widget; Billing and Cost Management → Credits and Free Tier; Support Center → Support plans
 mcp:
   official: true
-  readonly_flag: "always read-only for the listed tools: uvx awslabs.billing-cost-management-mcp-server@latest has no create, delete or purchase tools; run it with a billing read-only IAM role; each Cost Explorer API call is billed"
+  readonly_flag: "always read-only for the listed tools: uvx awslabs.billing-cost-management-mcp-server@latest the listed tools only read (storage-lens, not listed, creates Athena resources); run it with a billing read-only IAM role; each Cost Explorer API call is billed"
   allowed_tools: [cost-explorer, cost-comparison, budgets, cost-anomaly, free-tier-usage, credits, cost-optimization, compute-optimizer]
 common_fixes:
-  - create a cost budget with forecast alerts and an anomaly monitor, or a spend limit on a new-experience project (only the limit stops resources)
+  - create a cost budget with forecast alerts and an anomaly monitor, or a spend limit on a new-experience project (only the spend limit or a budget action stops resources)
   - delete idle NAT Gateways, use one per VPC for dev, and add gateway VPC endpoints for S3 and DynamoDB traffic
   - release unused Elastic IPs and drop public IPv4 addresses that are not needed (IPv6, a load balancer, or private subnets)
   - delete unattached EBS volumes, old snapshots and AMIs, checking every Region used
@@ -84,7 +84,7 @@ verified: 2026-10-11
 - Found from the SDKs, CDK, SAM, CodeBuild, CodeDeploy and Beanstalk files, a Terraform `aws` provider or a CloudFormation template. Each service the project uses has its own map (`aws-s3`, `aws-lambda` and so on) with how that service bills; read this map once for the account.
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` and `AWS_ENDPOINT_URL*` also serve S3-compatible storage (R2, Spaces, Tigris) and show up in Vercel Functions, so they are not signals.
 - `aws-sdk` (JS v2) reached end of support on 2025-09-08 and `github.com/aws/aws-sdk-go` (Go v1) on 2025-07-31: a Fit note to migrate. AWS CLI v1 is in maintenance mode.
-- Accounts created since 2025-07-15 choose a Free or Paid plan; a Free-plan account is suspended when its time or credits run out, so a launch on it is a Bill finding with a date. Older accounts keep the 12-month Free Tier.
+- Accounts created since 2025-07-15 choose a Free or Paid plan; a Free-plan account is closed when its time or credits run out, so a launch on it is a Bill finding with a date. Older accounts keep the 12-month Free Tier.
 - The Cost summary excludes credits; a bill covered by credits hides real usage that will be charged once they expire.
 - docs.aws.amazon.com pages have a `.md` twin. aws.amazon.com pricing pages fill prices in with JavaScript; the Price List API serves them as JSON at `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<ServiceCode>/current/<region>/index.json` (AmazonS3, AmazonRDS, AmazonDynamoDB, AWSLambda and so on).
 - AWS MCP Server (remote, Agent Toolkit for AWS) and `awslabs.aws-api-mcp-server` run any API or Python script; read-only depends on IAM (`READ_OPERATIONS_ONLY` only filters write calls) and reads still return secrets such as Lambda environment variables. Do not use them.

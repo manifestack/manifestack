@@ -27,11 +27,11 @@ pages:
 read:
   - Consumption - vCPU-seconds and GiB-seconds per running replica at the active rate, a lower idle rate for replicas kept by min replicas above zero while idle (thresholds on the billing page), and HTTP requests from outside the environment; monthly free grants of each per subscription; nothing while scaled to zero
   - jobs bill at the active rate from start to completion, with no request charge
-  - Dedicated workload profiles bill per profile instance, plus a Dedicated plan management fee once any Dedicated profile exists (private endpoints and planned maintenance also bring it); the Flexible profile (preview) bills like Consumption plus that fee and cannot scale to zero
+  - Dedicated workload profiles bill per profile instance, plus a Dedicated plan management fee once any Dedicated profile exists (private endpoints and planned maintenance each add the same hourly fee); the Flexible profile (preview) bills like Consumption plus that fee and cannot scale to zero
   - serverless GPU per second on top of vCPU and memory; dynamic sessions (code interpreter per allocated session, custom containers on Dedicated instances)
   - environment logs go to a Log Analytics workspace by default, and `az containerapp env create` without one creates it; ingestion bills under Azure Monitor
   - quota names - Managed Environment Count per region; Consumption, General Purpose and Memory Optimized cores per environment; scaling stops at the limit
-  - savings plan for compute on Consumption meters
+  - savings plan for compute on Consumption and Dedicated meters
   - Container Instances - per second per container group from start to stop, vCPU request rounded up to a whole vCPU and memory to a tenth of a GB; Windows software duration extra; Spot and confidential rates; no scale to zero
   - Container Registry - daily rate per registry by tier (Basic, Standard, Premium) with included storage, extra storage per GB per day, geo-replication per region and Tasks build time
 usage_questions:
@@ -73,4 +73,4 @@ verified: 2026-10-11
 - Function apps hosted on Container Apps bill as Container Apps.
 - Container Apps beside another host is an Overlap when the same traffic runs on both; an API here with the frontend elsewhere is a split. With App Service or Functions it is one family; ask why both.
 - The default Log Analytics workspace can cost more than small apps; check ingestion.
-- MCP: `containerapps_list` returns names, environment and state; `acr_registry_list` returns registries with SKU. Never call log query tools.
+- MCP: `containerapps_list` returns name, location, resource group, environment and provisioning state (not replicas or scale); `acr_registry_list` returns registries with SKU. Never call log query tools.

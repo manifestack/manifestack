@@ -9,7 +9,7 @@ detect:
   pypi: ["google-cloud-*", "pulumi-gcp"]
   go: ["cloud.google.com/go", "github.com/pulumi/pulumi-gcp/sdk"]
   env_prefixes: ["GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "GOOGLE_CLOUD_REGION", "GCLOUD_PROJECT", "GCP_PROJECT", "GCP_REGION", "CLOUDSDK_"]
-  service_signals: ['provider "google"', 'provider "google-beta"', 'hashicorp/google"', 'hashicorp/google-beta"', 'resource "google_', 'data "google_', "cnrm.cloud.google.com", "gcp-types/", "gcp:project:", "gcloud run deploy", "gcloud functions deploy", "gcloud app deploy"]
+  service_signals: ['provider "google"', "AnthropicVertex", 'provider "google-beta"', 'hashicorp/google"', 'hashicorp/google-beta"', 'resource "google_', 'data "google_', "cnrm.cloud.google.com", "gcp-types/", "gcp:project:", "gcloud run deploy", "gcloud functions deploy", "gcloud app deploy"]
   config_files: ["cloudbuild.yaml", "cloudbuild.yml", "cloudbuild.json", ".gcloudignore"]
 pages:
   pricing: https://cloud.google.com/pricing
@@ -83,7 +83,7 @@ verified: 2026-10-11
 ---
 
 - Found from `@google-cloud/*` SDKs, Pulumi, Terraform `google` resources, Config Connector or Cloud Build files. Each service has its own map (`gcp-cloud-run` and so on); read this one once for the account.
-- `googleapis`, `google-api-python-client`, `google.golang.org/api`, `google-auth-library`, `google-auth`, `@google-cloud/local-auth` and `GOOGLE_APPLICATION_CREDENTIALS` also serve Gmail, Drive, Sheets and Maps, so they are not signals; `@google-cloud/local-auth` alone is a Workspace OAuth helper, not Google Cloud.
+- `googleapis`, `google-api-python-client`, `google.golang.org/api`, `google-auth-library`, `google-auth`, `@google-cloud/local-auth` and `GOOGLE_APPLICATION_CREDENTIALS` also serve Gmail, Drive, Sheets and Maps, so they are not signals. `@google-cloud/local-auth` is a Workspace OAuth helper, but the `@google-cloud/` scope still finds Google Cloud from it: with no other Google Cloud evidence, ask whether the project uses Google Cloud or only Workspace APIs.
 - Firebase and AI Studio create Google Cloud projects with no billing account. Once one is linked (Blaze, Gemini paid tier), they bill on that account: the budgets, spend caps and reports here cover them.
 - On a Free Trial account, reports with credits show near zero: real usage is charged after the upgrade. A production app on a Free Trial is a Bill finding with its end date.
 - Deployment Manager (`gcp-types/` in YAML) lost support on 2026-03-31 and is turned down on 2027-06-30: a Fit note to move to Infrastructure Manager or Terraform.

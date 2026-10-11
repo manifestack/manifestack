@@ -64,7 +64,7 @@ common_fixes:
 verified: 2026-10-11
 ---
 
-- `pusher-js` and `PUSHER_*` names do not prove the hosted service. Laravel 11+ installs `pusher-js` with `laravel-echo` for its own Reverb server, and Soketi and laravel-websockets speak the same protocol. The `realtime` role counts only when the code shows Pusher's hosts or `broadcaster: 'pusher'`; `REVERB_*` names, `config/reverb.php`, `@soketi/soketi` or `config/websockets.php` mean a self-hosted server, and `pusher-js` pointed at `main.pusher.ably.net` is Ably's Pusher adapter. Ask when unsure.
+- `pusher-js` and `PUSHER_*` names do not prove the hosted service. Laravel 11+ installs `pusher-js` with `laravel-echo` for its own Reverb server, and Soketi and laravel-websockets speak the same protocol. The `realtime` role counts when the code shows Pusher's hosts or a Pusher client (`broadcaster: 'pusher'`, `new Pusher(`), which self-hosted Pusher-protocol servers also use: a `wsHost` option, `REVERB_*` names, `config/reverb.php`, `@soketi/soketi` or `config/websockets.php` mean a self-hosted server, and `pusher-js` pointed at `main.pusher.ably.net` is Ably's Pusher adapter. Ask when unsure.
 - Laravel 8–10 projects ship `PUSHER_APP_*`, `VITE_PUSHER_*` and `MIX_PUSHER_*` in `.env.example` with broadcasting off, so those names are not used for detection.
 - The support knowledge base moved to `messagebird.gitbook.io/pusher` (append `.md` to an article for markdown); legal pages are on bird.com. Two articles disagree on the warning threshold; cite the quotas page.
 - There is no official MCP server, and the Channels API has no usage endpoint: ask the user for numbers.

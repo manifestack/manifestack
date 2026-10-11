@@ -8,7 +8,7 @@ detect:
   packages: ["@aws-sdk/client-cloudfront", "@aws-sdk/cloudfront-signer", "@aws-sdk/client-cloudfront-keyvaluestore"]
   go: ["github.com/aws/aws-sdk-go-v2/service/cloudfront", "github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign", "github.com/aws/aws-sdk-go-v2/service/cloudfrontkeyvaluestore"]
   imports: ["@aws-sdk/client-cloudfront", "@aws-sdk/cloudfront-signer", "@aws-sdk/client-cloudfront-keyvaluestore"]
-  service_signals: ["aws_cloudfront_distribution", "AWS::CloudFront::Distribution", "aws-cdk-lib/aws-cloudfront", "aws_cdk.aws_cloudfront", "client('cloudfront'", "client(\"cloudfront\"", "new AWS.CloudFront(", "aws-sdk-go/service/cloudfront", "aws:cloudfront:Distribution", "sst.aws.Router(", "sst.aws.StaticSite(", "sst.aws.Nextjs("]
+  service_signals: ["aws_cloudfront_distribution", "AWS::CloudFront::Distribution", "aws-cdk-lib/aws-cloudfront", "aws_cdk.aws_cloudfront", "client('cloudfront'", "client(\"cloudfront\"", "new AWS.CloudFront(", "aws-sdk-go/service/cloudfront", "aws:cloudfront:Distribution", "sst.aws.Router(", "sst.aws.StaticSite(", "sst.aws.Nextjs(", "aws_cloudfront as", "aws.cloudfront."]
 pages:
   pricing: https://aws.amazon.com/cloudfront/pricing/
   pay_as_you_go: https://aws.amazon.com/cloudfront/pricing/pay-as-you-go/

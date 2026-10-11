@@ -11,7 +11,7 @@ detect:
   imports: ["@azure/search-documents"]
   env_prefixes: ["AZURE_SEARCH_", "AZURE_AI_SEARCH_"]
   config_files: []
-  service_signals: ["azure.search.documents", ".search.windows.net", "\"azurerm_search_", "Microsoft.Search/searchServices", "azure-native.search", "azure_native.search", "vectorstores.azuresearch", "vectorstores/azure_aisearch", "AzureAISearch", "AzureCognitiveSearch"]
+  service_signals: ["azure.search.documents", ".search.windows.net", "\"azurerm_search_", "Microsoft.Search/searchServices", "azure-native:search:", "azure_native.search", "vectorstores.azuresearch", "vectorstores/azure_aisearch", "AzureAISearch", "AzureCognitiveSearch"]
 pages:
   pricing: https://azure.microsoft.com/en-us/pricing/details/search/
   tiers: https://learn.microsoft.com/en-us/azure/search/search-sku-tier
@@ -65,4 +65,4 @@ verified: 2026-10-11
 - A Dedicated service bills every hour from creation, even with no queries; a forgotten S1 or higher is a Bill finding. Serverless avoids idle compute but is in preview.
 - LangChain (`AzureSearch`, `AzureAISearchVectorStore`), LlamaIndex and Semantic Kernel use it as a vector store; the signals count once the Azure family is found.
 - Pinecone has the database role in this catalog, so Pinecone plus AI Search is not reported as Overlap; flag it when both hold the same embeddings. Algolia, Elastic Cloud or OpenSearch next to AI Search is Overlap unless split on purpose.
-- MCP: `search_index_query` and `search_knowledge_base_retrieve` return documents and can bill semantic ranker or agentic retrieval; index, knowledge base and knowledge source definitions can hold connection details. Call only `search_service_list` (name, location, SKU, endpoint).
+- MCP: `search_index_query` and `search_knowledge_base_retrieve` return documents and can bill semantic ranker or agentic retrieval. Call only `search_service_list`, which returns service names only: get the tier from IaC or ask.

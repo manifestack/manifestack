@@ -11,7 +11,7 @@ detect:
   imports: ["@google-cloud/cloud-sql-connector", "@google-cloud/sql", "@googleapis/sqladmin", "@google-cloud/alloydb", "@googleapis/alloydb"]
   env_prefixes: ["INSTANCE_CONNECTION_NAME", "CLOUD_SQL_"]
   config_files: []
-  service_signals: ['"google_sql_', '"google_alloydb_', "gcp.sql.", "gcp:sql:", "gcp.alloydb.", "gcp:alloydb:", "sql.cnrm.cloud.google.com", "alloydb.cnrm.cloud.google.com", "gcloud sql ", "gcloud alloydb ", "/cloudsql/", "cloudsql-instances", "cloud-sql-proxy", "cloud_sql_proxy", "cloudsql-docker", "alloydb-auth-proxy", "google.cloud.sql.connector", "google.cloud.alloydb", "sqladmin.googleapis.com"]
+  service_signals: ['"google_sql_', '"google_alloydb_', "gcp.sql.", "gcp:sql:", "gcp.alloydb.", "gcp:alloydb:", "sql.cnrm.cloud.google.com", "alloydb.cnrm.cloud.google.com", "gcloud sql ", "gcloud alloydb ", "/cloudsql/", "cloudsql-instances", "cloud-sql-proxy", "cloud_sql_proxy", "cloudsql-docker", "alloydb-auth-proxy", "google.cloud.sql.connector", "google.cloud.alloydb", "sqladmin.googleapis.com/"]
 pages:
   pricing: https://cloud.google.com/sql/pricing
   alloydb_pricing: https://cloud.google.com/alloydb/pricing
@@ -61,4 +61,4 @@ verified: 2026-10-11
 - Cloud SQL or AlloyDB next to Supabase, Neon, PlanetScale or another managed database is Overlap unless split on purpose. Next to Firestore it is usually a split by data type.
 - Extended support starts automatically after a version's end of life, billed per vCPU on top of the instance. A stopped instance pays storage and IP addresses. Storage that grew automatically stays until shrunk, with downtime.
 - PostgreSQL 16+ and MySQL 8.4+ default to Enterprise Plus, which has no shared-core machines: a small app created with defaults pays far more than on a shared-core Enterprise instance.
-- MCP: in the read-only toolset, `execute_sql_readonly` returns table data and the user tools list database users; leave them out. The AlloyDB server has write tools and no read-only endpoint: do not use it.
+- MCP: in the read-only toolset, `execute_sql_readonly` returns table data, the user tools list database users and `postgres_upgrade_precheck` is not marked read-only; leave them out. The AlloyDB server has write tools and no read-only endpoint: do not use it.

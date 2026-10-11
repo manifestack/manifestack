@@ -72,4 +72,4 @@ verified: 2026-10-11
 - `@azure/data-tables` and `azure-data-tables` serve Azure Table Storage and the Cosmos DB Table API alike, so they belong to storage; a `*.table.cosmos.azure.com` host means Cosmos DB.
 - Next to MongoDB Atlas, Firestore, DynamoDB or a SQL database it is Overlap unless split on purpose.
 - Provisioned RU/s bill every hour whether used or not, in every region. Autoscale never goes below a tenth of its max. Azure Synapse Link is closed to new projects.
-- MCP: `--read-only` still exposes item query, get, recent, text and vector search and schema infer, which return or sample documents. Never call them; `cosmos_list` returns account, database and container names only, no RU/s or storage.
+- MCP: `--read-only` still exposes item query, get, recent, text and vector search and schema infer, which return or sample documents. Never call them; `cosmos_list` returns account, database and container names only, no RU/s or storage; call it without `--auth-method key`, and expect database and container names to need a Cosmos DB data-plane read role.

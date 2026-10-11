@@ -11,7 +11,7 @@ detect:
   imports: ["@aws-sdk/client-rds", "@aws-sdk/client-rds-data", "@aws-sdk/rds-signer", "aws-advanced-nodejs-wrapper"]
   env_prefixes: []
   config_files: []
-  service_signals: ["client('rds'", "client(\"rds\"", "client('rds-data'", "client(\"rds-data\"", "new AWS.RDS(", "new AWS.RDSDataService(", "aws-sdk/clients/rds", "aws-sdk-go/service/rds", '"aws_db_', '"aws_rds_', "AWS::RDS::", "aws-cdk-lib/aws-rds", "aws_cdk.aws_rds", "aws.rds.", "sst.aws.Postgres(", "sst.aws.Aurora(", "sst.aws.Mysql(", "arn:aws:rds:", "rds-db:connect", "rds.amazonaws.com"]
+  service_signals: ["client('rds'", "client(\"rds\"", "client('rds-data'", "client(\"rds-data\"", "new AWS.RDS(", "new AWS.RDSDataService(", "aws-sdk/clients/rds", "aws-sdk-go/service/rds", '"aws_db_', '"aws_rds_', "AWS::RDS::", "aws-cdk-lib/aws-rds", "aws_cdk.aws_rds", "aws.rds.", "sst.aws.Postgres(", "sst.aws.Aurora(", "sst.aws.Mysql(", "arn:aws:rds:", "rds-db:connect", "rds.amazonaws.com", "aws_rds as"]
 pages:
   pricing: https://aws.amazon.com/rds/pricing/
   postgres_pricing: https://aws.amazon.com/rds/postgresql/pricing/
@@ -48,7 +48,7 @@ mcp:
   readonly_flag: null
   allowed_tools: []
 common_fixes:
-  - upgrade major versions before end of standard support, or set Extended Support off when creating a database
+  - upgrade major versions before end of standard support; Extended Support enrollment can be turned off on an existing database, but past the end date that triggers an automatic major upgrade
   - use Single-AZ for dev and staging
   - right-size the class; gp3 unless IOPS need io2
   - for idle or spiky Aurora use Serverless v2 with a zero minimum

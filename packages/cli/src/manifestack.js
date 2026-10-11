@@ -89,7 +89,7 @@ function readJsonConfig(file) {
 	const text = readFileSync(file, 'utf8');
 	if (!text.trim()) return {};
 	try {
-		const data = JSON.parse(text);
+		const data = JSON.parse(text.replace(/^\uFEFF/, ''));
 		if (data === null || typeof data !== 'object' || Array.isArray(data)) throw new Error('not an object');
 		return data;
 	} catch {

@@ -20,7 +20,7 @@ pages:
   scale: https://learn.microsoft.com/en-us/azure/redis/how-to-scale
   persistence: https://learn.microsoft.com/en-us/azure/redis/how-to-persistence
   geo_replication: https://learn.microsoft.com/en-us/azure/redis/how-to-active-geo-replication
-  migrate: https://learn.microsoft.com/en-us/azure/redis/migrate/migrate-overview
+  migrate: https://learn.microsoft.com/en-us/azure/redis/migrate/migrate-basic-standard-premium-overview
   retirement_faq: https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/retirement-faq
   whats_new: https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/cache-whats-new
   cache_overview: https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/cache-overview
@@ -31,7 +31,7 @@ read:
   - Managed Redis persistence disk included in the price; active geo-replication billed per linked instance, and whether inter-region transfer is charged yet
   - Azure Cache for Redis per hour by tier and size (Basic single node with no SLA, Standard with a replica, Premium with shards, extra replicas and zones), Enterprise and Enterprise Flash
   - Premium persistence writes to the user's own storage account (billed as Azure Storage); Premium geo-replication pays inter-region transfer
-  - "retirement: Enterprise tiers end on 31 March 2027, Basic, Standard and Premium on 30 September 2028; creation is blocked for new customers; the migration tooling and the Managed Redis size that matches each cache"
+  - "retirement: Enterprise tiers end on 31 March 2027, Basic, Standard and Premium on 30 September 2028; Enterprise creation is blocked for everyone, Basic, Standard and Premium for tenants with no cache before April 2026; the migration tooling and the Managed Redis size that matches each cache"
   - reservations for one or three years and how they carry over after migration
 usage_questions:
   - metric: instances

@@ -11,7 +11,7 @@ detect:
   imports: ["@aws-sdk/client-cognito-identity-provider", "@aws-sdk/client-cognito-identity", "amazon-cognito-identity-js", "aws-jwt-verify", "@aws-amplify/auth", "aws-amplify/auth"]
   env_prefixes: ["COGNITO_", "AUTH_COGNITO_"]
   config_files: []
-  service_signals: ["client('cognito-idp'", "client(\"cognito-idp\"", "client('cognito-identity'", "client(\"cognito-identity\"", "aws_cognito", "AWS::Cognito::", "aws-cdk-lib/aws-cognito", "CognitoIdentityServiceProvider", "cognito-idp:", "cognito-idp.", "amazoncognito.com", "providers/cognito"]
+  service_signals: ["client('cognito-idp'", "client(\"cognito-idp\"", "client('cognito-identity'", "client(\"cognito-identity\"", "aws_cognito", "AWS::Cognito::", "aws-cdk-lib/aws-cognito", "CognitoIdentityServiceProvider", "cognito-idp:", "cognito-idp.", "amazoncognito.com", "providers/cognito", "aws_cognito as", "aws.cognito."]
 pages:
   pricing: https://aws.amazon.com/cognito/pricing/
   feature_plans: https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-sign-in-feature-plans.html
@@ -24,7 +24,7 @@ read:
   - feature plans (Lite, Essentials, Plus), which is the default for new user pools, and what each adds (passkeys and passwordless, managed login, threat protection)
   - price per MAU for each plan, which plans have a free MAU allowance (Plus has none), and the separate price and smaller free allowance for SAML or OIDC federated MAUs
   - what counts a user as active in a month (sign-in, token refresh, admin reads such as AdminGetUser) and that a user is billed at the highest plan active that month
-  - legacy terms for pools from before the plan change (larger Lite free tier, advanced security features add-on)
+  - legacy terms for pools from before the plan change (advanced security features add-on)
   - M2M token requests (client credentials), billed per request with no free tier
   - add-ons for multi-Region replication and purchased API request-rate capacity
   - request-rate quotas per category (UserAuthentication, UserCreation and others) per Region, and what happens at the limit (throttling)

@@ -7,7 +7,7 @@ Examples: `/manifestack compare neon supabase`, "Resend or Postmark at 200k emai
 ## Step 1. Set the sides
 
 1. Name the vendors and the job they are compared for (hosting, database, auth, email, storage, payments, monitoring, analytics, search, realtime, background jobs, CMS, feature flags, AI). Two vendors that do different jobs (Stripe and Supabase) are not a comparison: say so and offer `audit`. More than three: ask which three matter. Only one named: ask what to compare it with; if the scan shows another vendor doing that job, offer it. Do not pick the other side yourself.
-2. Open `vendors/<id>.md` for each. Without a map, find the official pricing page on the vendor's own domain and note `no page map`.
+2. Open `vendors/<id>.md` for each. Without a map, find the official pricing page on the vendor's own domain and note `no page map`. A map with `family` is one service of a cloud: also read `vendors/<family>.md` once. If the user names a cloud (AWS, Google Cloud, Azure), compare the service the code already uses for that job; if none, ask which one, listing the family's maps for that role.
 3. If the repository has code, run `node <skill-dir>/scripts/detect.mjs .`, `node <skill-dir>/scripts/stack-md.mjs parse .manifestack/STACK.md` and `… check .manifestack/STACK.md`:
    - a vendor already in use makes this "stay or switch": that side is the current one, and the switch has a cost (Step 5);
    - `decided` on that section says the team chose it on purpose: say what changed since, and the section's status from `check` (`triggered`, `ok`, or the ETA);

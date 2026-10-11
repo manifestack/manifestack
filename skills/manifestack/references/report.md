@@ -23,6 +23,8 @@
 - **Overlap**: two services do the same job (two auth providers, two email senders). Both must really be used in the code.
 - **Overbuilt**: infrastructure or framework far larger than the load (Kubernetes for 40 users, SSR where static pages work). `cost` is the monthly money or upkeep time saved.
 
+Retirements and deprecations, which vendor maps call Fit notes: a service, plan or runtime with a retirement date is a `Risk` with that date in `when`; a deprecated SDK or tool with no date that stops anything goes under "Also noticed".
+
 ## Severity
 
 One level per finding, from what happens and how soon. Count days from today.

@@ -34,8 +34,12 @@ export function normalizeSpecifier(spec) {
 /** Package name of a specifier without its subpath ("@a/b/c" -> "@a/b"). */
 const packageName = (spec) => /^(?:@[^/]+\/)?[^/]+/.exec(spec)?.[0] ?? spec;
 
-/** Source text with comments blanked out. Strings are kept, so a "//" or "#" inside one stays. */
-export function stripComments(src, { hash = false } = {}) {
+/**
+ * Source text with comments blanked out. Strings are kept, so a "//" or "#" inside one stays. `hash`: # comments
+ * (Python, YAML); `slash`: line and block comments of C-style languages, on by default without `hash` (JS, Go,
+ * Bicep); both for Terraform.
+ */
+export function stripComments(src, { hash = false, slash = !hash } = {}) {
 	let out = '';
 	let k = 0;
 	while (k < src.length) {
@@ -56,12 +60,18 @@ export function stripComments(src, { hash = false } = {}) {
 		} else if (c === '\\') {
 			out += src.slice(k, k + 2);
 			k += 2;
-		} else if (hash ? c === '#' : src.startsWith('//', k)) {
+		} else if ((hash && c === '#') || (slash && src.startsWith('//', k))) {
 			while (k < src.length && src[k] !== '\n') k++;
-		} else if (!hash && src.startsWith('/*', k)) {
+		} else if (slash && src.startsWith('/*', k)) {
 			const end = src.indexOf('*/', k + 2);
+			// An unclosed /* is text (a glob in a heredoc, a regex such as /[/*]$/), not a comment to the end of the file.
+			if (end === -1) {
+				out += c;
+				k++;
+				continue;
+			}
 			out += ' ';
-			k = end === -1 ? src.length : end + 2;
+			k = end + 2;
 		} else {
 			out += c;
 			k++;

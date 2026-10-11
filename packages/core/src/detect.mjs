@@ -98,8 +98,21 @@ const exactPattern = (p) => !/[/*]$/.test(p);
  */
 export function matchDependencies(deps, signatures, kind = 'npm') {
 	const field = ECOSYSTEM_FIELDS[kind];
+	// Go modules match their subpaths, so the longest exact pattern wins: cloud.google.com/go/storage is Cloud
+	// Storage's, not the cloud.google.com/go of the family map.
 	const exactOwner = new Map();
-	for (const d of deps) for (const sig of signatures) if ((sig[field] ?? []).some((p) => exactPattern(p) && dependencyMatches(kind, d, [p]) && (kind !== 'npm' || d === p))) exactOwner.set(d, [...(exactOwner.get(d) ?? []), sig.id]);
+	for (const d of deps) {
+		let best = 0;
+		let owners = [];
+		for (const sig of signatures) {
+			for (const p of sig[field] ?? []) {
+				if (!exactPattern(p) || !dependencyMatches(kind, d, [p]) || (kind === 'npm' && d !== p) || p.length < best) continue;
+				if (p.length > best) [best, owners] = [p.length, []];
+				if (!owners.includes(sig.id)) owners.push(sig.id);
+			}
+		}
+		if (owners.length) exactOwner.set(d, owners);
+	}
 	const vendors = [];
 	for (const sig of signatures) {
 		const hits = deps.filter((d) => dependencyMatches(kind, d, sig[field]) && (!exactOwner.has(d) || exactOwner.get(d).includes(sig.id)));
@@ -142,6 +155,8 @@ function listFiles(root, limits, classify) {
 		}
 		// A virtualenv under any name (python -m venv env, .venv, py312): installed packages, not the product.
 		if (q > 0 && entries.some((e) => e.name === 'pyvenv.cfg')) continue;
+		// Sorted, so a scan cut at the file limit finds the same vendors on every file system.
+		entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 		for (const e of entries) {
 			const full = join(queue[q], e.name);
 			if (e.isDirectory()) {
@@ -263,13 +278,16 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	const classify = (rel, name) => {
 		if (ENV_FILE.test(name) || manifestKind(rel) || INFRA_FILE.test(name)) return 'essential';
 		if (configNames.some((cfg) => rel === cfg || rel.endsWith('/' + cfg))) return 'essential';
+		// pnpm-lock.yaml lists every transitive package (firebase pulls in @firebase/storage): not the project's own code.
+		if (name === 'pnpm-lock.yaml') return null;
 		return /\.ya?ml$/.test(name) || SOURCE_EXT.test(name) ? 'candidate' : null;
 	};
 
 	const hit = (sig, kind, file, match, role) => {
 		if (!found.has(sig.id)) found.set(sig.id, { sig, evidence: new Map(), roleHits: new Set() });
 		const f = found.get(sig.id);
-		if (role) f.roleHits.add(role);
+		// A role seen only in tests, fixtures or examples says nothing about how the product uses the vendor.
+		if (role && !isSample(file)) f.roleHits.add(role);
 		const key = `${kind}\0${file}\0${match}`;
 		if (!f.evidence.has(key)) f.evidence.set(key, { kind, file, match });
 	};
@@ -294,10 +312,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		}
 	};
 	// Terraform, Bicep, serverless.yml, SAM and CloudFormation name services the application code may never import.
-	const scanInfraCode = (full, rel, text, hash = true) => {
+	const scanInfraCode = (full, rel, text, comments = { hash: true }) => {
 		try {
 			if (text === undefined && statSync(full).size > MAX_SOURCE_BYTES) return;
-			scanSignals(stripComments(text ?? read(full), { hash }), rel);
+			scanSignals(stripComments(text ?? read(full), comments), rel);
 		} catch {}
 	};
 
@@ -317,10 +335,16 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			} catch {}
 			for (const n of names) {
 				if (!isSample(rel)) envNames.add(n);
+				// The longest prefix wins, as an exact package beats a scope: ANTHROPIC_FOUNDRY_ is Azure's, not Anthropic's.
+				let best = 0;
+				let owners = [];
 				for (const sig of sigs) {
-					const prefix = sig.env_prefixes.find((p) => n.startsWith(p));
-					if (prefix) hit(sig, 'env', rel, n);
+					const len = Math.max(0, ...sig.env_prefixes.filter((p) => n.startsWith(p)).map((p) => p.length));
+					if (!len || len < best) continue;
+					if (len > best) [best, owners] = [len, []];
+					owners.push(sig);
 				}
+				for (const sig of owners) hit(sig, 'env', rel, n);
 			}
 			continue;
 		}
@@ -358,11 +382,12 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		else if (/^(docker-)?compose(\.[\w-]+)?\.ya?ml$/.test(name)) infra.push({ kind: 'docker-compose', file: rel });
 		else if (/\.tf$/.test(name)) {
 			infra.push({ kind: 'terraform', file: rel });
-			scanInfraCode(full, rel);
+			// Terraform comments start with #, // or /*.
+			scanInfraCode(full, rel, undefined, { hash: true, slash: true });
 		}
 		else if (/\.bicep$/.test(name)) {
 			infra.push({ kind: 'bicep', file: rel });
-			scanInfraCode(full, rel, undefined, false);
+			scanInfraCode(full, rel, undefined, { hash: false });
 		}
 		else if (name === 'Chart.yaml') infra.push({ kind: 'helm', file: rel });
 		else if (/^(helmfile|skaffold|kustomization)\.ya?ml$/.test(name)) infra.push({ kind: 'kubernetes', file: rel });
@@ -374,8 +399,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		else if (/\.ya?ml$/.test(name) || SOURCE_EXT.test(name)) deferred.push({ full, rel, name });
 	}
 
+	// The limit counts source and YAML reads only: manifests, env and Terraform files are always read.
+	let deferredRead = 0;
 	for (const { full, rel, name } of deferred) {
-		if (scanned >= maxFiles) {
+		if (deferredRead++ >= maxFiles) {
 			limits.truncated = true;
 			break;
 		}
@@ -411,8 +438,12 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	const familyIds = new Set(sigs.map((s) => s.family).filter(Boolean));
 	const hasService = (evidence) => [...evidence.values()].some((e) => e.kind === 'service');
 	const direct = (sig, evidence) => [...evidence.values()].some((e) => e.kind !== 'code' && e.kind !== 'service') || (familyIds.has(sig.id) && hasService(evidence));
+	// Families count from the product only: an AWS fixture does not make an S3 hostname in the app an S3 service.
 	const families = new Set();
-	for (const { sig, evidence } of found.values()) if (direct(sig, evidence)) families.add(sig.family ?? sig.id);
+	for (const { sig, evidence } of found.values()) {
+		const product = new Map([...evidence].filter(([, e]) => !isSample(e.file)));
+		if (direct(sig, product)) families.add(sig.family ?? sig.id);
+	}
 
 	const all = [...found.values()]
 		// A role signal (".storage.from(") only says how a vendor found otherwise is used; on its own it is too generic.
@@ -423,7 +454,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			const roles_used = sig.roles.filter((r) => !signalled.includes(r) || roleHits.has(r));
 			// Product code needs its own non-code evidence; a vendor that is a dependency only in fixtures is a sample.
 			const product = [...evidence.values()].filter((e) => !isSample(e.file));
-			const sample = !product.some((e) => e.kind !== 'code');
+			const sample = !product.some((e) => e.kind !== 'code' && (e.kind !== 'service' || families.has(sig.family ?? sig.id)));
 			return { id: sig.id, name: sig.name, ...(sig.family ? { family: sig.family } : {}), roles: sig.roles, roles_used, evidence: pickEvidence(sample ? evidence.values() : product), sample };
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));

@@ -8,7 +8,9 @@ detect:
   packages: ["@aws-sdk/client-ec2", "@aws-sdk/client-lightsail"]
   go: ["github.com/aws/aws-sdk-go-v2/service/ec2", "github.com/aws/aws-sdk-go-v2/service/lightsail"]
   imports: ["@aws-sdk/client-ec2", "@aws-sdk/client-lightsail"]
-  service_signals: ["\"aws_instance\"", "aws_launch_template", "aws_autoscaling_group", "aws_spot_instance_request", "aws_lightsail_instance", "AWS::EC2::Instance", "AWS::EC2::LaunchTemplate", "AWS::AutoScaling::AutoScalingGroup", "AWS::Lightsail::Instance", "ec2.Instance(", "client('ec2'", "client(\"ec2\"", "resource('ec2'", "client('lightsail'", "client(\"lightsail\"", "new AWS.EC2(", "new AWS.Lightsail(", "aws-sdk-go/service/ec2", "aws:ec2:Instance"]
+  service_signals: ["\"aws_instance\"", "aws_launch_template", "aws_autoscaling_group", "aws_spot_instance_request", "aws_lightsail_instance", "AWS::EC2::Instance", "AWS::EC2::LaunchTemplate", "AWS::AutoScaling::AutoScalingGroup", "AWS::Lightsail::Instance", "ec2.Instance(", "client('ec2'", "client(\"ec2\"", "resource('ec2'", "client('lightsail'", "client(\"lightsail\"", "new AWS.EC2(", "new AWS.Lightsail(", "aws-sdk-go/service/ec2", "aws:ec2:Instance", "aws.ec2.Instance(", "aws.lightsail.Instance("]
+  role_signals:
+    hosting: ["\"aws_instance\"", "aws_launch_template", "aws_autoscaling_group", "aws_spot_instance_request", "aws_lightsail_instance", "AWS::EC2::Instance", "AWS::EC2::LaunchTemplate", "AWS::AutoScaling::AutoScalingGroup", "AWS::Lightsail::Instance", "ec2.Instance(", "RunInstances", "run_instances(", "aws:ec2:Instance", "aws.ec2.Instance(", "aws.lightsail.Instance(", "@aws-sdk/client-lightsail", "service/lightsail", "client('lightsail'", "client(\"lightsail\"", "new AWS.Lightsail("]
 pages:
   pricing: https://aws.amazon.com/ec2/pricing/on-demand/
   savings_plans: https://aws.amazon.com/savingsplans/compute-pricing/
@@ -62,3 +64,4 @@ verified: 2026-10-11
 - ECS on EC2 and EKS node groups bill here as EC2.
 - `@aws-sdk/client-lightsail` also manages Lightsail buckets, databases and container services; ask which are used.
 - EC2 or Lightsail beside another host for the same app is an Overlap unless split on purpose.
+- The `hosting` role needs instances (IaC, `RunInstances`, Lightsail); EC2 API calls for security groups or AMIs list the map without it.

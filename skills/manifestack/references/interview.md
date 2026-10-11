@@ -5,7 +5,7 @@ The code shows what is installed, not how it runs or what the team needs: the pl
 ## How to ask
 
 - **Read before you ask.** Take what the code, the scan and `.manifestack/STACK.md` already show, and turn it into a question to confirm: "The code sets `iad1` (Washington). Is that where production runs?" is faster to answer and harder to get wrong than "Which region?".
-- **Batches the tool can take.** If your agent has a multiple-choice question tool, use it; it usually takes up to four questions at a time, each with two to four options. Send a round as one or two batches, the questions that change the answer most first (budget, users, requirements, priority). Without such a tool, send a numbered list with lettered options.
+- **Batches the tool can take.** If your agent has a multiple-choice question tool, use it; it usually takes up to four questions at a time, each with two to four options. Send a round as one or two batches, the questions that change the answer most first (budget, users, requirements, priority). Without such a tool, send a numbered list with lettered options. Usage numbers go in one numbered list after the choice batches.
 - **Options, not essays.** Up to three typical answers or ranges, plus "Not sure"; the user can always type an exact number instead. Every question says in a few words what it decides ("decides the email plan").
 - **Not sure means the default below, said out loud.** For costs and limits the default sits at the high end: underestimating a limit hurts more than overestimating it.
 - **A quick way out.** Offer once: "or skip the questions and I'll use the defaults". If the user takes it, the answer says that every number is an assumption.

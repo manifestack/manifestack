@@ -9,7 +9,7 @@ detect:
   go: ["github.com/grafana/grafana-com-public-clients/go/gcom", "github.com/grafana/agento11y/go"]
   imports: ["@grafana/faro-web-sdk", "@grafana/faro-web-tracing", "@grafana/faro-react", "@grafana/faro-core", "@grafana/faro-transport-otlp-http", "@grafana/faro-instrumentation-replay", "@grafana/faro-react-native", "@grafana/faro-react-native-tracing", "@grafana/agento11y", "grafana-openai-monitoring"]
   env_prefixes: ["GRAFANA_CLOUD_", "GCLOUD_HOSTED_", "GCLOUD_RW_API_KEY", "GCLOUD_FM_", "K6_CLOUD_", "GRAFANA_K6_", "GRAFANA_SM_", "GRAFANA_FRONTEND_O11Y_", "GRAFANA_STACK_ID", "NEXT_PUBLIC_FARO_", "VITE_FARO_", "PUBLIC_FARO_", "REACT_APP_FARO_"]
-  config_files: ["config.alloy"]
+  config_files: []
 pages:
   pricing: https://grafana.com/pricing/
   pricing_usage: https://grafana.com/docs/grafana-cloud/platform/pricing-and-usage/

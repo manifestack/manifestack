@@ -4,7 +4,7 @@ Every price, limit, region and certification in an answer comes from the vendor'
 
 ## Before the questions: check that pages load
 
-Open one pricing page you will need (from `vendors/<id>.md` → `pages.pricing`) before asking the user anything. If it does not load (no web tool in this agent, network off, the page is blocked or rendered only by JavaScript), say so now, not after the interview, and offer:
+Open one pricing page you will need (from `vendors/<id>.md` → `pages.pricing`; in `init`, the map of the host you expect to propose; for a big cloud, the price source its family map names) before asking the user anything. If it does not load (no web tool in this agent, network off, the page is blocked or rendered only by JavaScript), say so now, not after the interview, and offer:
 
 - paste the pricing table or attach a screenshot of the page: label it `user-pasted <url>, <date>` and use it like a page you read;
 - or continue with those vendors marked `unverified`.
@@ -32,4 +32,6 @@ Without a map, find the pricing page on the vendor's own domain and note `no pag
 
 ## Big clouds
 
-AWS, Google Cloud and Azure price per service and per region, through calculators. Do not price them from pages: ask for the billing export (AWS Cost Explorer CSV, Google Cloud billing export, Azure cost analysis) or the last invoice's line items, and work from those. Without one, name the services found and say their cost needs the bill.
+AWS, Google Cloud and Azure have a family map (`aws`, `gcp`, `azure`) for the account and one map per service: read the family map once, then each service map found. Prices depend on region, usage type and commitment: read the service's pricing page for the region in use (the family map names a JSON price source where the page fills prices in by script). For what the project actually pays, ask for the billing export (AWS Cost Explorer, Google Cloud billing export, Azure cost analysis) or the last invoice's line items. When the bill and a page disagree, the bill wins.
+
+The JSON price files are large (one Region of AWS Lambda is about 0.7 MB, RDS about 27 MB, EC2 about 480 MB). Never load one whole into the conversation: take only the rows of the usage types you need, quoted word for word. For EC2 and RDS use the pricing page or the bill's line items; if neither works, the price is `unverified`.

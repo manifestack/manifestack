@@ -73,4 +73,4 @@ verified: 2026-10-11
 - A VM shut down from inside the OS shows Stopped and still bills compute. Only Stopped (deallocated) ends compute charges.
 - Packer templates, cloud-init files and ARM JSON are not scanned; ask. `azurerm_virtual_machine` is the older Terraform resource, replaced by the Linux and Windows ones.
 - VMs beside another host for the same app are an Overlap unless split on purpose.
-- MCP: `--read-only` hides the create, update, delete and power-state tools; the tools above return configuration, power state and disk sizes, no cost.
+- MCP: `--read-only` hides the create, update, delete and power-state tools; the tools above return configuration and disk sizes, no cost. Power state needs `--instance-view`, which also returns VM agent and extension status messages (Custom Script output can appear there): read only the power state.

@@ -12,7 +12,7 @@ detect:
   imports: ["@aws-sdk/client-dynamodb", "@aws-sdk/lib-dynamodb", "@aws-sdk/util-dynamodb", "@aws-sdk/client-dynamodb-streams", "dynamoose", "electrodb", "dynamodb-toolbox", "dynamodb-onetable"]
   env_prefixes: []
   config_files: []
-  service_signals: ["client('dynamodb'", "client(\"dynamodb\"", "resource('dynamodb'", "resource(\"dynamodb\"", "new AWS.DynamoDB", "aws-sdk/clients/dynamodb", "aws-sdk-go/service/dynamodb", '"aws_dynamodb_', "AWS::DynamoDB::", "AWS::Serverless::SimpleTable", "aws-cdk-lib/aws-dynamodb", "aws_cdk.aws_dynamodb", "aws.dynamodb.Table", "sst.aws.Dynamo(", "arn:aws:dynamodb:"]
+  service_signals: ["client('dynamodb'", "client(\"dynamodb\"", "resource('dynamodb'", "resource(\"dynamodb\"", "new AWS.DynamoDB", "aws-sdk/clients/dynamodb", "aws-sdk-go/service/dynamodb", '"aws_dynamodb_', "AWS::DynamoDB::", "AWS::Serverless::SimpleTable", "aws-cdk-lib/aws-dynamodb", "aws_cdk.aws_dynamodb", "aws.dynamodb.Table", "sst.aws.Dynamo(", "arn:aws:dynamodb:", "aws_dynamodb as", "aws.dynamodb."]
 pages:
   pricing: https://aws.amazon.com/dynamodb/pricing/
   capacity_modes: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/capacity-mode.html
@@ -21,7 +21,7 @@ pages:
   quotas: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html
   cost_optimization: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-cost-optimization.html
 read:
-  - on-demand price per read and write request unit; provisioned per RCU and WCU hour; reserved capacity
+  - on-demand price per read and write request unit; provisioned per RCU and WCU hour; reserved capacity and Database Savings Plans
   - units per read (eventual, strong, transactional) and per write by item size
   - storage per GB-month by table class (Standard, Standard-IA) and when Standard-IA pays off
   - global secondary indexes billed for their own writes and storage; global tables billed for replicated writes in every Region

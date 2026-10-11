@@ -32,7 +32,7 @@ read:
   - the node resource group (MC_<group>_<cluster>_<region> by default) holds node VMs, disks, load balancers and public IPs; each LoadBalancer Service and persistent volume adds billed resources there; it is deleted with the cluster
   - Spot node pools - variable price, no SLA, eviction policy Delete (default) or Deallocate; deallocated nodes count against quota; a Spot pool can never be the system pool
   - a stopped cluster stops its control plane and nodes to save compute, keeps state up to 12 months, and may not restart in a capacity-constrained region
-  - version support - N-2 minor versions, then platform support with a 60-day grace period before AKS upgrades the cluster itself; LTS needs the Premium tier
+  - version support - N-2 minor versions, then platform support with a 60-day grace period before AKS upgrades the cluster itself (platform-initiated upgrades start on 2027-06-01); LTS needs the Premium tier
   - Container insights and Managed Prometheus bill in Azure Monitor by data ingested and retained; ContainerLogV2 can use the cheaper Basic logs plan
   - quota names - Total Regional vCPUs and the per-family vCPU quotas of the node VM sizes, a separate Spot vCPU quota, clusters per subscription, nodes per cluster and per node pool
 usage_questions:

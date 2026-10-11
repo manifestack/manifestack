@@ -1,6 +1,6 @@
 // Reads and updates .manifestack/STACK.md, evaluates `revisit_when` and keeps secrets out of the file.
 // Updates touch only the named fields: other lines, unknown keys and user comments stay as they are.
-import { readFileSync, writeFileSync, existsSync, renameSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, rmSync, openSync, closeSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { isMain, parseArgs, printJson, fail, todayIso, isIsoDate, dateArg } from './cli-util.mjs';
 import { parseQuantity, eta, approxMonth, monthlyGrowth, METRIC_UNIT_MB } from './project.mjs';
@@ -310,7 +310,8 @@ function usageQuantity(text) {
 		const slash = t.lastIndexOf('/');
 		const per = slash !== -1 && /^\/ ?[A-Za-z]+$/.test(t.slice(slash)) ? t.slice(slash) : '';
 		const words = (per ? t.slice(0, slash) : t).split(/\s+/).filter(Boolean);
-		while (words.length > 1 && /^[A-Za-z]+$/.test(words.at(-1)) && !/^[KMGT]?B$/i.test(words.at(-1))) words.pop();
+		// A unit or currency word it cannot read ("megabytes", "EUR") makes the reading unreadable, so lint says so.
+		while (words.length > 1 && /^[A-Za-z]+$/.test(words.at(-1)) && !/^(?:[KMGTPE]i?)?B$|bytes?$|^(?:EUR|GBP|JPY|INR|CAD|AUD|CHF|CNY|BRL)$/i.test(words.at(-1))) words.pop();
 		return parseQuantity(words.join(' ') + per);
 	}
 }
@@ -597,7 +598,10 @@ export function lintStackMd(text) {
 			try {
 				// A metric outside the list is fine when this section's usage names it; otherwise it may be a typo.
 				const named = Object.keys(parseUsage(s.values.usage));
-				for (const m of revisitMetrics(parseRevisit(s.values.revisit_when))) if (!REVISIT_METRICS.includes(m) && !named.includes(m)) warnings.push({ line: s.line, message: `revisit_when metric "${m}" is not a standard metric and usage does not name it` });
+				const metrics = [...revisitMetrics(parseRevisit(s.values.revisit_when))];
+				// One unnamed reading binds to the only metric (the vendor map's own name, such as monthly_search_requests).
+				const bound = metrics.length === 1 && named.includes('_');
+				for (const m of metrics) if (!bound && !REVISIT_METRICS.includes(m) && !named.includes(m)) warnings.push({ line: s.line, message: `revisit_when metric "${m}" is not a standard metric and usage does not name it` });
 			} catch (e) {
 				errors.push({ line: s.line, message: e.message });
 			}
@@ -707,32 +711,64 @@ export function stackMdMain(argv) {
 				mergeOnce(comments, j.comments, 'a comment');
 			}
 			if (!Object.keys(updates).length && !Object.keys(comments).length) throw new Error('nothing to set: pass --json, --set or --comment');
-			const out = setFields(text, args.section, updates, comments);
-			// Lines this write adds must be clean; a line already in the file is lint's to report, so one old
-			// false alarm does not block every later update.
-			const before = new Set(text.split(/\r?\n/));
-			const outLines = out.split(/\r?\n/);
-			const secrets = findSecrets(out);
-			const added = secrets.filter((h) => !before.has(outLines[h.line - 1]));
-			if (added.length) {
-				process.exitCode = 2;
-				throw new Error(`refusing to write: lines ${[...new Set(added.map((h) => h.line))].join(', ')} look like secrets`);
-			}
 			ensureWorkDir(file);
-			// Write a sibling file, then rename: an interrupted write never leaves half a STACK.md.
-			const tmp = `${file}.${process.pid}.tmp`;
-			try {
-				writeFileSync(tmp, out);
-				renameSync(tmp, file);
-			} catch (e) {
-				rmSync(tmp, { force: true });
-				throw e;
-			}
-			const elsewhere = [...new Set(secrets.filter((h) => before.has(outLines[h.line - 1])).map((h) => h.line))];
-			printJson({ file, written: true, section: normalizeHeading(args.section), ...(elsewhere.length ? { secrets_elsewhere: elsewhere } : {}) });
+			withLock(file, () => {
+				// Read again under the lock: another set may have written the file since.
+				const text = existsSync(file) ? stripBom(readFileSync(file, 'utf8')) : '';
+				const out = setFields(text, args.section, updates, comments);
+				// Lines this write adds must be clean; a line already in the file is lint's to report, so one old
+				// false alarm does not block every later update.
+				const before = new Set(text.split(/\r?\n/));
+				const outLines = out.split(/\r?\n/);
+				const secrets = findSecrets(out);
+				const added = secrets.filter((h) => !before.has(outLines[h.line - 1]));
+				if (added.length) {
+					process.exitCode = 2;
+					throw new Error(`refusing to write: lines ${[...new Set(added.map((h) => h.line))].join(', ')} look like secrets`);
+				}
+				ensureWorkDir(file);
+				// Write a sibling file, then rename: an interrupted write never leaves half a STACK.md.
+				const tmp = `${file}.${process.pid}.tmp`;
+				try {
+					writeFileSync(tmp, out);
+					renameSync(tmp, file);
+				} catch (e) {
+					rmSync(tmp, { force: true });
+					throw e;
+				}
+				const elsewhere = [...new Set(secrets.filter((h) => before.has(outLines[h.line - 1])).map((h) => h.line))];
+				printJson({ file, written: true, section: normalizeHeading(args.section), ...(elsewhere.length ? { secrets_elsewhere: elsewhere } : {}) });
+			});
 		}
 	} catch (e) {
 		fail(e.message, process.exitCode || 1);
+	}
+}
+
+/**
+ * Runs `fn` holding `<file>.lock`, so parallel `set` calls (agents run tools in parallel) do not overwrite each
+ * other's sections. A lock older than 10 s is left over from a crash and is removed.
+ */
+function withLock(file, fn) {
+	const lock = `${file}.lock`;
+	const start = Date.now();
+	for (;;) {
+		try {
+			closeSync(openSync(lock, 'wx'));
+			break;
+		} catch (e) {
+			if (e.code !== 'EEXIST') throw e;
+			try {
+				if (Date.now() - statSync(lock).mtimeMs > 10000) rmSync(lock, { force: true });
+			} catch {}
+			if (Date.now() - start > 5000) throw new Error(`${file} is being written by another set; run it again`);
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+		}
+	}
+	try {
+		return fn();
+	} finally {
+		rmSync(lock, { force: true });
 	}
 }
 

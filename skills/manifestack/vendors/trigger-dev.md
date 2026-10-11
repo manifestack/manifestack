@@ -50,7 +50,7 @@ usage_questions:
     where: project → Regions
 mcp:
   official: true
-  readonly_flag: "--readonly in the MCP server args (npx trigger.dev@latest mcp --readonly), which hides every write tool"
+  readonly_flag: "--readonly in the MCP server args (npx trigger.dev@latest mcp --readonly), which hides deploy, trigger_task, cancel_run and the agent-chat and session writes; create_project_in_org and initialize_project stay visible"
   allowed_tools: [list_orgs, list_projects, list_runs, list_deploys, list_preview_branches, get_current_worker, search_docs]
 common_fixes:
   - set a billing limit and alerts before launch (there is none by default)
@@ -66,5 +66,5 @@ verified: 2026-10-11
 - Trigger.dev is detected from `@trigger.dev/`, the `trigger.dev` CLI, `trigger.config.*` and the `TRIGGER_*` key names. It is open source and can be self-hosted (`TRIGGER_API_URL` or `configure({ baseURL })` pointing elsewhere), where none of the cloud limits or prices apply: ask where it runs. `@trigger.dev/python` is an npm build extension, not a Python SDK.
 - Concurrency is released only when a waiting run checkpoints, so short polling waits hold slots and queue other runs.
 - `docs/limits` can lag behind the pricing page (realtime connections); cite the pricing page when they disagree.
-- The MCP server with `--readonly` still has tools with side effects or user data: do not call `start_dev_server`, `stop_dev_server`, `switch_profile`, `get_run_details`, `get_span_details`, `get_webhook_delivery`, `query` or `run_dashboard_query` (they can return run payloads and output). It has no spend or invoice tool; usage comes from the Usage page.
+- The MCP server with `--readonly` still has tools with side effects or user data: do not call `create_project_in_org`, `initialize_project`, `start_dev_server`, `stop_dev_server`, `switch_profile`, `get_run_details`, `get_span_details`, `wait_for_run_to_complete`, `read_session_channel`, `query` or `run_dashboard_query` (they change projects or return run payloads, output and chat transcripts). It has no spend or invoice tool; usage comes from the Usage page.
 - Trigger.dev next to Inngest, Upstash QStash or another job runner is Overlap unless split on purpose.

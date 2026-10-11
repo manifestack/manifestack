@@ -4,7 +4,7 @@ description: Choose a stack that fits a project and check that it still fits. Us
 license: MIT
 compatibility: Needs web access to read vendor pricing pages and Node.js 22+ to run the bundled scripts.
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   homepage: https://manifestack.com
 ---
 
@@ -17,7 +17,7 @@ Helps choose a stack that fits a project (budget, users, requirements, team expe
 ## 1. Pick the mode
 
 1. If the user named a mode (`/manifestack init "B2B dashboard, EU users"`, `/manifestack audit`, `/manifestack compare neon supabase`), use it.
-2. If the user names two or three vendors for the same job and asks which one to use ("Neon or Supabase?", "Resend vs Postmark at 200k emails") → **compare**. When both are already in the project ("we have Clerk and Supabase Auth, which should stay?"), that is an `Overlap` → **audit**.
+2. If the user names two or three vendors for the same job and asks which one to use ("Neon or Supabase?", "Resend vs Postmark at 200k emails") → **compare**. When both are already in the project ("we have Clerk and Supabase Auth, which should stay?"), that is an `Overlap` → **audit**; for two services of one cloud, which never show as an Overlap, use **compare**.
 3. If the user asks for `migrate` or `watch`: say these modes are planned and not available yet, then offer `compare` (to weigh a switch), `audit` (for an existing project) or `init` (to rethink the stack from requirements).
 4. Otherwise run `node <skill-dir>/scripts/detect.mjs .` and look at `empty`:
    - `empty: true` (no code yet: only README, LICENSE, agent files, .manifestack/) → **init**.
@@ -57,7 +57,7 @@ For a vendor without a map, find its official pricing page yourself (vendor's ow
 
 | Script | Use |
 | --- | --- |
-| `scripts/detect.mjs [dir]` | Vendors from JS, Python and Go dependencies, imports, config files and env names, with evidence; unmapped SDKs, role overlaps, frameworks, infrastructure files, env var names, new-vendor hook status. JSON. |
+| `scripts/detect.mjs [dir]` | Vendors from JS, Python and Go dependencies, imports, infrastructure code (Terraform, Bicep, CloudFormation and other YAML), config files and env names, with evidence; unmapped SDKs, role overlaps, frameworks, infrastructure files, env var names, new-vendor hook status. JSON. |
 | `scripts/project.mjs eta …` | When a metric reaches a limit (linear rate, monthly growth or two data points). |
 | `scripts/project.mjs overage …` | Overage on published rates. |
 | `scripts/project.mjs cost .manifestack/tmp/model.json` | Monthly cost of a stack at several user counts, cheapest fitting plan per vendor. |
@@ -78,7 +78,7 @@ In Claude Code and Cursor a hook runs after edits to dependency manifests and af
 At the end of every `init` and `audit` run in Claude Code or Cursor, look at `hook` in the output of `detect.mjs` (run it now if you have not in this run) and take the entry for the agent you are running in: `claude-code` or `cursor`.
 
 - `on` or `plugin`: say nothing.
-- `off`: after the report, never before it, add one short offer, for example: "The new-service check is off in this project. Turn it on? It runs `npx manifestack@0.4.0 hook --agent claude-code`, which downloads manifestack 0.4.0 from npm and adds a hook to `.claude/settings.json` (Cursor: `--agent cursor`, `.cursor/hooks.json`)."
+- `off`: after the report, never before it, add one short offer, for example: "The new-service check is off in this project. Turn it on? It runs `npx manifestack@0.5.0 hook --agent claude-code`, which downloads manifestack 0.5.0 from npm and adds a hook to `.claude/settings.json` (Cursor: `--agent cursor`, `.cursor/hooks.json`)."
   - Run the command only after a clear yes, from the repository root, and show its output.
   - On a no, or no answer, drop it for the rest of this conversation. Ask again in the next run; do not record the answer in STACK.md or anywhere else.
 - `outdated`: an older manifestack set the hook up: it misses package-manager installs, fails on Windows without Git Bash, or (in Cursor) does not reach you at all. Offer the same command as for `off`, worded as an update, with the same rules.

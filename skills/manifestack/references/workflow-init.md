@@ -41,13 +41,13 @@ Use `references/fit.md`. Propose every layer the product needs, and only those:
 - email (transactional; marketing only if asked)
 - storage, payments, monitoring, analytics, search, realtime, background jobs, a CMS, feature flags and AI APIs when the product needs them
 
-For each pick: one or two sentences on why it fits *this* project (users, budget, requirements, team), the main limit to watch, and the realistic alternative if one constraint changes. Say clearly when something is more than the project needs: Next.js or SSR for a static site, Kubernetes or Terraform for one service, a big cloud for a few thousand users.
+For each pick: one or two sentences on why it fits *this* project (users, budget, requirements, team), the main limit to watch, and the realistic alternative if one constraint changes. Say clearly when something is more than the project needs: Next.js or SSR for a static site, Kubernetes for one service, always-on clusters or multi-region for a few thousand users.
 
 Lean to what is in `prefer` when it fits. Prefer one vendor covering two layers only if it really covers both; say what is lost.
 
 ## Step 3. Read the pages and price it
 
-1. For each vendor, read its pages as `references/vendor-pages.md` says: the free-tier limits, the next plan's price and included quotas, overage rates, seats and per-project charges, and, when `requires` names them, regions and certifications.
+1. For each vendor, read its pages as `references/vendor-pages.md` says (for a big cloud: pick the service, read the family map once plus that service's map, and name the STACK.md section after the service): the free-tier limits, the next plan's price and included quotas, overage rates, seats and per-project charges, and, when `requires` names them, regions and certifications.
 2. Check requirements now: if a vendor's published regions or certifications do not meet them, change the pick or say so explicitly.
 3. Price the stack with `scripts/project.mjs cost` (`references/cost-model.md`): the user counts from the brief next to 1k, 10k and 100k, the seats and environments from Step 1 in `fixed`, and the workload in `per_user`.
 4. Show the table: users × monthly cost per vendor and total, with the plan each count lands on. Below it list the free-tier limits that will be hit first and at roughly what user count.

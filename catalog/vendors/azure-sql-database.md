@@ -34,7 +34,7 @@ read:
   - backup storage per GB-month beyond the free amount equal to max data size, by redundancy (LRS, ZRS, GRS default, GZRS); long-term retention storage
   - geo-replicas and failover group secondaries billed as full databases; a license-free standby replica for one DR secondary
   - Azure Hybrid Benefit (provisioned vCore only, not serverless, DTU or new Hyperscale) and reservations
-  - SQL Managed Instance per vCore-hour and storage from creation, stop and start in General Purpose, and its free offer (one per subscription, monthly vCore hours, ends after a year)
+  - SQL Managed Instance per vCore-hour and storage from creation, stop and start in General Purpose, and its free offer (one per subscription, monthly vCore hours, stops after a year and is deleted 30 days later unless upgraded)
 usage_questions:
   - metric: instances
     ask: Each database's purchasing model and tier (DTU or vCore, serverless or provisioned, Hyperscale), max vCores or DTUs, elastic pool, replicas, and whether it uses the free offer?

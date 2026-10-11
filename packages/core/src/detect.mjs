@@ -222,6 +222,26 @@ export function hookStatus(root, { plugin = false } = {}) {
 	return status;
 }
 
+/**
+ * Finds which of many fixed strings occur in a text in one pass: candidate positions come from a hash of the first three
+ * characters, then each candidate is confirmed in place. Hundreds of service signals cost about one scan per file.
+ */
+export function needleMatcher(needles) {
+	const unique = [...new Set(needles)];
+	const short = unique.filter((n) => n.length < 3);
+	const byKey = new Map();
+	const key = (s, i) => ((s.charCodeAt(i) & 0xff) << 16) | ((s.charCodeAt(i + 1) & 0xff) << 8) | (s.charCodeAt(i + 2) & 0xff);
+	for (const n of unique) if (n.length >= 3) byKey.set(key(n, 0), [...(byKey.get(key(n, 0)) ?? []), n]);
+	return (text) => {
+		const found = new Set(short.filter((n) => text.includes(n)));
+		for (let i = 0; i + 2 < text.length; i++) {
+			const candidates = byKey.get(key(text, i));
+			if (candidates) for (const n of candidates) if (!found.has(n) && text.startsWith(n, i)) found.add(n);
+		}
+		return found;
+	};
+}
+
 function isKubernetesManifest(text) {
 	return /^apiVersion:/m.test(text) && /^kind:\s*(Deployment|StatefulSet|DaemonSet|Service|Ingress|HorizontalPodAutoscaler|CronJob)\b/m.test(text);
 }
@@ -260,13 +280,16 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	};
 	// Role signals say how a found vendor is used; service signals say which service of a vendor family is used
 	// (boto3.client('s3'), resource "aws_s3_bucket"). Both are read from source and infrastructure-as-code files.
+	const matchNeedles = needleMatcher(sigs.flatMap((sig) => [...Object.values(sig.role_signals ?? {}).flat(), ...(sig.service_signals ?? [])]));
 	const scanSignals = (src, rel) => {
+		const present = matchNeedles(src);
+		if (!present.size) return;
 		for (const sig of sigs) {
 			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
-				const needle = needles.find((n) => src.includes(n));
+				const needle = needles.find((n) => present.has(n));
 				if (needle) hit(sig, 'code', rel, needle, role);
 			}
-			const service = (sig.service_signals ?? []).find((n) => src.includes(n));
+			const service = (sig.service_signals ?? []).find((n) => present.has(n));
 			if (service) hit(sig, 'service', rel, service);
 		}
 	};
@@ -378,15 +401,18 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		scanSignals(src, rel);
 	}
 
-	// A vendor is found by a package, import, config file or env name. A service signal also counts once its family is
-	// found, by the family's own map or another of its services: boto3 plus boto3.client('s3') is S3.
-	const direct = (evidence) => [...evidence.values()].some((e) => e.kind !== 'code' && e.kind !== 'service');
+	// A vendor is found by a package, import, config file or env name. A family map is also found by its own service
+	// signals (provider "aws" in Terraform). A service signal of a member counts once its family is found, by the
+	// family's map or another of its services: boto3 plus boto3.client('s3') is S3.
+	const familyIds = new Set(sigs.map((s) => s.family).filter(Boolean));
+	const hasService = (evidence) => [...evidence.values()].some((e) => e.kind === 'service');
+	const direct = (sig, evidence) => [...evidence.values()].some((e) => e.kind !== 'code' && e.kind !== 'service') || (familyIds.has(sig.id) && hasService(evidence));
 	const families = new Set();
-	for (const { sig, evidence } of found.values()) if (direct(evidence)) families.add(sig.family ?? sig.id);
+	for (const { sig, evidence } of found.values()) if (direct(sig, evidence)) families.add(sig.family ?? sig.id);
 
 	const all = [...found.values()]
 		// A role signal (".storage.from(") only says how a vendor found otherwise is used; on its own it is too generic.
-		.filter(({ sig, evidence }) => direct(evidence) || (sig.family && families.has(sig.family) && [...evidence.values()].some((e) => e.kind === 'service')))
+		.filter(({ sig, evidence }) => direct(sig, evidence) || (sig.family && families.has(sig.family) && hasService(evidence)))
 		.map(({ sig, evidence, roleHits }) => {
 			// Roles with signals count only when a signal matched; other roles count once the vendor is present.
 			const signalled = Object.keys(sig.role_signals ?? {});
@@ -408,7 +434,9 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	// "other" groups different jobs (SMS, push notifications, a data pipeline), so two vendors in it are not an Overlap.
 	for (const v of vendors) for (const r of v.roles_used) if (r !== 'other') byRole.set(r, [...(byRole.get(r) ?? []), v.id]);
 	for (const u of unmappedInProduct) if (u.role !== 'other') byRole.set(u.role, [...(byRole.get(u.role) ?? []), u.name]);
-	const overlaps = [...byRole].filter(([, ids]) => ids.length > 1).map(([role, ids]) => ({ role, vendors: ids }));
+	// Services of one family in the same role work together (CloudFront in front of Lambda): an Overlap needs two vendors.
+	const familyOf = new Map(vendors.map((v) => [v.id, v.family ?? v.id]));
+	const overlaps = [...byRole].filter(([, ids]) => new Set(ids.map((id) => familyOf.get(id) ?? id)).size > 1).map(([role, ids]) => ({ role, vendors: ids }));
 
 	return {
 		root,

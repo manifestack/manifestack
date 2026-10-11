@@ -165,6 +165,7 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Storage | Cloudinary, UploadThing, Mux |
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar, PayPal (with Braintree) |
 | SMS and voice | Twilio |
+| AWS | account map plus S3, CloudFront, Lambda, ECS and Fargate, EC2 and Lightsail, Amplify, RDS and Aurora, DynamoDB, ElastiCache, OpenSearch, SES, Cognito, SQS and SNS, Bedrock, CloudWatch |
 | Search | Algolia, Elastic Cloud |
 | CMS | Contentful, Sanity, Storyblok, Strapi |
 | Realtime | Pusher, Ably |

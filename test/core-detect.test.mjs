@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES, ROOT, runNode, tempDir } from './helpers.mjs';
-import { detectVendors, readEnvNames, extractImports, extractPythonModules, extractGoImports, hookStatus, importMatches } from '../packages/core/src/detect.mjs';
+import { detectVendors, readEnvNames, extractImports, extractPythonModules, extractGoImports, hookStatus, importMatches, needleMatcher } from '../packages/core/src/detect.mjs';
 import { loadCatalog, vendorSignatures } from '../packages/core/src/catalog.mjs';
 
 const signatures = vendorSignatures(loadCatalog(join(ROOT, 'catalog/vendors')));
@@ -126,15 +126,16 @@ test('many-vendors: SDKs and config files find every newer vendor map', () => {
 	assert.deepEqual(r.overlaps.find((o) => o.role === 'ai').vendors, ['anthropic', 'openai']);
 });
 
-test('Python and Go manifests: unmapped SDKs and frameworks', (t) => {
+test('Python and Go manifests: unmapped SDKs, the AWS family and frameworks', (t) => {
 	const dir = tempDir(t);
 	writeFileSync(join(dir, 'requirements.txt'), 'boto3==1.35\nmistralai>=1\n');
 	writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "api"\ndependencies = ["fastapi>=0.110"]\n');
 	mkdirSync(join(dir, 'worker'));
 	writeFileSync(join(dir, 'worker/go.mod'), 'module example.com/worker\n\ngo 1.23\n\nrequire (\n\tgithub.com/gin-gonic/gin v1.10.0\n\tgithub.com/aws/aws-sdk-go-v2 v1.30.0\n)\n');
 	const r = detectVendors(dir, { signatures });
-	assert.deepEqual(r.unmapped.map((u) => u.name).sort(), ['AWS', 'Mistral']);
-	assert.deepEqual(r.unmapped.find((u) => u.name === 'AWS').evidence.map((e) => e.file).sort(), ['requirements.txt', 'worker/go.mod']);
+	assert.deepEqual(r.unmapped.map((u) => u.name), ['Mistral']);
+	assert.deepEqual(ids(r), ['aws'], 'boto3 and the Go SDK name no service, so only the family is found');
+	assert.deepEqual([...new Set(r.vendors[0].evidence.map((e) => e.file))].sort(), ['requirements.txt', 'worker/go.mod']);
 	assert.deepEqual(r.frameworks.map((f) => f.name).sort(), ['FastAPI', 'Gin']);
 	assert.equal(r.empty, false);
 });
@@ -157,12 +158,13 @@ test('go-worker: vendors from go.mod (major-version paths), DigitalOcean from it
 
 test('vultr-api: Vultr from its npm SDK and env names, roles only where the code reaches the service', () => {
 	const r = detect('vultr-api');
-	assert.deepEqual(ids(r), ['vultr']);
-	const vultr = r.vendors[0];
+	assert.deepEqual(ids(r), ['aws-s3', 'vultr']);
+	const vultr = r.vendors.find((v) => v.id === 'vultr');
 	assert.ok(vultr.evidence.some((e) => e.kind === 'package' && e.match === '@vultr/vultr-node'));
 	assert.ok(vultr.evidence.some((e) => e.kind === 'env' && e.match === 'VULTR_INFERENCE_API_KEY'));
 	assert.deepEqual(vultr.roles_used, ['hosting', 'storage', 'ai'], 'no vultrdb.com host, so no database role');
-	assert.deepEqual(r.unmapped.map((u) => u.name), ['AWS'], 'Object Storage goes through an S3 client');
+	assert.deepEqual(r.vendors.find((v) => v.id === 'aws-s3').roles_used, [], 'Object Storage goes through an S3 client: S3 without the storage role');
+	assert.deepEqual(r.overlaps, []);
 });
 
 test('Vultr from govultr (major-version path) and a Managed Database host in Go code', (t) => {
@@ -254,14 +256,17 @@ test('Hetzner from hcloud and HCLOUD_ names, storage only with an Object Storage
 	writeFileSync(join(dir, '.env'), 'HCLOUD_TOKEN=x\nMUX_ROOT=/tmp\n');
 	writeFileSync(join(dir, 'deploy.py'), 'import hcloud\nclient = hcloud.Client(token="x")\n');
 	let r = detectVendors(dir, { signatures });
-	assert.deepEqual(ids(r), ['hetzner']);
-	assert.deepEqual(r.vendors[0].roles_used, ['hosting']);
+	assert.deepEqual(ids(r), ['aws', 'hetzner'], 'boto3 is the AWS SDK, also used for S3-compatible storage');
+	const hetzner = () => r.vendors.find((v) => v.id === 'hetzner');
+	assert.deepEqual(hetzner().roles_used, ['hosting']);
 	writeFileSync(join(dir, 'files.py'), 'import boto3\ns3 = boto3.client("s3", endpoint_url="https://fsn1.your-objectstorage.com")\n');
 	r = detectVendors(dir, { signatures });
-	assert.deepEqual(r.vendors[0].roles_used, ['hosting', 'storage']);
+	assert.deepEqual(hetzner().roles_used, ['hosting', 'storage']);
+	assert.deepEqual(r.vendors.find((v) => v.id === 'aws-s3').roles_used, [], 'an S3 client pointed at Hetzner is not AWS storage');
+	assert.deepEqual(r.overlaps, []);
 	writeFileSync(join(dir, 'go.mod'), 'module example.com/x\n\ngo 1.23\n\nrequire (\n\tgithub.com/gorilla/mux v1.8.1\n\tgithub.com/hetznercloud/hcloud-go/v2 v2.52.0\n)\n');
 	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { mux: '0.5' } }));
-	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['hetzner']);
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['aws', 'aws-s3', 'hetzner']);
 });
 
 test('content-site: Sanity and a Strapi app in its own folder overlap as CMS; Algolia is search', () => {
@@ -339,7 +344,7 @@ test('Braintree is found as PayPal from Python and env names; Twilio from its se
 });
 
 // A made-up vendor family: one SDK for every service (like boto3), plus a service map with its own package.
-const acme = { id: 'acme', name: 'Acme Cloud', roles: ['other'], packages: ['acme-sdk'], pypi: ['acme'], go: [], imports: ['acme-sdk'], env_prefixes: ['ACME_'], config_files: [], service_signals: [], role_signals: {} };
+const acme = { id: 'acme', name: 'Acme Cloud', roles: ['other'], packages: ['acme-sdk'], pypi: ['acme'], go: [], imports: ['acme-sdk'], env_prefixes: ['ACME_'], config_files: [], service_signals: ['provider "acme"'], role_signals: {} };
 const acmeStore = { id: 'acme-store', name: 'Acme Store', family: 'acme', roles: ['storage'], packages: ['@acme/store'], pypi: [], go: [], imports: ['@acme/store'], env_prefixes: [], config_files: [], service_signals: ["acme.client('store')", 'acme_store_bucket', 'Acme::Store::Bucket'], role_signals: {} };
 const withAcme = [...signatures, acme, acmeStore];
 
@@ -375,8 +380,28 @@ test('families: a service found by its own package makes the family present for 
 	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@acme/store': '1' } }));
 	writeFileSync(join(dir, 'serverless.yml'), 'resources:\n  Resources:\n    Bucket:\n      Type: Acme::Store::Bucket\n');
 	const r = detectVendors(dir, { signatures: withAcme });
-	assert.deepEqual(ids(r), ['acme-store'], 'the family map needs its own evidence to be listed');
+	assert.deepEqual(ids(r), ['acme-store', 'aws-lambda'], 'the family map needs its own evidence to be listed; serverless.yml is the Lambda config');
 	assert.ok(r.vendors[0].evidence.some((e) => e.kind === 'service' && e.file === 'serverless.yml'));
+});
+
+test('families: Terraform alone finds the family by its provider, then its services by their resources', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'main.tf'), 'resource "acme_store_bucket" "files" {}\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures: withAcme })), [], 'a resource without the provider finds nothing');
+	writeFileSync(join(dir, 'main.tf'), 'provider "acme" {\n  region = "eu-1"\n}\nresource "acme_store_bucket" "files" {}\n');
+	const r = detectVendors(dir, { signatures: withAcme });
+	assert.deepEqual(ids(r), ['acme', 'acme-store']);
+	assert.deepEqual(r.vendors[0].evidence, [{ kind: 'service', file: 'main.tf', match: 'provider "acme"' }]);
+});
+
+test('families: services of one family in the same role are not an Overlap; with another vendor they are', (t) => {
+	const acmeCdn = { ...acmeStore, id: 'acme-cdn', name: 'Acme CDN', packages: ['@acme/cdn'], imports: ['@acme/cdn'], service_signals: [] };
+	const sigs = [...signatures, acme, acmeStore, acmeCdn];
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@acme/store': '1', '@acme/cdn': '1' } }));
+	assert.deepEqual(detectVendors(dir, { signatures: sigs }).overlaps, []);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@acme/store': '1', '@acme/cdn': '1', uploadthing: '7' } }));
+	assert.deepEqual(detectVendors(dir, { signatures: sigs }).overlaps, [{ role: 'storage', vendors: ['acme-cdn', 'acme-store', 'uploadthing'] }]);
 });
 
 test('role signals are read from infrastructure-as-code files too', (t) => {
@@ -384,6 +409,27 @@ test('role signals are read from infrastructure-as-code files too', (t) => {
 	writeFileSync(join(dir, '.env'), 'HCLOUD_TOKEN=x\n');
 	writeFileSync(join(dir, 'storage.tf'), 'locals { endpoint = "https://fsn1.your-objectstorage.com" }\n');
 	assert.deepEqual(detectVendors(dir, { signatures }).vendors.find((v) => v.id === 'hetzner').roles_used, ['hosting', 'storage']);
+});
+
+test('aws-serverless-app: AWS services from SDK clients and Terraform; services of one family are not an Overlap', () => {
+	const r = detect('aws-serverless-app');
+	assert.deepEqual(ids(r), ['aws', 'aws-cloudwatch', 'aws-dynamodb', 'aws-lambda', 'aws-s3', 'aws-ses', 'sentry']);
+	assert.ok(r.vendors.filter((v) => v.id.startsWith('aws-')).every((v) => v.family === 'aws'));
+	assert.deepEqual(r.vendors.find((v) => v.id === 'aws-s3').roles_used, ['storage'], 'aws_s3_bucket marks real S3');
+	assert.deepEqual(r.vendors.find((v) => v.id === 'aws-cloudwatch').roles_used, [], 'Lambda logs alone are a bill, not a second monitoring tool');
+	assert.ok(r.vendors.find((v) => v.id === 'aws').evidence.some((e) => e.file === 'infra/main.tf'));
+	assert.deepEqual(r.overlaps, []);
+	assert.deepEqual(r.unmapped, []);
+});
+
+test('AWS from boto3: services from client and resource calls, CloudFormation alone finds the family', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'requirements.txt'), 'boto3==1.35\n');
+	writeFileSync(join(dir, 'app.py'), "import boto3\nddb = boto3.resource('dynamodb')\nbedrock = boto3.client('bedrock-runtime')\nsqs = boto3.client(\"sqs\")\n");
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['aws', 'aws-bedrock', 'aws-dynamodb', 'aws-sqs-sns']);
+	const cfn = tempDir(t);
+	writeFileSync(join(cfn, 'template.yaml'), "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Queue:\n    Type: AWS::SQS::Queue\n  Users:\n    Type: AWS::Cognito::UserPool\n");
+	assert.deepEqual(ids(detectVendors(cfn, { signatures })), ['aws', 'aws-cognito', 'aws-sqs-sns']);
 });
 
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
@@ -571,4 +617,12 @@ test('detection: React Native SDKs, specific Cloudflare and Paddle env names, se
 	assert.ok(r.overlaps.some((o) => o.role === 'auth' && o.vendors.includes('Auth.js')));
 	writeFileSync(join(dir, '.env.example'), 'CF_API_TOKEN=\nPADDLE_API_KEY=\n');
 	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['auth0', 'cloudflare', 'firebase', 'paddle']);
+});
+
+test('needleMatcher finds every fixed string present, overlapping and nested ones included, short ones too', () => {
+	const match = needleMatcher(["client('bedrock", "client('bedrock-runtime'", 'aws_s3_', '"aws_s3_', 'ab', 'AWS::S3::', 'none here']);
+	const found = match(`s = boto3.client('bedrock-runtime')\nresource "aws_s3_bucket" "b" {}\nType: AWS::S3::Bucket\nab`);
+	assert.deepEqual([...found].sort(), ['"aws_s3_', 'AWS::S3::', "client('bedrock", "client('bedrock-runtime'", 'ab', 'aws_s3_'].sort());
+	assert.deepEqual([...match('nothing to see')], []);
+	assert.deepEqual([...needleMatcher(['é漢字x'])('a é漢字x b')], ['é漢字x'], 'non-ASCII needles are confirmed in place');
 });

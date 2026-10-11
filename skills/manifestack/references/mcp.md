@@ -25,6 +25,9 @@ Only if the user already connected it. Never ask the user to connect one with wr
 | LaunchDarkly | local `@launchdarkly/mcp-server` with `--scope read` and a Reader-role token | Flag lists, status and code references; never `get-environments` (SDK keys); no usage tools |
 | New Relic | read-only by design (remote `https://mcp.newrelic.com/mcp/`, OAuth scope `observability:read`, Organization Read Only user) | `execute_nrql_query` on `NrMTDConsumption` / `NrConsumption` only; never Log, Span or Transaction data |
 | Grafana Cloud | local `mcp-grafana --disable-write --enabled-tools datasource,prometheus` with a Viewer service-account token (not the hosted Cloud MCP, which bills each user) | `query_prometheus` on the `grafanacloud-usage` data source and `grafanacloud_*` metrics only |
+| AWS | `awslabs.billing-cost-management-mcp-server` (local; no create, delete or purchase tools) with a billing read-only IAM role | Cost Explorer, budgets, anomalies, credits and Free Tier usage; each Cost Explorer API call is billed. Never the AWS API MCP server or the remote AWS MCP Server |
+| AWS CloudWatch | `awslabs.cloudwatch-mcp-server` (local, no write tools) with a read-only profile | `describe_log_groups` only (stored bytes, retention); never Insights queries or log tools |
+| AWS ElastiCache | `awslabs.elasticache-mcp-server --readonly` with a read-only profile | Describe tools and metric statistics; never logs, tunnels or Cost Explorer |
 | Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres, Mux, OneSignal, Sanity, Mixpanel, Amplitude, Elastic Cloud, Twilio, PayPal | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
 
 Rules:

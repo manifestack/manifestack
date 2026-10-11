@@ -1,6 +1,7 @@
 <div align="center">
 
-<img width="72" height="72" alt="Manifestack logo" src="https://github.com/user-attachments/assets/9c9a39a8-b500-404f-a941-7d63219c173b" />
+<img width="72" height="72" alt="Manifestack logo" src="https://github.com/user-attachments/assets/f73c4146-dee0-4e17-b1fb-7ca675bd7090" />
+
 
 # Manifestack
 

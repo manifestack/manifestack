@@ -508,3 +508,19 @@ test('revisit_when stays linear and still reads blanks and tabs around the opera
 	assert.ok(Date.now() - t < 200);
 	assert.deepEqual(parseRevisit('db_size\t>  400 MB'), { type: 'cmp', metric: 'db_size', op: '>', value: 400, dim: 'size', raw: '400 MB' });
 });
+
+test('findSecrets: Slack webhooks, GitLab tokens, and long pasted lines stay fast', () => {
+	// Built from parts, so the test file itself does not trip secret scanners (GitHub push protection).
+	const webhook = ['https://hooks.slack', 'com/services/T0ABCDE12/B0ABCDE34', 'x'.repeat(24)].join('.').replace('34.x', '34/x');
+	assert.equal(findSecrets(`alerts: ${webhook}`)[0]?.kind, 'Slack webhook');
+	assert.equal(findSecrets(`ci token ${'glpat'}-${'abcdefghij1234567890'}`)[0]?.kind, 'GitLab token');
+	const start = Date.now();
+	findSecrets('aA1-'.repeat(100000));
+	assert.ok(Date.now() - start < 2000);
+	assert.equal(findSecrets('x'.repeat(10000) + ' ghp_' + 'a'.repeat(30))[0]?.kind, 'GitHub token', 'found past the first window');
+});
+
+test('findSecrets: a commit hash in a URL path at a window edge of a long line is not a secret', () => {
+	const line = '.'.repeat(3839) + '/' + 'a1b2c3d4e5'.repeat(4) + ' ' + 'b'.repeat(5000);
+	assert.deepEqual(findSecrets(line), []);
+});

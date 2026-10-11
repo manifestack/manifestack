@@ -768,3 +768,59 @@ test('needleMatcher finds every fixed string present, overlapping and nested one
 	assert.deepEqual([...match('nothing to see')], []);
 	assert.deepEqual([...needleMatcher(['é漢字x'])('a é漢字x b')], ['é漢字x'], 'non-ASCII needles are confirmed in place');
 });
+
+test('CI workflows and JSON templates: deploys in GitHub Actions, CloudFormation, ARM and Terraform JSON', (t) => {
+	const ci = tempDir(t);
+	mkdirSync(join(ci, '.github/workflows'), { recursive: true });
+	mkdirSync(join(ci, '.github/ISSUE_TEMPLATE'), { recursive: true });
+	writeFileSync(join(ci, 'package.json'), JSON.stringify({ dependencies: { express: '5' } }));
+	writeFileSync(join(ci, '.github/workflows/deploy.yml'), 'jobs:\n  deploy:\n    steps:\n      - uses: google-github-actions/auth@v2\n      - uses: google-github-actions/deploy-cloudrun@v2\n      # - uses: azure/webapps-deploy@v3\n');
+	writeFileSync(join(ci, '.github/ISSUE_TEMPLATE/bug.yml'), 'body:\n  - uses: aws-actions/configure-aws-credentials@v4\n');
+	let r = detectVendors(ci, { signatures });
+	assert.deepEqual(ids(r), ['gcp', 'gcp-cloud-run'], 'workflows are read, other .github folders and comments are not');
+	assert.deepEqual(r.vendors.find((v) => v.id === 'gcp-cloud-run').roles_used, ['hosting']);
+
+	const cfn = tempDir(t);
+	writeFileSync(join(cfn, 'template.json'), JSON.stringify({ AWSTemplateFormatVersion: '2010-09-09', Resources: { Q: { Type: 'AWS::SQS::Queue' } } }));
+	assert.deepEqual(ids(detectVendors(cfn, { signatures })), ['aws', 'aws-sqs-sns']);
+
+	const arm = tempDir(t);
+	writeFileSync(join(arm, 'azuredeploy.json'), JSON.stringify({ $schema: 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#', resources: [{ type: 'Microsoft.DocumentDB/databaseAccounts' }] }));
+	assert.deepEqual(ids(detectVendors(arm, { signatures })), ['azure', 'azure-cosmos-db']);
+
+	const tfjson = tempDir(t);
+	writeFileSync(join(tfjson, 'main.tf.json'), JSON.stringify({ terraform: { required_providers: { aws: { source: 'hashicorp/aws' } } }, resource: { aws_s3_bucket: { files: {} } } }));
+	r = detectVendors(tfjson, { signatures });
+	assert.deepEqual(ids(r), ['aws', 'aws-s3']);
+	assert.ok(r.infra.some((i) => i.kind === 'terraform' && i.file === 'main.tf.json'));
+});
+
+test('"!name" leaves a package out of a claimed scope: Workspace OAuth and Azure DevOps are not the clouds', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@google-cloud/local-auth': '3', googleapis: '150' } }));
+	writeFileSync(join(dir, 'auth.ts'), "import { authenticate } from '@google-cloud/local-auth';\n");
+	writeFileSync(join(dir, 'requirements.txt'), 'azure-devops==7.1\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+	writeFileSync(join(dir, 'requirements.txt'), 'azure-devops==7.1\nazure-identity==1.19\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['azure'], 'the rest of the prefix still counts');
+});
+
+test('review fixes: CI files do not make a repo non-empty, action refs in any case, only real JSON templates', (t) => {
+	const fresh = tempDir(t);
+	mkdirSync(join(fresh, '.github/workflows'), { recursive: true });
+	writeFileSync(join(fresh, 'README.md'), '# app\n');
+	writeFileSync(join(fresh, '.github/workflows/ci.yml'), 'jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n');
+	writeFileSync(join(fresh, '.github/dependabot.yml'), 'version: 2\n');
+	assert.equal(detectVendors(fresh, { signatures }).empty, true, 'a template repo with only CI is still a new project');
+
+	const cased = tempDir(t);
+	mkdirSync(join(cased, '.github/workflows'), { recursive: true });
+	writeFileSync(join(cased, '.github/workflows/deploy.yml'), 'steps:\n  - uses: Azure/Login@v2\n  - uses: "AZURE/webapps-deploy@v3"\n  # - uses: azure/functions-action@v1\n');
+	assert.deepEqual(ids(detectVendors(cased, { signatures })), ['azure', 'azure-app-service']);
+
+	const tpl = tempDir(t);
+	mkdirSync(join(tpl, 'emails'));
+	writeFileSync(join(tpl, 'package.json'), JSON.stringify({ dependencies: { '@aws-sdk/client-sesv2': '3' } }));
+	writeFileSync(join(tpl, 'emails/welcome-template.json'), JSON.stringify({ subject: 'Hi', note: 'queued with AWS::SQS::Queue' }));
+	assert.deepEqual(ids(detectVendors(tpl, { signatures })), ['aws-ses'], 'a JSON file named template is read only when it is an IaC template');
+});

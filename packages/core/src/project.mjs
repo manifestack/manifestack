@@ -145,7 +145,15 @@ export function costAt(model) {
 	});
 }
 
+// Every number of a cost model is a count, size or price: negative or endless values are mistakes.
 function modelNumber(v, metric, where) {
+	const n = readModelNumber(v, metric, where);
+	if (!Number.isFinite(n) || n > 1e15) throw new Error(`${where} is too large (got ${JSON.stringify(v)})`);
+	if (n < 0) throw new Error(`${where} must not be negative (got ${JSON.stringify(v)})`);
+	return n;
+}
+
+function readModelNumber(v, metric, where) {
 	if (typeof v === 'number' && Number.isFinite(v)) return v;
 	if (typeof v !== 'string') throw new Error(`${where}: expected a number or a string such as "100 GB", got ${JSON.stringify(v)}`);
 	let qv;
@@ -167,12 +175,16 @@ function normalizeModel(model) {
 	if (!model || typeof model !== 'object' || Array.isArray(model)) throw new Error('the model must be an object: { users, vendors }');
 	const users = [].concat(model.users ?? [1000, 10000, 100000]).map((n, i) => modelNumber(n, null, `users[${i}]`));
 	const perMetric = (obj, where) => Object.fromEntries(Object.entries(obj ?? {}).map(([m, x]) => [m, modelNumber(x, m, `${where}.${m}`)]));
+	const isObject = (x) => x && typeof x === 'object' && !Array.isArray(x);
 	const vendors = [].concat(model.vendors ?? []).map((v, vi) => {
-		const at = `vendor ${v?.id ?? vi}`;
+		if (!isObject(v)) throw new Error(`vendors[${vi}] must be an object: { id, per_user, fixed, plans }`);
+		const at = `vendor ${v.id ?? vi}`;
 		const plans = [].concat(v.plans ?? []).map((p, pi) => {
-			const pat = `${at} plan ${p?.name ?? pi}`;
+			if (!isObject(p)) throw new Error(`${at} plans[${pi}] must be an object: { name, base, metrics }`);
+			const pat = `${at} plan ${p.name ?? pi}`;
 			const metrics = {};
 			for (const [m, r] of Object.entries(p.metrics ?? {})) {
+				if (!isObject(r)) throw new Error(`${pat} metrics.${m} must be an object: { included, price, per }`);
 				const per = r.per == null ? 1 : modelNumber(r.per, m, `${pat} ${m}.per`);
 				if (!(per > 0)) throw new Error(`${pat} ${m}.per must be above 0`);
 				const included = r.included == null ? 0 : modelNumber(r.included, m, `${pat} ${m}.included`);

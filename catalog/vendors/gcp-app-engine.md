@@ -9,7 +9,7 @@ detect:
   pypi: ["google-cloud-appengine-admin", "appengine-python-standard"]
   go: ["cloud.google.com/go/appengine", "google.golang.org/appengine"]
   imports: ["@google-cloud/appengine-admin"]
-  service_signals: ["google_app_engine_standard_app_version", "google_app_engine_flexible_app_version", "StandardAppVersion", "FlexibleAppVersion", "gcloud app deploy", "gcloud app versions", "args: ['app', 'deploy'", "args: [\"app\", \"deploy\"", "instance_class: F", "instance_class: B", "automatic_scaling:", "basic_scaling:", "manual_scaling:", "env: flex", "app_engine_apis:", "static_dir:", "script: auto", ".r.appspot.com", "google.appengine.", "GAE_APPLICATION", "GAE_SERVICE", "GAE_ENV"]
+  service_signals: ["google_app_engine_standard_app_version", "google_app_engine_flexible_app_version", "StandardAppVersion", "FlexibleAppVersion", "gcloud app deploy", "gcloud app versions", "args: ['app', 'deploy'", "args: [\"app\", \"deploy\"", "instance_class: F", "instance_class: B", "automatic_scaling:", "basic_scaling:", "manual_scaling:", "env: flex", "app_engine_apis:", "static_dir:", "script: auto", ".r.appspot.com", "google.appengine.", "GAE_APPLICATION", "GAE_SERVICE", "GAE_ENV", "google-github-actions/deploy-appengine@"]
 pages:
   pricing: https://cloud.google.com/appengine/pricing
   environments: https://docs.cloud.google.com/appengine/docs/the-appengine-environments

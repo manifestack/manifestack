@@ -7,10 +7,10 @@ roles: [other]
 detect:
   packages: ["@azure/", "@azure-rest/", "@pulumi/azure-native", "@pulumi/azure"]
   imports: ["@azure/", "@azure-rest/", "@pulumi/azure-native", "@pulumi/azure"]
-  pypi: ["azure-*", "pulumi-azure-native", "pulumi-azure"]
+  pypi: ["azure-*", "!azure-devops", "pulumi-azure-native", "pulumi-azure"]
   go: ["github.com/Azure/azure-sdk-for-go", "github.com/Azure/go-autorest", "github.com/pulumi/pulumi-azure-native-sdk", "github.com/pulumi/pulumi-azure/sdk"]
   env_prefixes: ["AZURE_SUBSCRIPTION_ID", "AZURE_RESOURCE_GROUP", "AZURE_LOCATION", "AZURE_ENV_NAME", "ARM_SUBSCRIPTION_ID"]
-  service_signals: ["AzureOpenAI(", "AzureChatOpenAI", "AzureOpenAIEmbeddings", ".openai.azure.com", ".redis.cache.windows.net", ".documents.azure.com", ".servicebus.windows.net", 'provider "azurerm"', 'provider "azapi"', 'backend "azurerm"', 'hashicorp/azurerm"', 'azure/azapi"', 'resource "azurerm_', 'data "azurerm_', "targetScope = 'subscription'", "resourceGroup().location", "'Microsoft.Resources/resourceGroups@", "br/public:avm/", "azd-env-name", "azure-native:", "management.azure.com", "azureSubscription:", "az group create", "az deployment ", "az webapp ", "az containerapp ", "az functionapp ", "azd provision", "azd deploy"]
+  service_signals: ["AzureOpenAI(", "AzureChatOpenAI", "AzureOpenAIEmbeddings", ".openai.azure.com", ".redis.cache.windows.net", ".documents.azure.com", ".servicebus.windows.net", 'provider "azurerm"', 'provider "azapi"', 'backend "azurerm"', 'hashicorp/azurerm"', 'azure/azapi"', 'resource "azurerm_', 'data "azurerm_', "targetScope = 'subscription'", "resourceGroup().location", "'Microsoft.Resources/resourceGroups@", "br/public:avm/", "azd-env-name", "azure-native:", "management.azure.com", "azureSubscription:", "az group create", "az deployment ", "az webapp ", "az containerapp ", "az functionapp ", "azd provision", "azd deploy", "azure/login@", "deploymentTemplate.json#"]
   config_files: ["azure.yaml", ".azure/config.json", "bicepconfig.json"]
 pages:
   pricing: https://azure.microsoft.com/en-us/pricing/
@@ -84,7 +84,7 @@ verified: 2026-10-11
 ---
 
 - Found from the SDKs, Pulumi, Terraform `azurerm` or `azapi`, Bicep or `azure.yaml` (Azure Developer CLI). Each service has its own map; read this one once for the account.
-- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `@azure/identity` alone also serve Microsoft Graph apps with no Azure subscription, so the env names are not signals; ask. PyPI `azure-devops` and `azure-pipelines.yml` are Azure DevOps, billed apart; ask.
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `@azure/identity` alone also serve Microsoft Graph apps with no Azure subscription, so the env names are not signals; ask. PyPI `azure-devops` (excluded) and `azure-pipelines.yml` are Azure DevOps, billed apart; ask.
 - On a free account or Students subscription, cost views show charges covered by credit; real usage is billed after the upgrade. A production app on one is a Bill finding with its end date.
 - A spending limit stops services and can lose virtual IP settings; budgets stop nothing unless an action group runs automation.
 - Pricing pages fill prices in by script; the Retail Prices API serves list prices as JSON without sign-in: `https://prices.azure.com/api/retail/prices?$filter=serviceName eq '<name>'`.

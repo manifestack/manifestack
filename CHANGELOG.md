@@ -4,6 +4,19 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Added
+
+- Detection reads CI workflows (`.github/workflows`, `.circleci`, `.buildkite`): deploy steps for AWS, Google Cloud and Azure (`google-github-actions/deploy-cloudrun`, `azure/webapps-deploy`, `aws-actions/amazon-ecs-deploy-task-definition` and others) find the cloud and the service.
+- Detection reads infrastructure in JSON: CloudFormation and SAM templates (`template.json`), ARM templates (`azuredeploy.json`) and Terraform JSON (`*.tf.json`).
+- Vendor maps can leave one package out of a scope they claim (`!azure-devops`, `!@google-cloud/local-auth`), so Azure DevOps and Google Workspace sign-in no longer find the clouds.
+
+### Fixed
+
+- STACK.md: Slack webhook URLs and GitLab tokens are refused as secrets, and very long pasted lines are checked quickly.
+- `project.mjs cost`: negative, endless or malformed model values are errors that name the field, instead of negative totals or a crash.
+- `npx manifestack uninstall` removes agent folders it left empty (`.gemini`, `.windsurf`), so a later install does not detect agents the project does not use.
+- Detection is about a third faster on large repositories.
+
 ## [0.5.0] - 2026-10-11
 
 108 vendor maps, up from 36: AWS, Google Cloud and Azure as vendor families, 27 more vendors and six new roles. To update an installed project, run `npx manifestack@latest`; it also updates the new-vendor hook, which carries its own copy of the vendor list. With the hook added by `npx manifestack hook`, run `npx manifestack@latest hook`; with the Claude Code plugin, update the plugin.

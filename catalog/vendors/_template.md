@@ -8,7 +8,7 @@ name: Example
 # family: example                # optional: this map is one service of a larger vendor (aws-s3 of aws); the skill also reads the family's map
 roles: [database, auth]         # hosting, database, auth, email, storage, payments, monitoring, analytics, search, realtime, jobs, cms, flags, ai, other
 detect:
-  packages: ["example-sdk", "@example/"]   # exact npm names; a trailing "/" matches the whole scope
+  packages: ["example-sdk", "@example/"]   # exact npm names; a trailing "/" matches the whole scope; "!name" leaves one package of it out
   pypi: ["example-sdk"]                     # PyPI names (case-insensitive, - _ . equal); a trailing "*" is a prefix
   go: ["github.com/example/example-go"]     # Go module paths; ".../v2" suffixes match the base path
   imports: ["@example/", "example-sdk"]    # a package name also matches its subpaths; a trailing "/" or ":" is a prefix

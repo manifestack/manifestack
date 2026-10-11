@@ -284,7 +284,15 @@ function costAt(model) {
 	});
 }
 
+// Every number of a cost model is a count, size or price: negative or endless values are mistakes.
 function modelNumber(v, metric, where) {
+	const n = readModelNumber(v, metric, where);
+	if (!Number.isFinite(n) || n > 1e15) throw new Error(`${where} is too large (got ${JSON.stringify(v)})`);
+	if (n < 0) throw new Error(`${where} must not be negative (got ${JSON.stringify(v)})`);
+	return n;
+}
+
+function readModelNumber(v, metric, where) {
 	if (typeof v === 'number' && Number.isFinite(v)) return v;
 	if (typeof v !== 'string') throw new Error(`${where}: expected a number or a string such as "100 GB", got ${JSON.stringify(v)}`);
 	let qv;
@@ -306,12 +314,16 @@ function normalizeModel(model) {
 	if (!model || typeof model !== 'object' || Array.isArray(model)) throw new Error('the model must be an object: { users, vendors }');
 	const users = [].concat(model.users ?? [1000, 10000, 100000]).map((n, i) => modelNumber(n, null, `users[${i}]`));
 	const perMetric = (obj, where) => Object.fromEntries(Object.entries(obj ?? {}).map(([m, x]) => [m, modelNumber(x, m, `${where}.${m}`)]));
+	const isObject = (x) => x && typeof x === 'object' && !Array.isArray(x);
 	const vendors = [].concat(model.vendors ?? []).map((v, vi) => {
-		const at = `vendor ${v?.id ?? vi}`;
+		if (!isObject(v)) throw new Error(`vendors[${vi}] must be an object: { id, per_user, fixed, plans }`);
+		const at = `vendor ${v.id ?? vi}`;
 		const plans = [].concat(v.plans ?? []).map((p, pi) => {
-			const pat = `${at} plan ${p?.name ?? pi}`;
+			if (!isObject(p)) throw new Error(`${at} plans[${pi}] must be an object: { name, base, metrics }`);
+			const pat = `${at} plan ${p.name ?? pi}`;
 			const metrics = {};
 			for (const [m, r] of Object.entries(p.metrics ?? {})) {
+				if (!isObject(r)) throw new Error(`${pat} metrics.${m} must be an object: { included, price, per }`);
 				const per = r.per == null ? 1 : modelNumber(r.per, m, `${pat} ${m}.per`);
 				if (!(per > 0)) throw new Error(`${pat} ${m}.per must be above 0`);
 				const included = r.included == null ? 0 : modelNumber(r.included, m, `${pat} ${m}.included`);
@@ -539,6 +551,8 @@ const SECRET_PATTERNS = [
 	['JWT', /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/],
 	['GitHub token', /\bgh[pousr]_[A-Za-z0-9]{20,}/],
 	['Slack token', /\bxox[abprs]-[A-Za-z0-9-]{10,}/],
+	['Slack webhook', /\bhooks\.slack\.com\/(?:services|workflows|triggers)\/[A-Za-z0-9/_-]{16,}/],
+	['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/],
 	['AWS access key', /\bAKIA[0-9A-Z]{16}\b/],
 	['Neon API key', /\bnapi_[A-Za-z0-9]{16,}/],
 	// Only names that usually hold secrets: NODE_ENV=production in a note is fine.
@@ -549,7 +563,17 @@ const SECRET_PATTERNS = [
 	['long token', /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/, (m) => !inUrlPath(m) && looksRandom(m[0])],
 ].map(([kind, re, check]) => [kind, new RegExp(re.source, re.flags + 'g'), check]);
 
-const secretIn = (line, re, check) => [...line.matchAll(re)].some((m) => !check || check(m));
+// A very long line is checked in overlapping windows, so the patterns stay fast on pasted blobs.
+const WINDOW = 4096;
+const secretIn = (line, re, check) => {
+	for (let start = 0; start < line.length || start === 0; start += WINDOW - 256) {
+		// A match at the start of a later window is cut there (the slice invents a word boundary); the previous
+		// window, which overlaps it, already saw where it really starts.
+		if ([...line.slice(start, start + WINDOW).matchAll(re)].some((m) => !(start && m.index === 0) && (!check || check(m)))) return true;
+		if (start + WINDOW >= line.length) break;
+	}
+	return false;
+};
 
 /** Finds strings that look like secrets, one hit per line. STACK.md must never contain one. */
 export function findSecrets(text) {

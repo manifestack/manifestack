@@ -285,6 +285,24 @@ test('uninstall removes only our skill folders and leaves non-empty folders', (t
 	assert.match(next.stderr, /no agent folders found/, 'a leftover .github/skills would make this detect Copilot');
 });
 
+test('uninstall removes agent folders it left empty, so a later install does not detect those agents', (t) => {
+	const dir = tempDir(t);
+	assert.equal(cli(dir, 'install', '--agent', 'gemini-cli,windsurf', '--yes').code, 0);
+	writeFileSync(join(dir, '.windsurf/rules.md'), '# mine\n');
+	assert.equal(cli(dir, 'uninstall', '--yes').code, 0);
+	assert.ok(!existsSync(join(dir, '.gemini')), 'empty .gemini removed');
+	assert.ok(existsSync(join(dir, '.windsurf/rules.md')), 'a folder with the user\'s files stays');
+});
+
+test('uninstall never removes the project folder, even when its name starts with a dot', (t) => {
+	const dir = join(tempDir(t), '.sandbox');
+	mkdirSync(dir);
+	assert.equal(cli(dir, 'install', '--agent', 'gemini-cli', '--yes').code, 0);
+	assert.equal(cli(dir, 'uninstall', '--yes').code, 0);
+	assert.ok(existsSync(dir));
+	assert.ok(!existsSync(join(dir, '.gemini')));
+});
+
 test('detect.mjs reports the hook the CLI installs as on, not outdated', (t) => {
 	const dir = tempDir(t);
 	assert.equal(cli(dir, 'install', '--agent', 'claude-code', '--agent', 'cursor').code, 0);

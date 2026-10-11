@@ -9,7 +9,7 @@ detect:
   pypi: ["google-cloud-run", "google-cloud-functions", "functions-framework"]
   go: ["cloud.google.com/go/run", "cloud.google.com/go/functions", "github.com/GoogleCloudPlatform/functions-framework-go"]
   imports: ["@google-cloud/run", "@google-cloud/functions", "@google-cloud/functions-framework"]
-  service_signals: ["google_cloud_run_", "google_cloudfunctions", "gcloud run ", "gcloud beta run ", "gcloud functions ", "args: ['run', 'deploy'", "args: [\"run\", \"deploy\"", "args: ['functions', 'deploy'", "args: [\"functions\", \"deploy\"", "allow-unauthenticated", "serving.knative.dev", "run.googleapis.com/", "cloudfunctions.googleapis.com/", ".a.run.app", ".run.app/", ".run.app\"", ".run.app'", "cloudfunctions.net", "gcp.cloudrun", "gcp.cloudfunctions", "/gcp/cloudrun", "/gcp/cloudfunctions", "run_v2.ServicesClient", "\"K_SERVICE\"", "'K_SERVICE'", "env.K_SERVICE", "CLOUD_RUN_JOB"]
+  service_signals: ["google_cloud_run_", "google_cloudfunctions", "gcloud run ", "gcloud beta run ", "gcloud functions ", "args: ['run', 'deploy'", "args: [\"run\", \"deploy\"", "args: ['functions', 'deploy'", "args: [\"functions\", \"deploy\"", "allow-unauthenticated", "serving.knative.dev", "run.googleapis.com/", "cloudfunctions.googleapis.com/", ".a.run.app", ".run.app/", ".run.app\"", ".run.app'", "cloudfunctions.net", "gcp.cloudrun", "gcp.cloudfunctions", "/gcp/cloudrun", "/gcp/cloudfunctions", "run_v2.ServicesClient", "\"K_SERVICE\"", "'K_SERVICE'", "env.K_SERVICE", "CLOUD_RUN_JOB", "google-github-actions/deploy-cloudrun@", "google-github-actions/deploy-cloud-functions@"]
 pages:
   pricing: https://cloud.google.com/run/pricing
   billing_settings: https://docs.cloud.google.com/run/docs/configuring/billing-settings
@@ -58,7 +58,7 @@ verified: 2026-10-11
 ---
 
 - `@google-cloud/run` and `@google-cloud/functions` are admin clients; the Functions Framework, Terraform, gcloud, Knative `service.yaml`, `.run.app` or `cloudfunctions.net` URLs and `K_SERVICE` show code that runs here. `serving.knative.dev` also fits self-hosted Knative.
-- `.github/` is not scanned: a deploy only in GitHub Actions leaves no signal; ask.
+- GitHub Actions workflows are read: `google-github-actions/deploy-cloudrun` finds Cloud Run; other CI systems may need a question.
 - Firebase Functions, App Hosting and Hosting rewrites run on Cloud Run in the same project: one deployment, not an Overlap.
 - Cloud Run beside another host (Vercel, Fly, Render) is an Overlap when the same traffic runs on both; an API here with the frontend elsewhere is a split. Cloud Run, App Engine, Compute Engine and GKE are one family, so detection never reports them as an Overlap; still ask why one app uses two.
 - `allow-unauthenticated` with no max instances is a Bill risk under abuse.

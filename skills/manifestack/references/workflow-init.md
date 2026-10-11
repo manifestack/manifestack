@@ -39,7 +39,7 @@ Use `references/fit.md`. Propose every layer the product needs, and only those:
 - database
 - auth
 - email (transactional; marketing only if asked)
-- storage, payments, monitoring, analytics, search, realtime, background jobs, a CMS and AI APIs when the product needs them
+- storage, payments, monitoring, analytics, search, realtime, background jobs, a CMS, feature flags and AI APIs when the product needs them
 
 For each pick: one or two sentences on why it fits *this* project (users, budget, requirements, team), the main limit to watch, and the realistic alternative if one constraint changes. Say clearly when something is more than the project needs: Next.js or SSR for a static site, Kubernetes or Terraform for one service, a big cloud for a few thousand users.
 

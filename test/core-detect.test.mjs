@@ -283,6 +283,21 @@ test('CMS config and generated files: Contentful, Sanity and Storyblok without a
 	assert.deepEqual(r.overlaps, [{ role: 'cms', vendors: ['contentful', 'sanity', 'storyblok'] }]);
 });
 
+test('product-analytics-app: three analytics tools and three flag services overlap; Segment feeding them does not', () => {
+	const r = detect('product-analytics-app');
+	assert.deepEqual(ids(r), ['amplitude', 'launchdarkly', 'mixpanel', 'posthog', 'segment']);
+	assert.deepEqual(r.vendors.find((v) => v.id === 'mixpanel').roles_used, ['analytics'], 'no Mixpanel flags in the code');
+	assert.deepEqual(r.vendors.find((v) => v.id === 'segment').roles_used, ['other']);
+	assert.deepEqual(r.overlaps, [{ role: 'analytics', vendors: ['amplitude', 'mixpanel', 'posthog'] }, { role: 'flags', vendors: ['amplitude', 'launchdarkly', 'posthog'] }]);
+});
+
+test('look-alikes: Segment utility packages and linker variables are not vendors', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@segment/ajv-human-errors': '2', amplitude: '1' } }));
+	writeFileSync(join(dir, '.env'), 'LD_LIBRARY_PATH=/usr/lib\nLD_PRELOAD=\nSEGMENT_DURATION=6\n');
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+});
+
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);

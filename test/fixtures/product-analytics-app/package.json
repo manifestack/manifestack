@@ -1,0 +1,13 @@
+{
+  "name": "product-analytics-app",
+  "private": true,
+  "dependencies": {
+    "next": "15.5.0",
+    "@segment/analytics-next": "1.84.3",
+    "mixpanel-browser": "2.84.0",
+    "@amplitude/analytics-browser": "2.47.4",
+    "@amplitude/experiment-js-client": "1.23.1",
+    "@launchdarkly/node-server-sdk": "9.14.4",
+    "posthog-js": "1.300.0"
+  }
+}

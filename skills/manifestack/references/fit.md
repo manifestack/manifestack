@@ -86,6 +86,11 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 - Content in the repo (Markdown, MDX) first; a hosted CMS when non-developers edit content often.
 - Billed by seats, API requests, records and asset bandwidth: fetching content on every page view instead of at build time or through the CDN, preview in production and extra editors raise the bill. Plan steps are large.
 
+### Feature flags
+
+- Environment variables or a config file first; a flag service when non-developers toggle flags, rollouts are gradual or experiments need stats.
+- Billed by seats, server connections and client-side users: every serverless instance can count as a connection. One flag service, and remove flags once rolled out.
+
 ### AI APIs
 
 - Cost grows with every request and every user: price per token by model, not a flat plan. Estimate tokens per user action before picking a model.

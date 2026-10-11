@@ -316,7 +316,7 @@ test('look-alikes: Grafana plugin packages, k6, OpenSearch and the Elasticsearch
 	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@grafana/ui': '13', '@grafana/data': '13', k6: '0.0.0', '@opensearch-project/opensearch': '3', '@elastic/eui': '100' } }));
 	writeFileSync(join(dir, '.env'), 'ELASTIC_PASSWORD=x\nGF_SECURITY_ADMIN_PASSWORD=x\nGCLOUD_PROJECT=demo\n');
 	writeFileSync(join(dir, 'load.js'), "import http from 'k6/http';\nexport default function () { http.get('https://example.com'); }\n");
-	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['gcp'], 'GCLOUD_PROJECT is Google Cloud, not Grafana Cloud');
 });
 
 test('checkout-sms-app: PayPal and Stripe are reported for the auditor to judge; Twilio is other; Braintree utilities are not vendors', () => {
@@ -430,6 +430,42 @@ test('AWS from boto3: services from client and resource calls, CloudFormation al
 	const cfn = tempDir(t);
 	writeFileSync(join(cfn, 'template.yaml'), "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Queue:\n    Type: AWS::SQS::Queue\n  Users:\n    Type: AWS::Cognito::UserPool\n");
 	assert.deepEqual(ids(detectVendors(cfn, { signatures })), ['aws', 'aws-cognito', 'aws-sqs-sns']);
+});
+
+test('gcp-cloud-run-app: Google Cloud services from client packages and Terraform; Cloud Run logs are a bill, not a second monitoring tool', () => {
+	const r = detect('gcp-cloud-run-app');
+	assert.deepEqual(ids(r), ['gcp', 'gcp-cloud-run', 'gcp-cloud-sql', 'gcp-cloud-storage', 'gcp-logging', 'gcp-pubsub', 'sentry']);
+	assert.ok(r.vendors.filter((v) => v.id.startsWith('gcp-')).every((v) => v.family === 'gcp'));
+	const roles = Object.fromEntries(r.vendors.map((v) => [v.id, v.roles_used]));
+	assert.deepEqual(roles['gcp-cloud-run'], ['hosting']);
+	assert.deepEqual(roles['gcp-cloud-storage'], ['storage']);
+	assert.deepEqual(roles['gcp-logging'], [], 'Cloud Run sends logs to Cloud Logging by default');
+	assert.ok(!ids(r).includes('gcp-memorystore'), 'a commented-out resource is not a signal');
+	assert.deepEqual(r.overlaps, []);
+	assert.deepEqual(r.unmapped, []);
+});
+
+test('Google Cloud: Terraform or Python alone; Firebase is in the family; Cloud Run next to Vercel is an Overlap', (t) => {
+	const tf = tempDir(t);
+	writeFileSync(join(tf, 'main.tf'), 'provider "google" {}\nresource "google_container_cluster" "main" {}\nresource "google_redis_instance" "cache" {}\nresource "google_bigquery_dataset" "events" {}\n');
+	assert.deepEqual(ids(detectVendors(tf, { signatures })), ['gcp', 'gcp-bigquery', 'gcp-gke', 'gcp-logging', 'gcp-memorystore']);
+
+	const py = tempDir(t);
+	writeFileSync(join(py, 'requirements.txt'), 'google-cloud-storage==3\nfunctions-framework==3\n');
+	writeFileSync(join(py, 'main.py'), 'import functions_framework\nfrom google.cloud import bigquery\n');
+	assert.deepEqual(ids(detectVendors(py, { signatures })), ['gcp-bigquery', 'gcp-cloud-run', 'gcp-cloud-storage', 'gcp-logging'], 'Python imports reduce to `google`, so code signals name the service');
+
+	const fb = tempDir(t);
+	writeFileSync(join(fb, 'package.json'), JSON.stringify({ dependencies: { 'firebase-admin': '13', '@google-cloud/firestore': '7', '@google-cloud/storage': '7', 'next': '15' } }));
+	writeFileSync(join(fb, 'db.ts'), "import { Firestore } from '@google-cloud/firestore';\nimport { Storage } from '@google-cloud/storage';\n");
+	let r = detectVendors(fb, { signatures });
+	assert.deepEqual(ids(r), ['firebase', 'gcp-cloud-storage', 'gcp-firestore']);
+	assert.deepEqual(r.overlaps, [], 'Firestore and Cloud Storage next to Firebase are one family');
+
+	writeFileSync(join(fb, 'vercel.json'), '{}');
+	writeFileSync(join(fb, 'cloudbuild.yaml'), "steps:\n  - name: gcr.io/google.com/cloudsdktool/cloud-sdk\n    args: ['run', 'deploy', 'api']\n");
+	r = detectVendors(fb, { signatures });
+	assert.deepEqual(r.overlaps.find((o) => o.role === 'hosting')?.vendors, ['gcp-cloud-run', 'vercel']);
 });
 
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {

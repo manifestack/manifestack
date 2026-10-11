@@ -27,7 +27,7 @@ read:
   - the "Used to improve our products" row on the pricing page for the Free and Paid tier (Free tier content may be used to improve Google products and read by human reviewers; Paid tier is not)
   - rate limits per model and tier (RPM, TPM, RPD), that they apply per project and not per API key, when RPD resets, and which preview models have tighter limits
   - usage tiers (Free, Tier 1 to 3), what moves a project up (billing linked, cumulative spend, days since first payment), and the monthly spend limit per tier
-  - Prepay versus Postpay billing, project-level monthly spend caps, what a cap pauses, and the enforcement delay during which overage can still accrue (Batch and agent sessions can run past the cap)
+  - Prepay versus Postpay billing, project-level monthly spend caps (also as Cloud Billing spend cap budgets), what a cap pauses, and the enforcement delay during which overage can still accrue (Batch and agent sessions can run past the cap); Google Cloud Free Trial credits on newer accounts do not pay for the Gemini API
   - the terms on Unpaid versus Paid Services data use, and the rule that apps offered to users in the EEA, Switzerland or the UK must use Paid Services
   - abuse-monitoring retention of prompts and outputs on the Paid tier, and whether any zero-retention option exists for the Developer API
   - processing location: the Developer API serves from a global pool with no region choice (region-pinned processing is a Vertex AI feature); the available-regions page lists only countries where the API may be used

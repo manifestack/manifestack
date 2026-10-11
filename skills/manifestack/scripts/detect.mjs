@@ -235,7 +235,6 @@ const UNMAPPED_SDKS = [
 	{ name: 'Auth.js', role: 'auth', packages: ['next-auth', '@auth/'] },
 	{ name: 'Better Auth', role: 'auth', packages: ['better-auth'] },
 	{ name: 'Loops', role: 'email', packages: ['loops'] },
-	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
 	{ name: 'Better Stack', role: 'monitoring', packages: ['@logtail/'] },
 	{ name: 'Liveblocks', role: 'realtime', packages: ['@liveblocks/'] },

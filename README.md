@@ -163,7 +163,8 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Auth | Clerk, Auth0, WorkOS |
 | Email | Resend, Postmark, SendGrid, Mailgun |
 | Storage | Cloudinary, UploadThing, Mux |
-| Payments | Stripe, Paddle, Lemon Squeezy, Polar |
+| Payments | Stripe, Paddle, Lemon Squeezy, Polar, PayPal (with Braintree) |
+| SMS and voice | Twilio |
 | Search | Algolia, Elastic Cloud |
 | CMS | Contentful, Sanity, Storyblok, Strapi |
 | Realtime | Pusher, Ably |

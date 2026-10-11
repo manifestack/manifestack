@@ -6,7 +6,6 @@
     "@google-cloud/pubsub": "^5.2.0",
     "@google-cloud/storage": "^7.17.0",
     "@sentry/node": "^10.0.0",
-    "express": "^5.1.0",
     "pg": "^8.16.0"
   }
 }

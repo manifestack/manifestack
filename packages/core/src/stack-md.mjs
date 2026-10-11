@@ -6,7 +6,7 @@ import { isMain, parseArgs, printJson, fail, todayIso, isIsoDate, dateArg } from
 import { parseQuantity, eta, approxMonth, monthlyGrowth, METRIC_UNIT_MB } from './project.mjs';
 import { STACK_FILE, ensureWorkDir, ignoreTmpDir, withinCwd } from './workdir.mjs';
 
-export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'Analytics', 'Search', 'Realtime', 'Jobs', 'AI', 'Other'];
+export const STACK_ROLES = ['Hosting', 'Database', 'Auth', 'Email', 'Storage', 'Payments', 'Monitoring', 'Analytics', 'Search', 'Realtime', 'Jobs', 'CMS', 'AI', 'Other'];
 export const STACK_KEYS = ['plan', 'limit', 'source', 'usage', 'decided', 'revisit_when', 'next', 'env'];
 export const REQUIREMENT_KEYS = ['budget', 'users', 'requires', 'prefer', 'avoid', 'priority'];
 export const PRIORITIES = ['lowest cost', 'balanced', 'least ops', 'control'];

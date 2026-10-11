@@ -238,7 +238,6 @@ const UNMAPPED_SDKS = [
 	{ name: 'Twilio', role: 'other', packages: ['twilio'], pypi: ['twilio'], go: ['github.com/twilio/twilio-go'] },
 	{ name: 'Axiom', role: 'monitoring', packages: ['@axiomhq/'] },
 	{ name: 'Better Stack', role: 'monitoring', packages: ['@logtail/'] },
-	{ name: 'Algolia', role: 'search', packages: ['algoliasearch', '@algolia/'] },
 	{ name: 'Liveblocks', role: 'realtime', packages: ['@liveblocks/'] },
 	{ name: 'Mistral', role: 'ai', packages: ['@mistralai/mistralai', '@ai-sdk/mistral'], pypi: ['mistralai', 'langchain-mistralai'] },
 	{ name: 'Groq', role: 'ai', packages: ['groq-sdk', '@ai-sdk/groq'], pypi: ['groq', 'langchain-groq'] },
@@ -541,7 +540,7 @@ function dependencyMatches(kind, dep, patterns = []) {
 // A map says where to look and what to extract, never the prices themselves.
 
 const VENDOR_SCHEMA = 1;
-const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'analytics', 'search', 'realtime', 'jobs', 'ai', 'other'];
+const VENDOR_ROLES = ['hosting', 'database', 'auth', 'email', 'storage', 'payments', 'monitoring', 'analytics', 'search', 'realtime', 'jobs', 'cms', 'ai', 'other'];
 
 /** Upgrades older map formats to the current schema. Add a case when VENDOR_SCHEMA goes up. */
 function upgradeVendorMap(data) {

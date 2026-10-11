@@ -164,6 +164,8 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Email | Resend, Postmark, SendGrid, Mailgun |
 | Storage | Cloudinary, UploadThing, Mux |
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar |
+| Search | Algolia |
+| CMS | Contentful, Sanity, Storyblok, Strapi |
 | Realtime | Pusher, Ably |
 | Jobs | Inngest, Trigger.dev |
 | Mobile | RevenueCat, Adapty, Expo EAS, OneSignal |

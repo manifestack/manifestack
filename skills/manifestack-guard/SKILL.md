@@ -1,6 +1,6 @@
 ---
 name: manifestack-guard
-description: Use before adding, removing or replacing an infrastructure dependency or vendor SDK - hosting, database, auth, email, storage, payments, monitoring, analytics, search, realtime, background jobs, queues or AI APIs (for example "add Stripe", "set up Resend for emails", "install @supabase/supabase-js", "move auth to Clerk"), and when a hook reports that a new vendor was added. Checks the change against STACK.md requirements, the team's avoid list, budget, services already in the stack and revisit_when, and points to a full manifestack audit when limits need a look. Not for UI, styling, copy, tests or ordinary code changes.
+description: Use before adding, removing or replacing an infrastructure dependency or vendor SDK - hosting, database, auth, email, storage, payments, monitoring, analytics, search, realtime, background jobs, queues, CMS or AI APIs (for example "add Stripe", "set up Resend for emails", "install @supabase/supabase-js", "move auth to Clerk"), and when a hook reports that a new vendor was added. Checks the change against STACK.md requirements, the team's avoid list, budget, services already in the stack and revisit_when, and points to a full manifestack audit when limits need a look. Not for UI, styling, copy, tests or ordinary code changes.
 license: MIT
 compatibility: Node.js 22+ to run the bundled script. No network needed.
 metadata:
@@ -18,7 +18,7 @@ A quick check before the stack changes. It reads `.manifestack/STACK.md` only; i
 
 1. Run `node <skill-dir>/scripts/stack-md.mjs parse .manifestack/STACK.md` from the repository root.
    - `exists: false` → tell the user there is no `.manifestack/STACK.md` and suggest `/manifestack` (it records the stack and its limits). Then continue with their task.
-2. Name the service being added, removed or changed, and its role (Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Analytics, Search, Realtime, Jobs, AI, Other).
+2. Name the service being added, removed or changed, and its role (Hosting, Database, Auth, Email, Storage, Payments, Monitoring, Analytics, Search, Realtime, Jobs, CMS, AI, Other).
 3. Check it against STACK.md:
    - **Requirements**: go through every item in `requires` one by one (data region, certifications such as SOC 2, SSO) and say for each whether this vendor meets it or needs checking. A payments, email or auth vendor holds customer data, so a data-region rule applies to it as much as to the database. Do not guess the answer; do not skip an item.
    - **Avoid**: does the vendor, its cloud or the setup it needs match anything in `avoid`? Quote the line.

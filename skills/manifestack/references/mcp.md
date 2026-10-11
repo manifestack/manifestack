@@ -18,7 +18,11 @@ Only if the user already connected it. Never ask the user to connect one with wr
 | Turso | read-only permission for a single group at OAuth consent (`https://mcp.turso.ai/mcp`); the organization option grants full access | Database and branch lists only; no usage tools, never `read_database` or `database_analytics` |
 | Trigger.dev | `--readonly` in the server args (`npx trigger.dev@latest mcp --readonly`) | Projects, runs and deploys lists; never run details, spans or queries (payloads and output); no spend tools |
 | Inngest | read permissions only, one environment, at OAuth consent (`https://api.inngest.com/mcp`) or a read-only API key | Apps, functions and run lists; never run details, traces, insights queries or key tools; no usage tools |
-| Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres, Mux, OneSignal | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
+| Algolia | read-only by design (Productivity MCP, `https://mcp.algolia.com/mcp`, OAuth) | Index list and analytics counts only; never search, recommendation or top-search tools (records, end-user queries) |
+| Contentful | every tool category set to read-only in the Contentful MCP app for the environment (remote `https://mcp.contentful.com/mcp`); the local server has none | Spaces, environments, locales, content types and usage; never entries, assets, previews or `export_space` |
+| Storyblok | read-only permissions at OAuth consent (`https://mcp.storyblok.com/mcp`) or a read-scoped token | `execute_readonly` for statistics only; never API keys, the space object or collaborators |
+| Strapi | built into the user's Strapi (`mcp.enabled`), Admin token with only upload read permission | Media list tools only; never content tools |
+| Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres, Mux, OneSignal, Sanity | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
 
 Rules:
 

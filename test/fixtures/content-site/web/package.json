@@ -1,0 +1,11 @@
+{
+  "name": "content-site-web",
+  "private": true,
+  "dependencies": {
+    "next": "15.5.0",
+    "next-sanity": "13.3.4",
+    "@strapi/client": "1.6.2",
+    "algoliasearch": "5.59.0",
+    "react-instantsearch": "7.51.0"
+  }
+}

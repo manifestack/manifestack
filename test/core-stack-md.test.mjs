@@ -376,7 +376,7 @@ test('lint warns about a priority outside the four known values', () => {
 });
 
 test('lint accepts every role, Analytics and Search included', () => {
-	for (const role of ['Analytics', 'Search', 'Realtime', 'Jobs', 'AI', 'Other']) assert.deepEqual(lintStackMd(`## ${role}: Acme\nplan: free\n`).warnings.filter((w) => /role/.test(w.message)), [], role);
+	for (const role of ['Analytics', 'Search', 'Realtime', 'Jobs', 'CMS', 'AI', 'Other']) assert.deepEqual(lintStackMd(`## ${role}: Acme\nplan: free\n`).warnings.filter((w) => /role/.test(w.message)), [], role);
 	assert.ok(lintStackMd('## Marketing: Acme\nplan: free\n').warnings.some((w) => /role "Marketing" is not one of/.test(w.message)));
 });
 

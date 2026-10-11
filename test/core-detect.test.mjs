@@ -264,6 +264,25 @@ test('Hetzner from hcloud and HCLOUD_ names, storage only with an Object Storage
 	assert.deepEqual(ids(detectVendors(dir, { signatures })), ['hetzner']);
 });
 
+test('content-site: Sanity and a Strapi app in its own folder overlap as CMS; Algolia is search', () => {
+	const r = detect('content-site');
+	assert.deepEqual(ids(r), ['algolia', 'sanity', 'strapi']);
+	assert.ok(r.vendors.find((v) => v.id === 'strapi').evidence.some((e) => e.file === 'cms/package.json'));
+	assert.deepEqual(r.overlaps, [{ role: 'cms', vendors: ['sanity', 'strapi'] }]);
+});
+
+test('CMS config and generated files: Contentful, Sanity and Storyblok without a package', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, '.contentfulrc.json'), '{}');
+	writeFileSync(join(dir, 'sanity.config.ts'), 'export default {};\n');
+	mkdirSync(join(dir, 'src/types'), { recursive: true });
+	writeFileSync(join(dir, 'src/types/storyblok-components.d.ts'), 'export {};\n');
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['contentful', 'sanity', 'storyblok']);
+	assert.ok(r.vendors.every((v) => v.evidence.every((e) => e.kind === 'config')));
+	assert.deepEqual(r.overlaps, [{ role: 'cms', vendors: ['contentful', 'sanity', 'storyblok'] }]);
+});
+
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);

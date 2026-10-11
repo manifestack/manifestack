@@ -12,6 +12,7 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 - Vendor maps: Mux, OneSignal and Hetzner. OneSignal counts for email only when the code sends email through it; Hetzner counts for storage only with an Object Storage endpoint in the code.
 - Vendor maps: Algolia, Contentful, Sanity, Storyblok and Strapi. Strapi notes how to tell Strapi Cloud from a self-hosted server, where Strapi itself costs nothing.
 - Vendor maps: Segment, Mixpanel, Amplitude and LaunchDarkly. Segment feeding an analytics tool is not an Overlap; Mixpanel and Amplitude count for flags only when the code uses their feature flags.
+- Vendor maps: New Relic, Grafana Cloud and Elastic Cloud. Grafana Cloud and Elastic Cloud notes tell the hosted service from free self-hosted Grafana and Elasticsearch; Elastic counts for search or monitoring only when the code uses that part.
 - Roles `Analytics` and `Search` for STACK.md sections and vendor maps. PostHog is `Analytics`, and counts for `Monitoring` only when the code uses its error tracking.
 - Roles `Realtime` and `Jobs`, so two realtime services or two job runners are reported as an Overlap. Upstash counts for `Jobs` when the code uses QStash or Workflow.
 - Role `CMS`, so two content management systems are reported as an Overlap.

@@ -298,6 +298,22 @@ test('look-alikes: Segment utility packages and linker variables are not vendors
 	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
 });
 
+test('observability-app: New Relic and Grafana Cloud overlap; Elastic used only for search is not monitoring', () => {
+	const r = detect('observability-app');
+	assert.deepEqual(ids(r), ['elastic-cloud', 'grafana-cloud', 'newrelic']);
+	assert.deepEqual(r.vendors.find((v) => v.id === 'elastic-cloud').roles_used, ['search']);
+	assert.ok(r.vendors.find((v) => v.id === 'newrelic').evidence.some((e) => e.kind === 'config' && e.match === 'newrelic.js'));
+	assert.deepEqual(r.overlaps, [{ role: 'monitoring', vendors: ['grafana-cloud', 'newrelic'] }]);
+});
+
+test('look-alikes: Grafana plugin packages, k6, OpenSearch and the Elasticsearch image password are not vendors', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@grafana/ui': '13', '@grafana/data': '13', k6: '0.0.0', '@opensearch-project/opensearch': '3', '@elastic/eui': '100' } }));
+	writeFileSync(join(dir, '.env'), 'ELASTIC_PASSWORD=x\nGF_SECURITY_ADMIN_PASSWORD=x\nGCLOUD_PROJECT=demo\n');
+	writeFileSync(join(dir, 'load.js'), "import http from 'k6/http';\nexport default function () { http.get('https://example.com'); }\n");
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+});
+
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);

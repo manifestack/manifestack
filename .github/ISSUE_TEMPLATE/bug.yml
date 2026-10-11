@@ -1,5 +1,5 @@
 name: Bug
-description: Something manifestack did wrong, from the installer, the hook or a skill answer.
+description: Something manifestack did wrong, from the installer or the hook to a skill answer, including a wrong price or limit.
 labels: [bug]
 body:
   - type: dropdown

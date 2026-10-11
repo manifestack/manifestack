@@ -4,13 +4,13 @@
     "name": "Manifestack"
   },
   "metadata": {
-    "description": "Manifestack: an Agent Skill that fits your stack to your project and keeps it fitting as it changes."
+    "description": "Manifestack: an Agent Skill that tells you what your stack will cost before the bill arrives."
   },
   "plugins": [
     {
       "name": "manifestack",
       "source": "./",
-      "description": "A stack that fits your project: pick one, audit it, and check every new vendor against budget, users and data rules."
+      "description": "Know what your stack will cost before the bill arrives: price it, audit it for bills, limits and requirement gaps, and check every new vendor."
     }
   ]
 }

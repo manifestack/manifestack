@@ -4,7 +4,7 @@
 
 # Manifestack
 
-**A stack that fits your project, and keeps fitting as it changes.**
+**Know what your stack will cost before the bill arrives.**
 
 [![Website](https://img.shields.io/badge/website-manifestack.com-0a7cff)](https://manifestack.com)
 [![npm](https://img.shields.io/npm/v/manifestack?logo=npm&color=cb3837)](https://www.npmjs.com/package/manifestack)
@@ -13,7 +13,9 @@
 
 </div>
 
-Manifestack is a skill for your coding agent (Claude Code, Cursor, Codex and others). Ask it to check your stack, and it finds the bills, outages and compliance gaps ahead of you. Each finding comes with a fix, and every price is read from the vendor's own page.
+Manifestack is a free skill for your coding agent (Claude Code, Cursor, Codex and others). Ask what your stack will cost at 50k users: it prices every service at your usage on the vendor's own pages and finds the bills ahead of you, each with the fix that cuts it. The same report flags the plan limits that take a product down, data rules it breaks and services you pay for twice.
+
+For developers, small teams and agencies who build with a coding agent and pick their own services, from Vercel and Supabase to AWS. Not a FinOps tool for large cloud accounts.
 
 <p align="center">
 <img width="702" alt="Claude Code running a manifestack audit: over budget at 50k users, with critical and high findings and a fix for each" src="https://github.com/user-attachments/assets/62acd5c4-3779-48f4-9c09-264598a67acd" />
@@ -29,14 +31,23 @@ Requires Node.js 22 or newer.
 npx manifestack
 ```
 
-Then run `/manifestack`, or just ask your agent: "what breaks first at 50k users?", "what should we build this on?", "Neon or Supabase for this app?".
+Then run `/manifestack`, or just ask your agent: "what will we pay at 50k users?", "what breaks first?", "what should we build this on?", "Neon or Supabase for this app?".
 
 ## What it does
 
+- **Prices your stack as it grows.** Every service at your usage, now and at 10k, 50k or 100k users, read from the vendor's current pricing page. Each bill comes with what cuts it: a plan or tier that fits, a setting, a service you don't need.
+- **Finds what breaks before then.** Free-tier caps, rate limits, spend limits that pause production, with the date each one hits.
+- **Checks the rest of the fit.** Data rules (EU region, SOC 2), two services doing one job, and setups built for far more users than you have.
+- **Remembers why.** Budget, requirements and decisions live in `.manifestack/STACK.md`, so the next audit, the next teammate and the next agent session start from them.
+
+Every price cites the page and the date it was read. A page it can't open is marked unverified, never filled from memory.
+
+### At every stage
+
 - **New project:** asks about users, budget, data rules and your team, then picks hosting, database, auth, email and the rest, priced from launch to 100k users, and says what you don't need.
-- **Existing project:** scans the whole product (JS, Python and Go dependencies, Terraform, Bicep and CloudFormation, config files, env var names) and reports what breaks or costs too much, by severity, with a fix for each.
-- **Choosing a vendor:** compares two or three vendors for the same job on your workload: requirements, cost at your size, the first limit, the features you use and what it takes to leave.
-- **Every change:** in Claude Code and Cursor, a hook flags each new vendor SDK and checks it against your requirements before you rely on it.
+- **Existing project:** scans the whole product (JS, Python and Go dependencies, Terraform, Bicep and CloudFormation, CI deploy steps, config files, env var names) and reports what costs too much, hits a limit or breaks a rule, by severity, with a fix for each.
+- **Choosing a vendor:** compares two or three vendors for the same job on your workload: cost at your size, requirements, the first limit, the features you use and what it takes to leave.
+- **Every change:** in Claude Code and Cursor, a hook flags each new vendor SDK and checks it against your budget and requirements before you rely on it.
 
 It never changes your code or vendor settings and needs no API keys or account. The skill writes only inside `.manifestack/`: `STACK.md`, plus working files in `.manifestack/tmp/` that git ignores. The installer adds the skill folders and, for Claude Code and Cursor, one hook entry; `npx manifestack uninstall` removes them.
 
@@ -46,8 +57,8 @@ It never changes your code or vendor settings and needs no API keys or account. 
 | --- | --- |
 | `/manifestack` | `init` on an empty repo, `audit` otherwise |
 | `/manifestack init "B2B dashboard, EU users"` | Proposes and prices a whole stack |
-| `/manifestack audit` | Checks every service against your requirements, budget and growth |
-| `/manifestack compare neon supabase` | Puts two or three vendors side by side for your workload |
+| `/manifestack audit` | Prices every service at your usage and growth, and lists what to fix |
+| `/manifestack compare neon supabase` | Puts two or three vendors side by side, priced on your workload |
 
 <details>
 <summary>Example: the full audit from the image above</summary>
@@ -133,7 +144,7 @@ cp -r manifestack/skills/manifestack manifestack/skills/manifestack-guard .agent
 
 ## STACK.md
 
-Your requirements and decisions, in `.manifestack/STACK.md`. Commit it; every audit and new service is checked against it.
+Your budget, requirements and decisions, in `.manifestack/STACK.md`. Commit it; every audit and new service is checked against it.
 
 ```markdown
 ## Requirements
@@ -154,7 +165,7 @@ Decisions are written only after your yes; secrets never go in. [Full format](ht
 
 ## Vendors
 
-Works with any vendor. Built-in page maps make these faster and more reliable:
+108 built-in page maps say where a vendor's pricing, limits, regions and security pages are, and which traps to check. AWS, Google Cloud and Azure are each an account map (free tier and credits, spend limits, budgets, data transfer, NAT Gateway, public IPv4) plus one map per service, so an audit reads only the services you use. Any other vendor works too: the skill finds its pages itself.
 
 | Role | Vendors |
 | --- | --- |

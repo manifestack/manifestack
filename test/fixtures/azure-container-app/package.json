@@ -1,0 +1,12 @@
+{
+  "name": "azure-container-app",
+  "private": true,
+  "dependencies": {
+    "@azure/cosmos": "^4.5.0",
+    "@azure/identity": "^4.12.0",
+    "@azure/service-bus": "^7.9.0",
+    "@azure/storage-blob": "^12.28.0",
+    "@sentry/node": "^10.0.0",
+    "openai": "^6.0.0"
+  }
+}

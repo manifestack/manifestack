@@ -1,0 +1,6 @@
+name: orders
+services:
+  api:
+    project: .
+    host: containerapp
+    language: ts

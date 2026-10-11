@@ -229,7 +229,6 @@ function splitInline(s) {
 // npm prefix entries end with `/` and match every package in that scope or path. `pypi` and `go` follow the rules in
 // manifests.mjs (PyPI names normalized, trailing `*` = prefix; Go module path prefixes).
 const UNMAPPED_SDKS = [
-	{ name: 'Azure', role: 'other', packages: ['@azure/'], pypi: ['azure-*'], go: ['github.com/Azure/azure-sdk-for-go'] },
 	{ name: 'Auth.js', role: 'auth', packages: ['next-auth', '@auth/'] },
 	{ name: 'Better Auth', role: 'auth', packages: ['better-auth'] },
 	{ name: 'Loops', role: 'email', packages: ['loops'] },
@@ -853,7 +852,7 @@ const SAMPLE_DIR = /(?:^|\/)(?:fixtures?|__fixtures__|__mocks__|mocks?|examples?
 const isSample = (rel) => SAMPLE_DIR.test(rel);
 
 // Infrastructure files read by name: always listed, even past the file limit.
-const INFRA_FILE = /^(Dockerfile(\..+)?|(docker-)?compose(\.[\w-]+)?\.ya?ml|.+\.tf|Chart\.yaml|(helmfile|skaffold|kustomization)\.ya?ml|Pulumi\.ya?ml|serverless\.ya?ml)$/;
+const INFRA_FILE = /^(Dockerfile(\..+)?|(docker-)?compose(\.[\w-]+)?\.ya?ml|.+\.tf|Chart\.yaml|(helmfile|skaffold|kustomization)\.ya?ml|Pulumi\.ya?ml|serverless\.ya?ml|.+\.bicep)$/;
 
 // Evidence kept per vendor, most telling first; every kind found keeps at least one slot.
 const EVIDENCE_ORDER = ['package', 'config', 'import', 'service', 'code', 'env'];
@@ -963,11 +962,11 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			if (service) hit(sig, 'service', rel, service);
 		}
 	};
-	// Terraform, serverless.yml, SAM and CloudFormation name services the application code may never import.
-	const scanInfraCode = (full, rel, text) => {
+	// Terraform, Bicep, serverless.yml, SAM and CloudFormation name services the application code may never import.
+	const scanInfraCode = (full, rel, text, hash = true) => {
 		try {
 			if (text === undefined && statSync(full).size > MAX_SOURCE_BYTES) return;
-			scanSignals(stripComments(text ?? read(full), { hash: true }), rel);
+			scanSignals(stripComments(text ?? read(full), { hash }), rel);
 		} catch {}
 	};
 
@@ -1029,6 +1028,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		else if (/\.tf$/.test(name)) {
 			infra.push({ kind: 'terraform', file: rel });
 			scanInfraCode(full, rel);
+		}
+		else if (/\.bicep$/.test(name)) {
+			infra.push({ kind: 'bicep', file: rel });
+			scanInfraCode(full, rel, undefined, false);
 		}
 		else if (name === 'Chart.yaml') infra.push({ kind: 'helm', file: rel });
 		else if (/^(helmfile|skaffold|kustomization)\.ya?ml$/.test(name)) infra.push({ kind: 'kubernetes', file: rel });

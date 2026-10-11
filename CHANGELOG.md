@@ -15,7 +15,9 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 - Vendor maps: New Relic, Grafana Cloud and Elastic Cloud. Grafana Cloud and Elastic Cloud notes tell the hosted service from free self-hosted Grafana and Elasticsearch; Elastic counts for search or monitoring only when the code uses that part.
 - Vendor maps: Twilio and PayPal (with Braintree). PayPal next to Stripe is usually a wallet button next to card payments; the maps say when it is an Overlap.
 - AWS as a vendor family: an account map (Free plan and credits, spend limits, Budgets, data transfer, NAT Gateway, public IPv4, support plans, regions) and 15 service maps, from SDK clients, boto3 calls, Terraform, CloudFormation, SAM, CDK, Pulumi and SST. AWS is no longer an unmapped SDK. Services of one family in the same role (CloudFront in front of Lambda) are not an Overlap, and a family map's own signals (a Terraform `aws` provider, a CloudFormation template) find the family without an SDK.
-- Google Cloud as a vendor family: an account map (Free Trial and credits, Cloud Billing budgets, spend caps, network egress, regions) and 12 service maps, from client libraries, Python and Go modules, Terraform, Pulumi, Config Connector, `cloudbuild.yaml` and `gcloud` deploy commands. Firebase is now a service of this family, so Firestore next to Cloud SQL or Firebase Storage next to Cloud Storage is not an Overlap. Cloud Run, GKE and App Engine logs make Cloud Logging a bill check, not a second monitoring tool. Google Cloud is no longer an unmapped SDK.
+- Google Cloud as a vendor family: an account map (Free Trial and credits, Cloud Billing budgets, spend caps, network egress, regions) and 11 service maps, from client libraries, Python and Go modules, Terraform, Pulumi, Config Connector, `cloudbuild.yaml` and `gcloud` deploy commands. Firebase is now a service of this family, so Firestore next to Cloud SQL or Firebase Storage next to Cloud Storage is not an Overlap. Cloud Run, GKE and App Engine logs make Cloud Logging a bill check, not a second monitoring tool. Google Cloud is no longer an unmapped SDK.
+- Azure as a vendor family: an account map (free account and credits, spending limit, budgets, bandwidth, public IPv4, reservations and savings plans, support plans, regions) and 16 service maps, from client libraries, Python and Go modules, Terraform, Bicep, Pulumi, `azure.yaml` (Azure Developer CLI), Azure Pipelines and `az` commands. Container Apps, Functions and AKS logs make Azure Monitor a bill check, not a second monitoring tool. Communication Services is marked as retiring. Azure is no longer an unmapped SDK.
+- Bicep files are scanned for service signals like Terraform files, and listed in `infra`.
 - Roles `Analytics` and `Search` for STACK.md sections and vendor maps. PostHog is `Analytics`, and counts for `Monitoring` only when the code uses its error tracking.
 - Roles `Realtime` and `Jobs`, so two realtime services or two job runners are reported as an Overlap. Upstash counts for `Jobs` when the code uses QStash or Workflow.
 - Role `CMS`, so two content management systems are reported as an Overlap.
@@ -24,6 +26,7 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ### Fixed
 
+- OpenAI counts for `AI` only when the code calls OpenAI directly: Azure OpenAI through the `openai` SDK (`AzureOpenAI`) is read from the Azure map and is no longer an Overlap with OpenAI.
 - Two vendors in the `Other` role (for example SMS and a CMS) are no longer reported as an Overlap.
 
 ## [0.4.0] - 2026-10-08

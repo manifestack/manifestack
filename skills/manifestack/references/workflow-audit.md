@@ -8,10 +8,10 @@ Run `node <skill-dir>/scripts/detect.mjs .` from the repository root. It returns
 
 - `empty`: true when there is no code yet (use init instead);
 - `scanned_files` and `truncated`: how many files were read, and whether the scan stopped at the file limit;
-- `vendors`: mapped vendors with `evidence` (package from package.json, requirements*.txt, pyproject.toml, Pipfile or go.mod; import; config; env name; service or code signal, also from Terraform and YAML) and `roles_used`; `family` when the entry is one service of a larger vendor;
+- `vendors`: mapped vendors with `evidence` (package from package.json, requirements*.txt, pyproject.toml, Pipfile or go.mod; import; config; env name; service or code signal, also from Terraform, Bicep and YAML) and `roles_used`; `family` when the entry is one service of a larger vendor;
 - `unmapped`: known SDKs without a page map (AWS, Mistral, Twilio, …);
 - `overlaps`: roles served by more than one vendor (candidate `Overlap` findings);
-- `frameworks` and `infra`: inputs for `Overbuilt` (Next.js, Django, FastAPI, Gin, Docker, Terraform, Helm, Kubernetes manifests);
+- `frameworks` and `infra`: inputs for `Overbuilt` (Next.js, Django, FastAPI, Gin, Docker, Terraform, Bicep, Helm, Kubernetes manifests);
 - `env_names`: variable names only;
 - `samples`: vendors seen only in fixtures, mocks, tests or examples. They are not the product's stack: no findings for them;
 - `hook`: new-vendor hook status per agent (SKILL.md section 6).

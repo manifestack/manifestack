@@ -114,7 +114,9 @@ test('read and common_fixes items must be plain strings', () => {
 
 test('families: service signals need a family, the family must have its own map, families do not nest', () => {
 	const map = (extra) => parseVendorMap(`---\nschema: 1\nid: acme-store\nname: Acme Store\nroles: [storage]\n${extra}detect:\n  packages: ["@acme/store"]\n  service_signals: ["acme_store_bucket"]\npages:\n  pricing: https://acme.example/pricing\nread:\n  - storage per GB\nverified: 2026-10-11\n---\n`);
-	assert.ok(validateVendorMap(map('')).some((e) => /service_signals needs a family/.test(e)));
+	assert.deepEqual(validateVendorMap(map('')), [], 'checked across maps instead');
+	assert.match(familyErrors([map('')])[0], /service_signals needs a family, or a map that names this one/);
+	assert.deepEqual(familyErrors([{ ...map(''), id: 'acme' }, map('family: acme\n')]), [], 'a family map may have its own service signals');
 	assert.deepEqual(validateVendorMap(map('family: acme\n')), []);
 	assert.ok(validateVendorMap(map('family: acme-store\n')).some((e) => /another map/.test(e)));
 	const store = map('family: acme\n');

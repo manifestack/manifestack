@@ -61,10 +61,10 @@ export function validateVendorMap(v) {
 	// Detection calls .some() on these and an empty pattern matches everything, so the shape is checked here.
 	for (const field of DETECT_LISTS) if (!isStringList(d[field])) errors.push(`detect.${field} must be a list of non-empty strings`);
 	if (!DETECT_LISTS.some((field) => Array.isArray(d[field]) && d[field].length)) errors.push('detect needs at least one signature');
-	// A service of a larger vendor (aws-s3 of aws): its service signals count only when the family is found.
+	// A service of a larger vendor (aws-s3 of aws): its service signals count only when the family is found. A family map's
+	// own service signals (provider "aws") find the family; familyErrors checks that some map names it as a family.
 	if (v.family !== undefined && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(v.family))) errors.push('family must be the id of another map');
 	if (v.family === v.id) errors.push('family must be another map, not this one');
-	if ((d.service_signals ?? []).length && !v.family) errors.push('detect.service_signals needs a family');
 	const signals = d.role_signals ?? {};
 	if (typeof signals !== 'object' || Array.isArray(signals)) errors.push('detect.role_signals must map roles to lists');
 	else {
@@ -96,6 +96,8 @@ export function loadCatalog(dir) {
 		if (`${v.id}.md` !== name) throw new Error(`${name}: id "${v.id}" must match the file name`);
 		vendors.push(v);
 	}
+	// By id, not file name: "aws-s3.md" sorts before "aws.md", "aws-s3" after "aws".
+	vendors.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 	const clash = packageClashes(vendors)[0];
 	if (clash) throw new Error(clash);
 	const family = familyErrors(vendors)[0];
@@ -107,7 +109,10 @@ export function loadCatalog(dir) {
 export function familyErrors(vendors) {
 	const byId = new Map(vendors.map((v) => [v.id, v]));
 	const errors = [];
+	const families = new Set(vendors.map((v) => v.family).filter(Boolean));
 	for (const v of vendors) {
+		// On a family map, service signals (provider "aws", AWSTemplateFormatVersion) find the family itself.
+		if (!v.family && v.detect?.service_signals?.length && !families.has(v.id)) errors.push(`${v.id}.md: detect.service_signals needs a family, or a map that names this one as its family`);
 		if (!v.family) continue;
 		const parent = byId.get(v.family);
 		if (!parent) errors.push(`${v.id}.md: family "${v.family}" has no map`);

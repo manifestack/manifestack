@@ -4,6 +4,10 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-11
+
+Detection now reads CI workflows and JSON infrastructure templates. To update an installed project, run `npx manifestack@latest`, which also updates the new-vendor hook.
+
 ### Added
 
 - Detection reads CI workflows (`.github/workflows`, `.circleci`, `.buildkite`): deploy steps for AWS, Google Cloud and Azure (`google-github-actions/deploy-cloudrun`, `azure/webapps-deploy`, `aws-actions/amazon-ecs-deploy-task-definition` and others) find the cloud and the service.
@@ -118,7 +122,8 @@ To update an installed project: `npx manifestack@latest`, then `npx manifestack 
 - "New vendor" hook for Claude Code and Cursor.
 - Vendor maps: Vercel, Supabase, Neon, Clerk, Resend.
 
-[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/manifestack/manifestack/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/manifestack/manifestack/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/manifestack/manifestack/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/manifestack/manifestack/compare/v0.2.0...v0.3.0

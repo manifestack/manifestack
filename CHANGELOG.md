@@ -4,6 +4,10 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Changed
+
+- README and the npm and Claude Code plugin descriptions lead with what the stack will cost: every service priced at your usage and growth on the vendor's own pages, each bill with the fix that cuts it. Limits, data rules, overlaps and overbuilt setups follow in the same report.
+
 ## [0.5.1] - 2026-10-11
 
 108 vendor maps, up from 36: AWS, Google Cloud and Azure as vendor families, 27 more vendors and six new roles. Detection also reads CI workflows and infrastructure templates in JSON. To update an installed project, run `npx manifestack@latest`; it also updates the new-vendor hook, which carries its own copy of the vendor list. With the hook added by `npx manifestack hook`, run `npx manifestack@latest hook`; with the Claude Code plugin, update the plugin.

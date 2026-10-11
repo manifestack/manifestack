@@ -2,7 +2,7 @@
   "name": "manifestack",
   "displayName": "Manifestack",
   "version": "0.5.1",
-  "description": "Fits your stack to your project's budget, users, data rules and team, then keeps it fitting: audits requirement gaps, duplicate services, overbuilt setups, plan limits and bills, compares vendors for your workload, and checks every vendor the agent adds. Read-only, no API keys.",
+  "description": "Know what your stack will cost before the bill arrives: prices every service at your usage and growth on vendors' own pages, audits bills, overbuilt setups, plan limits, duplicate services and requirement gaps, compares vendors for your workload, and checks every vendor the agent adds. Read-only, no API keys.",
   "author": {
     "name": "Manifestack"
   },

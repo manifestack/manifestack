@@ -4,9 +4,9 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-10-11
+## [0.5.1] - 2026-10-11
 
-108 vendor maps, up from 36: AWS, Google Cloud and Azure as vendor families, 27 more vendors and six new roles. To update an installed project, run `npx manifestack@latest`; it also updates the new-vendor hook, which carries its own copy of the vendor list. With the hook added by `npx manifestack hook`, run `npx manifestack@latest hook`; with the Claude Code plugin, update the plugin.
+108 vendor maps, up from 36: AWS, Google Cloud and Azure as vendor families, 27 more vendors and six new roles. Detection also reads CI workflows and infrastructure templates in JSON. To update an installed project, run `npx manifestack@latest`; it also updates the new-vendor hook, which carries its own copy of the vendor list. With the hook added by `npx manifestack hook`, run `npx manifestack@latest hook`; with the Claude Code plugin, update the plugin.
 
 ### Added
 
@@ -26,6 +26,9 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
   - Analytics and flags: Segment, Mixpanel, Amplitude and LaunchDarkly. Segment feeding an analytics tool is not an Overlap; Mixpanel and Amplitude count for flags only when the code uses their feature flags.
   - Monitoring: New Relic, Grafana Cloud and Elastic Cloud. Their notes tell Grafana Cloud and Elastic Cloud apart from free self-hosted Grafana and Elasticsearch. Elastic counts for search or monitoring only when the code uses that part.
 - Roles `Analytics`, `Search`, `Realtime`, `Jobs`, `CMS` and `Flags` for STACK.md sections and vendor maps, so two services doing the same job are reported as an Overlap. PostHog is `Analytics`, and counts for `Monitoring` or `Flags` only when the code uses error tracking or feature flags. Upstash counts for `Jobs` when the code uses QStash or Workflow. `Other` holds unrelated jobs (SMS, a data pipeline, a cloud account), so two vendors in it are never an Overlap.
+- Detection reads CI workflows (`.github/workflows`, `.circleci`, `.buildkite`): deploy steps for AWS, Google Cloud and Azure (`google-github-actions/deploy-cloudrun`, `azure/webapps-deploy`, `aws-actions/amazon-ecs-deploy-task-definition` and others) find the cloud and the service.
+- Detection reads infrastructure in JSON: CloudFormation and SAM templates (`template.json`), ARM templates (`azuredeploy.json`) and Terraform JSON (`*.tf.json`).
+- Vendor maps can leave one package out of a scope they claim (`!azure-devops`, `!@google-cloud/local-auth`), so Azure DevOps and Google Workspace sign-in no longer find the clouds.
 
 ### Fixed
 
@@ -35,6 +38,10 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 - `npx manifestack` reads `.claude/settings.json` and `.cursor/hooks.json` saved with a byte order mark.
 - STACK.md: `usage` reads GiB, MiB, TiB and PB, and a unit or currency it cannot read is a lint warning instead of a wrong number; parallel `set` calls no longer lose each other's sections; `lint` accepts a vendor map's own metric name when the section has one reading.
 - `project.mjs eta`: a reading old enough that the trend has already passed the limit says `Now`, with the projected date.
+- STACK.md: Slack webhook URLs and GitLab tokens are refused as secrets, and very long pasted lines are checked quickly.
+- `project.mjs cost`: negative, endless or malformed model values are errors that name the field, instead of negative totals or a crash.
+- `npx manifestack uninstall` removes agent folders it left empty (`.gemini`, `.windsurf`), so a later install does not detect agents the project does not use.
+- Detection is about a third faster on large repositories.
 
 ## [0.4.0] - 2026-10-08
 
@@ -105,8 +112,8 @@ To update an installed project: `npx manifestack@latest`, then `npx manifestack 
 - "New vendor" hook for Claude Code and Cursor.
 - Vendor maps: Vercel, Supabase, Neon, Clerk, Resend.
 
-[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/manifestack/manifestack/compare/v0.4.0...v0.5.0
+[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/manifestack/manifestack/compare/v0.4.0...v0.5.1
 [0.4.0]: https://github.com/manifestack/manifestack/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/manifestack/manifestack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/manifestack/manifestack/compare/v0.1.0...v0.2.0

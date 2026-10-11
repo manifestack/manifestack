@@ -9,7 +9,8 @@ import { loadCatalog, vendorSignatures } from './catalog.mjs';
 import { UNMAPPED_SDKS, FRAMEWORK_PACKAGES, FRAMEWORK_PYPI, FRAMEWORK_GO } from './known-sdks.mjs';
 import { ECOSYSTEM_FIELDS, manifestKind, manifestDependencies, dependencyMatches, normalizeSpecifier, stripComments } from './manifests.mjs';
 
-const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'venv', 'site-packages', 'Pods', '__pycache__', 'target', 'tmp']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'vendor', 'venv', 'site-packages', 'Pods', '__pycache__', 'target', 'tmp', 'cdk.out']);
+const CI_DIRS = new Set(['.github', '.github/workflows', '.circleci', '.buildkite']);
 const SOURCE_EXT = /\.(m?[jt]sx?|cjs|cts|vue|svelte|astro|py|go)$/;
 const FRAMEWORKS = { npm: FRAMEWORK_PACKAGES, pypi: FRAMEWORK_PYPI, go: FRAMEWORK_GO };
 const ENV_FILE = /^\.env(\..+)?$/;
@@ -106,7 +107,7 @@ export function matchDependencies(deps, signatures, kind = 'npm') {
 		let owners = [];
 		for (const sig of signatures) {
 			for (const p of sig[field] ?? []) {
-				if (!exactPattern(p) || !dependencyMatches(kind, d, [p]) || (kind === 'npm' && d !== p) || p.length < best) continue;
+				if (p[0] === '!' || !exactPattern(p) || !dependencyMatches(kind, d, [p]) || (kind === 'npm' && d !== p) || p.length < best) continue;
 				if (p.length > best) [best, owners] = [p.length, []];
 				if (!owners.includes(sig.id)) owners.push(sig.id);
 			}
@@ -131,7 +132,10 @@ export function matchDependencies(deps, signatures, kind = 'npm') {
  * "cloudflare:"); any other pattern is a package name and matches it or its subpaths ("mongodb", "mongodb/lib").
  */
 export function importMatches(spec, patterns = []) {
-	return patterns.some((p) => (/[/:]$/.test(p) ? spec.startsWith(p) : spec === p || spec.startsWith(p + '/')));
+	const one = (p) => (/[/:]$/.test(p) ? spec.startsWith(p) : spec === p || spec.startsWith(p + '/'));
+	// "!name" excludes one package from a claimed scope, as in dependencyMatches.
+	if (patterns.some((p) => p[0] === '!' && one(p.slice(1)))) return false;
+	return patterns.some((p) => p[0] !== '!' && one(p));
 }
 
 /**
@@ -160,8 +164,10 @@ function listFiles(root, limits, classify) {
 		for (const e of entries) {
 			const full = join(queue[q], e.name);
 			if (e.isDirectory()) {
-				// Dot-directories hold agent configs, installed skills and VCS data, not the product.
-				if (!e.name.startsWith('.') && !SKIP_DIRS.has(e.name)) queue.push(full);
+				// Dot-directories hold agent configs, installed skills and VCS data, not the product; CI folders
+				// (.github/workflows, .circleci, .buildkite) are read, since deploys to a cloud often live only there.
+				const relDir = relative(root, full).split(sep).join('/');
+				if (CI_DIRS.has(relDir) || (!e.name.startsWith('.') && !SKIP_DIRS.has(e.name) && !relDir.startsWith('.github/'))) queue.push(full);
 				continue;
 			}
 			// Symlinks are followed to files only; a linked directory could loop.
@@ -171,7 +177,7 @@ function listFiles(root, limits, classify) {
 				return { files, projectFiles };
 			}
 			const rel = relative(root, full).split(sep).join('/');
-			if (!(q === 0 && NON_PROJECT_FILES.test(e.name))) projectFiles++;
+			if (!(q === 0 && NON_PROJECT_FILES.test(e.name)) && !CI_FILE.test(rel)) projectFiles++;
 			const kind = classify(rel, e.name);
 			if (!kind) continue;
 			if (kind === 'candidate' && ++candidates > limits.maxListed) {
@@ -199,6 +205,12 @@ const isSample = (rel) => SAMPLE_DIR.test(rel);
 
 // Infrastructure files read by name: always listed, even past the file limit.
 const INFRA_FILE = /^(Dockerfile(\..+)?|(docker-)?compose(\.[\w-]+)?\.ya?ml|.+\.tf|Chart\.yaml|(helmfile|skaffold|kustomization)\.ya?ml|Pulumi\.ya?ml|serverless\.ya?ml|.+\.bicep)$/;
+// Infrastructure in JSON: Terraform JSON, ARM templates (azuredeploy.json), CloudFormation and SAM templates.
+const INFRA_JSON = /^(?:.+\.tf\.json|azuredeploy[\w.-]*\.json|(?:.+[.-])?template\.json)$/i;
+// A JSON template is read only when it is one: an email or config template.json is not infrastructure.
+const IAC_JSON = /AWSTemplateFormatVersion|AWS::Serverless|deploymentTemplate\.json#|"Resources"\s*:/;
+// CI workflow files: read for deploy steps, but they are not the product (an empty repo with a workflow is still empty).
+const CI_FILE = /^\.(?:github\/workflows|circleci|buildkite)\/|^\.github\/[^/]+$/;
 
 // Evidence kept per vendor, most telling first; every kind found keeps at least one slot.
 const EVIDENCE_ORDER = ['package', 'config', 'import', 'service', 'code', 'env'];
@@ -276,7 +288,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 	const limits = { maxListed: maxFiles * 20, maxWalked: maxFiles * 200, truncated: false };
 	const configNames = sigs.flatMap((sig) => sig.config_files);
 	const classify = (rel, name) => {
-		if (ENV_FILE.test(name) || manifestKind(rel) || INFRA_FILE.test(name)) return 'essential';
+		if (ENV_FILE.test(name) || manifestKind(rel) || INFRA_FILE.test(name) || INFRA_JSON.test(name)) return 'essential';
 		if (configNames.some((cfg) => rel === cfg || rel.endsWith('/' + cfg))) return 'essential';
 		// pnpm-lock.yaml lists every transitive package (firebase pulls in @firebase/storage): not the project's own code.
 		if (name === 'pnpm-lock.yaml') return null;
@@ -321,6 +333,32 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 
 	// Config files are also checked at their exact path: the walk skips dot-directories such as .do/.
 	for (const sig of sigs) for (const cfg of sig.config_files) if (isFileSync(join(root, cfg))) hit(sig, 'config', cfg, cfg);
+
+	// Import patterns indexed once: a package name ("stripe", "@vercel/kv") is looked up by itself and its parent
+	// paths, and only the scope and prefix patterns ("@sentry/", "cloudflare:") are tried one by one.
+	const exactImports = new Map();
+	const prefixImports = [];
+	for (const sig of sigs) {
+		for (const p of sig.imports) {
+			if (p[0] === '!') continue;
+			if (/[/:]$/.test(p)) prefixImports.push([p, sig]);
+			else exactImports.set(p, [...(exactImports.get(p) ?? []), sig]);
+		}
+	}
+	const ownersCache = new Map();
+	// As for dependencies, a map that names the package beats one that only claims its scope (@vercel/kv is Upstash).
+	const importOwners = (pkg) => {
+		if (ownersCache.has(pkg)) return ownersCache.get(pkg);
+		const exact = new Set();
+		for (let i = pkg.indexOf('/'); ; i = pkg.indexOf('/', i + 1)) {
+			for (const sig of exactImports.get(i === -1 ? pkg : pkg.slice(0, i)) ?? []) exact.add(sig);
+			if (i === -1) break;
+		}
+		const candidates = exact.size ? [...exact] : [...new Set(prefixImports.filter(([p]) => pkg.startsWith(p)).map(([, sig]) => sig))];
+		const owners = candidates.filter((sig) => importMatches(pkg, sig.imports));
+		ownersCache.set(pkg, owners);
+		return owners;
+	};
 
 	const deferred = [];
 	const listing = listFiles(root, limits, classify);
@@ -377,13 +415,23 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			continue;
 		}
 
-		if (INFRA_FILE.test(name) && isSample(rel)) continue;
+		if ((INFRA_FILE.test(name) || INFRA_JSON.test(name)) && isSample(rel)) continue;
 		if (name === 'Dockerfile' || /^Dockerfile\./.test(name)) infra.push({ kind: 'docker', file: rel });
 		else if (/^(docker-)?compose(\.[\w-]+)?\.ya?ml$/.test(name)) infra.push({ kind: 'docker-compose', file: rel });
 		else if (/\.tf$/.test(name)) {
 			infra.push({ kind: 'terraform', file: rel });
 			// Terraform comments start with #, // or /*.
 			scanInfraCode(full, rel, undefined, { hash: true, slash: true });
+		}
+		else if (INFRA_JSON.test(name)) {
+			const tf = /\.tf\.json$/i.test(name);
+			try {
+				if (statSync(full).size > MAX_SOURCE_BYTES) continue;
+				const text = read(full);
+				if (!tf && !IAC_JSON.test(text)) continue;
+				if (tf) infra.push({ kind: 'terraform', file: rel });
+				scanInfraCode(full, rel, text, { hash: false, slash: false });
+			} catch {}
 		}
 		else if (/\.bicep$/.test(name)) {
 			infra.push({ kind: 'bicep', file: rel });
@@ -411,7 +459,9 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 				if (statSync(full).size >= 256 * 1024) continue;
 				const text = read(full);
 				if (!isSample(rel) && isKubernetesManifest(text)) infra.push({ kind: 'kubernetes', file: rel });
-				scanInfraCode(full, rel, text);
+				// GitHub resolves `uses: Azure/login@v2` in any case: action refs are matched in lower case.
+				const uses = CI_FILE.test(rel) ? [...stripComments(text, { hash: true }).matchAll(/\buses:\s*['"]?([^\s'"#]+)/g)].map((m) => m[1].toLowerCase()) : [];
+				scanInfraCode(full, rel, uses.length ? `${text}\n${uses.join('\n')}` : text);
 			} catch {}
 			continue;
 		}
@@ -426,9 +476,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		// Python and Go imports name the package itself, so they match like dependencies.
 		const native = name.endsWith('.py') ? ['pypi', extractPythonModules(src)] : name.endsWith('.go') ? ['go', extractGoImports(src)] : null;
 		if (native) for (const v of matchDependencies(native[1], sigs, native[0]).vendors) for (const p of v.packages) hit(sigs.find((x) => x.id === v.id), 'import', rel, p);
-		// As for dependencies, a map that names the package beats one that only claims its scope (@vercel/kv is Upstash).
-		const owners = new Map(specs.map(([, pkg]) => [pkg, sigs.filter((sig) => sig.imports.some((p) => !/[/:]$/.test(p) && (pkg === p || pkg.startsWith(p + '/')))).map((sig) => sig.id)]));
-		for (const sig of sigs) for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports) && (!owners.get(pkg).length || owners.get(pkg).includes(sig.id))) hit(sig, 'import', rel, spec);
+		for (const [spec, pkg] of specs) for (const sig of importOwners(pkg)) hit(sig, 'import', rel, spec);
 		scanSignals(src, rel);
 	}
 

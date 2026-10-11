@@ -9,7 +9,7 @@ detect:
   go: ["github.com/aws/aws-sdk-go-v2/service/ecs", "github.com/aws/aws-sdk-go-v2/service/apprunner"]
   imports: ["@aws-sdk/client-ecs", "@aws-sdk/client-apprunner"]
   config_files: ["apprunner.yaml", "copilot/.workspace"]
-  service_signals: ["client('ecs'", "client(\"ecs\"", "client('apprunner'", "client(\"apprunner\"", "aws_ecs_service", "aws_ecs_task_definition", "aws_ecs_express_gateway_service", "aws_apprunner_service", "AWS::ECS::Service", "AWS::ECS::TaskDefinition", "AWS::ECS::ExpressGatewayService", "AWS::AppRunner::Service", "aws-cdk-lib/aws-ecs", "aws-cdk-lib/aws-apprunner", "@aws-cdk/aws-apprunner-alpha", "aws_cdk.aws_ecs", "new AWS.ECS(", "aws-sdk-go/service/ecs", "sst.aws.Service(", "aws:ecs:Service", "Load Balanced Web Service", "Request-Driven Web Service", "aws_ecs as", "aws.ecs."]
+  service_signals: ["client('ecs'", "client(\"ecs\"", "client('apprunner'", "client(\"apprunner\"", "aws_ecs_service", "aws_ecs_task_definition", "aws_ecs_express_gateway_service", "aws_apprunner_service", "AWS::ECS::Service", "AWS::ECS::TaskDefinition", "AWS::ECS::ExpressGatewayService", "AWS::AppRunner::Service", "aws-cdk-lib/aws-ecs", "aws-cdk-lib/aws-apprunner", "@aws-cdk/aws-apprunner-alpha", "aws_cdk.aws_ecs", "new AWS.ECS(", "aws-sdk-go/service/ecs", "sst.aws.Service(", "aws:ecs:Service", "Load Balanced Web Service", "Request-Driven Web Service", "aws_ecs as", "aws.ecs.", "aws-actions/amazon-ecs-deploy-task-definition@", "aws-actions/amazon-ecs-render-task-definition@"]
 pages:
   pricing: https://aws.amazon.com/fargate/pricing/
   ecs_pricing: https://aws.amazon.com/ecs/pricing/

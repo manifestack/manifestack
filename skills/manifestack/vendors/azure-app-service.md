@@ -11,7 +11,7 @@ detect:
   go: ["github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appservice/armappservice"]
   imports: ["@azure/arm-appservice"]
   config_files: ["staticwebapp.config.json", "swa-cli.config.json"]
-  service_signals: ["\"azurerm_linux_web_app", "\"azurerm_windows_web_app", "\"azurerm_app_service\"", "\"azurerm_static_web_app\"", "\"azurerm_static_site\"", "Microsoft.Web/staticSites", "kind: 'app,", "'app,linux", "appservice.LinuxWebApp", "appservice.WindowsWebApp", "appservice.StaticWebApp", "web.StaticSite(", "az webapp ", "az staticwebapp ", "swa deploy", "AzureWebApp@", "AzureWebAppContainer@", "AzureStaticWebApp@", "appType: webApp", "appType: 'webApp", ".azurestaticapps.net", "from azure.mgmt.web import"]
+  service_signals: ["\"azurerm_linux_web_app", "\"azurerm_windows_web_app", "\"azurerm_app_service\"", "\"azurerm_static_web_app\"", "\"azurerm_static_site\"", "Microsoft.Web/staticSites", "kind: 'app,", "'app,linux", "appservice.LinuxWebApp", "appservice.WindowsWebApp", "appservice.StaticWebApp", "web.StaticSite(", "az webapp ", "az staticwebapp ", "swa deploy", "AzureWebApp@", "AzureWebAppContainer@", "AzureStaticWebApp@", "appType: webApp", "appType: 'webApp", ".azurestaticapps.net", "from azure.mgmt.web import", "azure/webapps-deploy@", "azure/static-web-apps-deploy@"]
 pages:
   pricing: https://azure.microsoft.com/en-us/pricing/details/app-service/linux/
   windows_pricing: https://azure.microsoft.com/en-us/pricing/details/app-service/windows/

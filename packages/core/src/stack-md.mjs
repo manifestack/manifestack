@@ -58,6 +58,8 @@ const SECRET_PATTERNS = [
 	['JWT', /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/],
 	['GitHub token', /\bgh[pousr]_[A-Za-z0-9]{20,}/],
 	['Slack token', /\bxox[abprs]-[A-Za-z0-9-]{10,}/],
+	['Slack webhook', /\bhooks\.slack\.com\/(?:services|workflows|triggers)\/[A-Za-z0-9/_-]{16,}/],
+	['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/],
 	['AWS access key', /\bAKIA[0-9A-Z]{16}\b/],
 	['Neon API key', /\bnapi_[A-Za-z0-9]{16,}/],
 	// Only names that usually hold secrets: NODE_ENV=production in a note is fine.
@@ -68,7 +70,17 @@ const SECRET_PATTERNS = [
 	['long token', /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/, (m) => !inUrlPath(m) && looksRandom(m[0])],
 ].map(([kind, re, check]) => [kind, new RegExp(re.source, re.flags + 'g'), check]);
 
-const secretIn = (line, re, check) => [...line.matchAll(re)].some((m) => !check || check(m));
+// A very long line is checked in overlapping windows, so the patterns stay fast on pasted blobs.
+const WINDOW = 4096;
+const secretIn = (line, re, check) => {
+	for (let start = 0; start < line.length || start === 0; start += WINDOW - 256) {
+		// A match at the start of a later window is cut there (the slice invents a word boundary); the previous
+		// window, which overlaps it, already saw where it really starts.
+		if ([...line.slice(start, start + WINDOW).matchAll(re)].some((m) => !(start && m.index === 0) && (!check || check(m)))) return true;
+		if (start + WINDOW >= line.length) break;
+	}
+	return false;
+};
 
 /** Finds strings that look like secrets, one hit per line. STACK.md must never contain one. */
 export function findSecrets(text) {

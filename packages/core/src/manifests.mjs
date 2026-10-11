@@ -264,6 +264,15 @@ export function manifestDependencies(kind, text, path = '') {
 
 /** Whether a dependency matches a vendor's patterns, by the naming rules of its ecosystem. */
 export function dependencyMatches(kind, dep, patterns = []) {
+	// "!name" excludes one package from a scope or prefix the map claims ("!azure-devops" next to "azure-*").
+	if (patterns.some((p) => p[0] === '!')) {
+		if (matchesAny(kind, dep, patterns.filter((p) => p[0] === '!').map((p) => p.slice(1)))) return false;
+		patterns = patterns.filter((p) => p[0] !== '!');
+	}
+	return matchesAny(kind, dep, patterns);
+}
+
+function matchesAny(kind, dep, patterns) {
 	if (kind === 'npm') return packageMatches(dep, patterns);
 	if (kind === 'go') return patterns.some((p) => dep === p || dep.startsWith(p + '/'));
 	if (kind === 'pypi') {

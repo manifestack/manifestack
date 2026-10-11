@@ -9,7 +9,7 @@ detect:
   pypi: ["boto3", "botocore", "aiobotocore", "aws-cdk-lib", "aws-cdk*", "awscli", "pulumi-aws"]
   go: ["github.com/aws/aws-sdk-go-v2", "github.com/aws/aws-sdk-go", "github.com/aws/aws-cdk-go/awscdk", "github.com/pulumi/pulumi-aws/sdk"]
   env_prefixes: ["AWS_PROFILE", "AWS_DEFAULT_REGION", "AWS_ACCOUNT_ID", "AWS_ROLE_ARN", "CDK_DEFAULT_"]
-  service_signals: ['provider "aws"', "AnthropicBedrock", "hashicorp/aws", "AWSTemplateFormatVersion", "AWS::Serverless-2016-10-31", "sst.aws."]
+  service_signals: ['provider "aws"', "AnthropicBedrock", "hashicorp/aws", "AWSTemplateFormatVersion", "AWS::Serverless-2016-10-31", "sst.aws.", "aws-actions/configure-aws-credentials@"]
   config_files: ["cdk.json", "samconfig.toml", "samconfig.yaml", "samconfig.yml", "buildspec.yml", "appspec.yml", "Dockerrun.aws.json"]
 pages:
   pricing: https://aws.amazon.com/pricing/

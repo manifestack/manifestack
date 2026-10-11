@@ -265,3 +265,11 @@ test('--points: commas in numbers, ; or , between points, and no slow split on l
 	assert.ok(Date.now() - t < 200, `took ${Date.now() - t} ms`);
 	assert.equal(eta('--points', `2026-09-06=1${' ;'.repeat(100)}x`, '--limit', '5').code, 1);
 });
+
+test('costAt: negative, endless and malformed model values are errors that name the field', () => {
+	assert.throws(() => costAt({ users: [10], vendors: [{ id: 'a', plans: [{ name: 'p', base: -10 }] }] }), /plan p base must not be negative/);
+	assert.throws(() => costAt({ users: [-1], vendors: [] }), /users\[0\] must not be negative/);
+	assert.throws(() => costAt({ users: [10], vendors: [null] }), /vendors\[0\] must be an object/);
+	assert.throws(() => costAt({ users: [10], vendors: [{ id: 'a', plans: [{ name: 'p', metrics: { m: null } }] }] }), /metrics\.m must be an object/);
+	assert.throws(() => costAt({ users: [10], vendors: [{ id: 'a', plans: [{ name: 'p', base: 1e308 }] }] }), /too large/);
+});

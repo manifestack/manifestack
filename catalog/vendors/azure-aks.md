@@ -9,7 +9,7 @@ detect:
   pypi: ["azure-mgmt-containerservice"]
   go: ["github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"]
   imports: ["@azure/arm-containerservice"]
-  service_signals: ['"azurerm_kubernetes_cluster"', '"azurerm_kubernetes_cluster_node_pool"', "Azure/aks/azurerm", "avm-res-containerservice-managedcluster", "avm/res/container-service/managed-cluster", "Microsoft.ContainerService/managedClusters", "azure-native:containerservice:", "azure:containerservice:KubernetesCluster", "containerservice.ManagedCluster", "containerservice.KubernetesCluster", "azure.mgmt.containerservice", "az aks ", "kubelogin convert-kubeconfig", "Azure/kubelogin", "kubernetes.azure.com", "azure.workload.identity/", "service.beta.kubernetes.io/azure-"]
+  service_signals: ['"azurerm_kubernetes_cluster"', '"azurerm_kubernetes_cluster_node_pool"', "Azure/aks/azurerm", "avm-res-containerservice-managedcluster", "avm/res/container-service/managed-cluster", "Microsoft.ContainerService/managedClusters", "azure-native:containerservice:", "azure:containerservice:KubernetesCluster", "containerservice.ManagedCluster", "containerservice.KubernetesCluster", "azure.mgmt.containerservice", "az aks ", "kubelogin convert-kubeconfig", "Azure/kubelogin", "kubernetes.azure.com", "azure.workload.identity/", "service.beta.kubernetes.io/azure-", "azure/aks-set-context@", "azure/k8s-deploy@"]
 pages:
   pricing: https://azure.microsoft.com/en-us/pricing/details/kubernetes-service/
   tiers: https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers

@@ -4,7 +4,7 @@
 // registers the "new vendor" hook. `hook` registers only the hook, for skills installed another way
 // (npx skills add, a manual copy). No network, no dependencies.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, rmdirSync, cpSync, statSync } from 'node:fs';
-import { dirname, join, resolve, relative } from 'node:path';
+import { dirname, join, resolve, relative, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 import { AGENTS, HOOKS, ConfigError, findAgent } from './agents.js';
@@ -252,12 +252,21 @@ function writeConfig(file, config) {
 	writeFileSync(file, JSON.stringify(config, null, 2) + '\n');
 }
 
-/** Removes the skills and hooks folders that uninstall emptied, so an empty .github/skills is not taken for Copilot. */
-function removeEmptyDirs(actions) {
+/**
+ * Removes the skills and hooks folders that uninstall emptied, and agent folders (.gemini, .windsurf) left empty
+ * by that, so an empty .github/skills or .gemini is not taken for an agent the user has.
+ */
+function removeEmptyDirs(actions, project) {
 	const dirs = new Set(actions.filter((a) => a.status === 'remove' && a.kind !== 'hook-config').map((a) => dirname(a.to)));
-	for (const dir of dirs) {
+	for (let dir of dirs) {
 		try {
-			if (isDir(dir) && !readdirSync(dir).length) rmdirSync(dir);
+			// Only folders inside the project, never the project itself; .github holds the user's workflows even
+			// when it is empty for now.
+			while (dir !== project && dirname(dir) !== dir && isDir(dir) && !readdirSync(dir).length) {
+				rmdirSync(dir);
+				dir = dirname(dir);
+				if (!basename(dir).startsWith('.') || basename(dir) === '.github') break;
+			}
 		} catch {
 			// Best effort: a folder we cannot remove is harmless.
 		}
@@ -337,7 +346,7 @@ async function uninstall(opts) {
 	if (opts.dryRun) return console.log('Dry run: nothing changed.');
 	if (!(await confirm(opts))) return console.log('Cancelled: nothing changed.');
 	apply(actions);
-	removeEmptyDirs(actions);
+	removeEmptyDirs(actions, project);
 	console.log('Done. .manifestack/ was not touched.');
 }
 

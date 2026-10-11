@@ -9,7 +9,7 @@ detect:
   pypi: ["google-cloud-container"]
   go: ["cloud.google.com/go/container"]
   imports: ["@google-cloud/container"]
-  service_signals: ["google_container_cluster", "google_container_node_pool", "terraform-google-modules/kubernetes-engine", "gcloud container clusters ", "gcloud container node-pools ", "gke-gcloud-auth-plugin", "cloud-builders/gke-deploy", "gcp.container.Cluster", "gcp.container.NodePool", "container.NewCluster(", "container_v1.ClusterManagerClient", "container.cnrm.cloud.google.com", ".gke.io/", "cloud.google.com/gke-", "cloud.google.com/compute-class", "cloud.google.com/neg"]
+  service_signals: ["google_container_cluster", "google_container_node_pool", "terraform-google-modules/kubernetes-engine", "gcloud container clusters ", "gcloud container node-pools ", "gke-gcloud-auth-plugin", "cloud-builders/gke-deploy", "gcp.container.Cluster", "gcp.container.NodePool", "container.NewCluster(", "container_v1.ClusterManagerClient", "container.cnrm.cloud.google.com", ".gke.io/", "cloud.google.com/gke-", "cloud.google.com/compute-class", "cloud.google.com/neg", "google-github-actions/get-gke-credentials@"]
 pages:
   pricing: https://cloud.google.com/kubernetes-engine/pricing
   autopilot: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview

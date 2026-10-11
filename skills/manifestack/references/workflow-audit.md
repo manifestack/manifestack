@@ -8,7 +8,7 @@ Run `node <skill-dir>/scripts/detect.mjs .` from the repository root. It returns
 
 - `empty`: true when there is no code yet (use init instead);
 - `scanned_files` and `truncated`: how many files were read, and whether the scan stopped at the file limit;
-- `vendors`: mapped vendors with `evidence` (package from package.json, requirements*.txt, pyproject.toml, Pipfile or go.mod; import; config; env name; service or code signal, also from Terraform, Bicep and YAML) and `roles_used`; `family` when the entry is one service of a larger vendor;
+- `vendors`: mapped vendors with `evidence` (package from package.json, requirements*.txt, pyproject.toml, Pipfile or go.mod; import; config; env name; service or code signal, also from Terraform, Bicep, JSON templates, YAML and CI workflows) and `roles_used`; `family` when the entry is one service of a larger vendor;
 - An entry with empty `roles_used` is present without a role signal: CloudWatch, Cloud Logging or Azure Monitor collecting platform logs, or the `openai` package as the client of Azure OpenAI. Read its map's notes first. It can carry a `Bill` finding (log ingestion, retention), never an `Overlap`; in STACK.md it goes under `Other` (`## Other: Amazon CloudWatch (Lambda logs)`), or nowhere when another vendor bills that usage;
 - `unmapped`: known SDKs without a page map (Mistral, Groq, Liveblocks, …);
 - `overlaps`: roles served by more than one vendor (candidate `Overlap` findings);

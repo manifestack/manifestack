@@ -1,0 +1,9 @@
+{
+  "name": "content-site-cms",
+  "private": true,
+  "dependencies": {
+    "@strapi/strapi": "5.57.0",
+    "@strapi/plugin-users-permissions": "5.57.0",
+    "@strapi/plugin-cloud": "5.57.0"
+  }
+}

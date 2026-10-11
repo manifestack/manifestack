@@ -6,7 +6,7 @@ Examples: `/manifestack compare neon supabase`, "Resend or Postmark at 200k emai
 
 ## Step 1. Set the sides
 
-1. Name the vendors and the job they are compared for (hosting, database, auth, email, storage, payments, monitoring, analytics, search, realtime, background jobs, AI). Two vendors that do different jobs (Stripe and Supabase) are not a comparison: say so and offer `audit`. More than three: ask which three matter. Only one named: ask what to compare it with; if the scan shows another vendor doing that job, offer it. Do not pick the other side yourself.
+1. Name the vendors and the job they are compared for (hosting, database, auth, email, storage, payments, monitoring, analytics, search, realtime, background jobs, CMS, AI). Two vendors that do different jobs (Stripe and Supabase) are not a comparison: say so and offer `audit`. More than three: ask which three matter. Only one named: ask what to compare it with; if the scan shows another vendor doing that job, offer it. Do not pick the other side yourself.
 2. Open `vendors/<id>.md` for each. Without a map, find the official pricing page on the vendor's own domain and note `no page map`.
 3. If the repository has code, run `node <skill-dir>/scripts/detect.mjs .`, `node <skill-dir>/scripts/stack-md.mjs parse .manifestack/STACK.md` and `… check .manifestack/STACK.md`:
    - a vendor already in use makes this "stay or switch": that side is the current one, and the switch has a cost (Step 5);

@@ -27,7 +27,7 @@ env: ACME_DB_URL, ACME_DB_KEY  # names only
 ## Sections
 
 - `## Requirements`: keys `budget`, `users`, `requires`, `prefer`, `avoid`, `priority`. Free text values. `requires` holds hard rules from outside (region, certifications, contracts); `prefer` what the team knows or wants to use; `avoid` vendors, technologies or setups the team rules out (Kubernetes, a specific cloud, self-hosting, lock-in), with an optional reason as a comment; `priority` what the team gives up first when options trade off: `lowest cost`, `balanced`, `least ops` or `control`. A value the user gave in an interview carries the comment `# user YYYY-MM-DD`, so a later run knows its source and age (`references/interview.md`).
-- `## <Role>: <Vendor>`: one per service. Roles: `Hosting`, `Database`, `Auth`, `Email`, `Storage`, `Payments`, `Monitoring`, `Analytics`, `Search`, `Realtime`, `Jobs`, `AI`, `Other`. A vendor that serves two roles gets two sections (`## Database: Supabase`, `## Auth: Supabase`) only if both are used.
+- `## <Role>: <Vendor>`: one per service. Roles: `Hosting`, `Database`, `Auth`, `Email`, `Storage`, `Payments`, `Monitoring`, `Analytics`, `Search`, `Realtime`, `Jobs`, `CMS`, `AI`, `Other`. A vendor that serves two roles gets two sections (`## Database: Supabase`, `## Auth: Supabase`) only if both are used.
 
 ## Keys of a service section
 

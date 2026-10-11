@@ -81,6 +81,11 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 - A queue or cron on the platform you already use first; a jobs service when work needs retries, long waits or steps that survive deploys.
 - Billed by runs, steps or compute time: fan-out, frequent schedules and retries of a failing job multiply the bill. Set concurrency and retry limits.
 
+### CMS
+
+- Content in the repo (Markdown, MDX) first; a hosted CMS when non-developers edit content often.
+- Billed by seats, API requests, records and asset bandwidth: fetching content on every page view instead of at build time or through the CDN, preview in production and extra editors raise the bill. Plan steps are large.
+
 ### AI APIs
 
 - Cost grows with every request and every user: price per token by model, not a flat plan. Estimate tokens per user action before picking a model.

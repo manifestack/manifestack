@@ -27,7 +27,7 @@ read:
   - flexible - no free tier, Compute Engine VMs billed per second for vCPU, memory (including runtime overhead) and disk, at least one instance per version, egress at Compute Engine rates
   - legacy bundled services prices (Blobstore, dedicated memcache, Search API, Logs API) and the ones with no extra charge
   - quota names - Frontend instance hours, Backend instance hours, Outgoing bandwidth; daily and per-minute quotas and the error at the limit
-  - runtime end of support, deprecated (deploys blocked) and decommissioned (app may be disabled) dates
+  - runtime end of support (deploys blocked unless an org policy re-enables them), deprecated (that re-enable removed) and decommissioned (app may be disabled) dates
   - Google recommends Cloud Run for new projects; the app region cannot change after creation
 usage_questions:
   - metric: monthly_bill
@@ -48,7 +48,7 @@ common_fixes:
   - smallest instance class that keeps latency acceptable
   - stop or delete old versions, above all flexible ones
   - move low-traffic flexible services to standard or Cloud Run so they scale to zero
-  - upgrade runtimes before the deprecated date
+  - upgrade runtimes before the end of support date
   - budget alert scoped to App Engine
 verified: 2026-10-11
 ---

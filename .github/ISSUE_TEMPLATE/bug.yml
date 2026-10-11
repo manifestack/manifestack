@@ -21,7 +21,7 @@ body:
     attributes:
       label: Versions
       description: Output of `npx manifestack --version`, `node --version` and your OS.
-      placeholder: manifestack 0.3.0, Node 24.1.0, macOS 15
+      placeholder: manifestack 0.5.0, Node 24.1.0, macOS 15
     validations:
       required: true
   - type: textarea

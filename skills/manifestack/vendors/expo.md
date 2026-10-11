@@ -9,7 +9,7 @@ detect:
   imports: ["expo-updates", "expo-insights"]
   pypi: []
   go: []
-  env_prefixes: ["EAS_", "EXPO_TOKEN"]
+  env_prefixes: ["EXPO_TOKEN"]
   config_files: ["eas.json"]
 pages:
   pricing: https://expo.dev/pricing
@@ -60,7 +60,7 @@ common_fixes:
 verified: 2026-10-07
 ---
 
-- The `expo` npm package is the open-source framework and is used without EAS. Do not report EAS from `expo`, `expo-router` or `expo-dev-client` alone; rely on `eas.json`, `eas-cli`, `expo-updates`, `expo-insights` or `EAS_`/`EXPO_TOKEN` env names. `expo-updates` can also point at a self-hosted update server: check `updates.url` in app.json for `u.expo.dev` before counting EAS Update.
+- The `expo` npm package is the open-source framework and is used without EAS. Do not report EAS from `expo`, `expo-router` or `expo-dev-client` alone; rely on `eas.json`, `eas-cli`, `expo-updates`, `expo-insights` or `EXPO_TOKEN` (`EAS_` env names are not used: the Ethereum Attestation Service has them too). `expo-updates` can also point at a self-hosted update server: check `updates.url` in app.json for `u.expo.dev` before counting EAS Update.
 - EAS Hosting (`eas deploy` of an Expo Router web build with `web.output: "server"`) is not detected: the signals live in app.json and package.json scripts, which role signals do not read, and `@expo/server` also runs on other hosts. Ask the user whether they deploy with EAS Hosting before adding a hosting finding.
 - Expo push notifications (`expo-server-sdk`, `exponent_server_sdk` on PyPI) are a separate free Expo service, not EAS, and are not mapped here. There are no official EAS packages on PyPI or Go.
 - Do not use the Expo MCP server. It is official (remote `https://mcp.expo.dev/mcp`, OAuth, plus an optional local `expo-mcp` package) and has write tools (`build_run`, `build_submit`, `workflow_run`, `appstore_reply_review`, `playstore_reply_review`, `add_library`) with no read-only mode or tool allowlist. Ask the user for numbers from Billing → Usage instead.

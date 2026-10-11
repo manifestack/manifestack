@@ -12,7 +12,7 @@ detect:
   imports: ["@azure/service-bus", "@azure/eventgrid", "@azure/eventgrid-namespaces", "@azure/event-hubs", "@azure/eventhubs-checkpointstore-blob", "@azure/storage-queue"]
   env_prefixes: ["AZURE_SERVICEBUS_", "AZURE_SERVICE_BUS_", "SERVICEBUS_CONNECTION_STRING", "AZURE_EVENTHUB", "EVENTHUB_CONNECTION_STRING", "AZURE_EVENTGRID_"]
   config_files: []
-  service_signals: ["azure.servicebus", "azure.eventgrid", "azure.eventhub", "azure.storage.queue", "\"azurerm_servicebus_", "\"azurerm_eventgrid_", "\"azurerm_eventhub", "\"azurerm_storage_queue\"", "Microsoft.ServiceBus/namespaces", "Microsoft.EventGrid/", "Microsoft.EventHub/namespaces", "Microsoft.EventHub/clusters", "azure-native.servicebus", "azure_native.servicebus", "azure-native.eventgrid", "azure_native.eventgrid", "azure-native.eventhub", "azure_native.eventhub", ".servicebus.windows.net", ".eventgrid.azure.net", ".queue.core.windows.net", ".serviceBusQueue(", ".serviceBusTopic(", ".eventHub(", ".eventGrid(", ".storageQueue(", ".service_bus_", ".event_hub_", ".event_grid_", ".queue_trigger(", ".queue_output("]
+  service_signals: ["azure.servicebus", "azure.eventgrid", "azure.eventhub", "azure.storage.queue", "\"azurerm_servicebus_", "\"azurerm_eventgrid_", "\"azurerm_eventhub", "\"azurerm_storage_queue\"", "Microsoft.ServiceBus/namespaces", "Microsoft.EventGrid/", "Microsoft.EventHub/namespaces", "Microsoft.EventHub/clusters", "azure-native:servicebus:", "azure_native.servicebus", "azure-native:eventgrid:", "azure_native.eventgrid", "azure-native:eventhub:", "azure_native.eventhub", ".servicebus.windows.net", ".eventgrid.azure.net", ".queue.core.windows.net", ".serviceBusQueue(", ".serviceBusTopic(", ".eventHub(", ".eventGrid(", ".storageQueue(", ".service_bus_", ".event_hub_", ".event_grid_", ".queue_trigger(", ".queue_output("]
 pages:
   pricing: https://azure.microsoft.com/en-us/pricing/details/service-bus/
   quotas: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-quotas
@@ -29,7 +29,7 @@ pages:
 read:
   - Service Bus tiers (Basic, Standard, Premium): topics, sessions and duplicate detection need Standard; large messages, isolation and geo-replication need Premium
   - Standard base charge (once per Azure subscription, not per namespace) with included operations, then tiered per million operations; each 64 KB chunk, receive, complete, abandon, lock renewal and delivery to each topic subscription counts
-  - brokered connection charges on Basic and Standard (AMQP connections and HTTP long polling) above the included allowance
+  - brokered connection charges on Standard (AMQP connections and HTTP long polling) above the included allowance; Basic is capped at its free connections
   - Premium per messaging unit per hour on the highest unit count in each hour, whether used or not; partitioned namespaces multiply units by partitions; geo-replication per replica and per GB
   - Event Grid Basic per million operations (publish, advanced filtering, each delivery attempt) with a free monthly allowance; Standard namespaces per throughput unit per hour plus event and MQTT operations, each per 64 KB
   - Event Hubs tiers (Basic, Standard per throughput unit per hour plus ingress events; Premium per processing unit; Dedicated per capacity unit with a minimum of hours); retention per tier and storage overage
@@ -51,8 +51,8 @@ usage_questions:
     where: Service Bus namespace → Metrics (ActiveMessages, DeadletteredMessages) split by EntityName
 mcp:
   official: true
-  readonly_flag: "--read-only on the local Azure MCP Server with only the tools below (npx -y @azure/mcp@latest server start --read-only --tool servicebus_queue_details --tool ...); sign in with a Reader identity"
-  allowed_tools: [servicebus_queue_details, servicebus_topic_details, servicebus_topic_subscription_details, eventhubs_namespace_get, eventhubs_eventhub_get, eventgrid_topic_list]
+  readonly_flag: "--read-only on the local Azure MCP Server with only these tools: npx -y @azure/mcp@latest server start --read-only --tool eventhubs_namespace_get --tool eventhubs_eventhub_get --tool eventgrid_topic_list; sign in with a Reader identity"
+  allowed_tools: [eventhubs_namespace_get, eventhubs_eventhub_get, eventgrid_topic_list]
 common_fixes:
   - cut abandons, lock renewals and redeliveries, which each bill as operations; use receive-and-delete where losing a message on a crash is acceptable
   - set max delivery count and handle dead-lettered messages so poison messages stop redelivering
@@ -67,4 +67,4 @@ verified: 2026-10-11
 - `.servicebus.windows.net` is the host of both Service Bus and Event Hubs namespaces. Azure Functions triggers (`app.serviceBusQueue(`, `@app.service_bus_queue_trigger(`) find the service even when no SDK is imported; `function.json` bindings and C# or Java code are not scanned.
 - Queue Storage lives in a storage account; its cost shows as Storage transactions, not under messaging.
 - Service Bus, Event Grid or Event Hubs with Inngest, Trigger.dev, Upstash QStash, SQS or Pub/Sub is Overlap unless split on purpose (infrastructure events versus app jobs).
-- MCP: `--read-only` alone still exposes read tools of every Azure service, some of which return data or run billed calls, so start the server with the `--tool` list above (`--namespace` cannot be combined with `--tool`). The Service Bus tools return message counts and entity settings, not message bodies. Never call `eventgrid_events_publish` or any update or delete tool.
+- MCP: `--read-only` alone still exposes read tools of every Azure service, some of which return data or run billed calls, so start the server with the `--tool` list above (`--namespace` cannot be combined with `--tool`). The Service Bus tools (`servicebus_*_details`) read the namespace data plane and need Azure Service Bus Data Owner, a role that can also send and receive messages: leave them out and ask for queue counts instead. Never call `eventgrid_events_publish` or any update or delete tool.

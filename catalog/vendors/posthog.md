@@ -11,8 +11,8 @@ detect:
   env_prefixes: ["POSTHOG_", "NEXT_PUBLIC_POSTHOG_", "VITE_POSTHOG_", "VITE_PUBLIC_POSTHOG_", "EXPO_PUBLIC_POSTHOG_", "PUBLIC_POSTHOG_", "REACT_APP_POSTHOG_"]
   config_files: []
   role_signals:
-    monitoring: ["posthog.captureException", "posthog.capture_exception"]
-    flags: ["posthog.isFeatureEnabled", "posthog.getFeatureFlag", "useFeatureFlagEnabled", "useFeatureFlagVariantKey", "useFeatureFlagPayload", "posthog.feature_enabled", "posthog.get_feature_flag"]
+    monitoring: ["posthog.captureException", "posthog.capture_exception", "enableExceptionAutocapture", "enable_exception_autocapture"]
+    flags: ["posthog.isFeatureEnabled", "posthog.getFeatureFlag", "useFeatureFlagEnabled", "useFeatureFlagVariantKey", "useFeatureFlagPayload", "posthog.feature_enabled", "posthog.get_feature_flag", "evaluateFlags(", "evaluate_flags(", ".isFeatureEnabled(", "PostHogFeature", "useActiveFeatureFlags"]
 pages:
   pricing: https://posthog.com/pricing
   billing: https://posthog.com/docs/billing/estimating-usage-costs

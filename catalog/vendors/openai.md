@@ -11,7 +11,7 @@ detect:
   env_prefixes: ["OPENAI_"]
   config_files: []
   role_signals:
-    ai: ["new OpenAI(", "= OpenAI(", "= AsyncOpenAI(", "openai.OpenAI(", "openai.AsyncOpenAI(", "import OpenAI", "api.openai.com", "env.OPENAI_API_KEY", "\"OPENAI_API_KEY\"", "'OPENAI_API_KEY'", "@ai-sdk/openai", "createOpenAI(", "new ChatOpenAI(", "= ChatOpenAI(", "new OpenAIEmbeddings(", "= OpenAIEmbeddings(", "@openai/agents", "openai.chat.completions.create(", "openai.ChatCompletion.create(", "openai.NewClient(", "new OpenAIApi("]
+    ai: ["new OpenAI(", "= OpenAI(", "= AsyncOpenAI(", "openai.OpenAI(", "openai.AsyncOpenAI(", "import OpenAI", "api.openai.com", "env.OPENAI_API_KEY", "\"OPENAI_API_KEY\"", "'OPENAI_API_KEY'", "@ai-sdk/openai", "createOpenAI(", "new ChatOpenAI(", "= ChatOpenAI(", "new OpenAIEmbeddings(", "= OpenAIEmbeddings(", "@openai/agents", "openai.chat.completions.create(", "openai.ChatCompletion.create(", "openai.NewClient()", "openai.NewClient(option.", "openai.NewClient(os.", "new OpenAIApi(", "from agents import", "=ChatOpenAI(", "(ChatOpenAI(", "OpenAIEmbedding(", "\"openai:", "'openai:", "openai.responses.create(", "openai.embeddings.create(", "openai.images.", "openai.audio."]
 pages:
   pricing: https://developers.openai.com/api/docs/pricing
   rate_limits: https://developers.openai.com/api/docs/guides/rate-limits
@@ -59,7 +59,7 @@ verified: 2026-10-08
 ---
 
 - The `openai` SDK also talks to other providers (OpenRouter, Groq, DeepSeek, a local model) when `OPENAI_BASE_URL` or a `baseURL` option points elsewhere: if one is set, ask which provider it is before reading OpenAI's pages.
-- `openai` is also an English word in imports and comments; trust the package.json entry first. Azure OpenAI (`AzureOpenAI`, `AzureChatOpenAI`, `.openai.azure.com`, `AZURE_OPENAI_*`) uses this SDK but is billed by Azure: read `azure-openai`. The ai role counts here only for direct OpenAI use (`new OpenAI(`, `= OpenAI(`, `@ai-sdk/openai` and similar); `OpenAI` pointed at an `/openai/v1` Azure endpoint still counts, so check the base URL.
+- `openai` is also an English word in imports and comments; trust the package.json entry first. Azure OpenAI (`AzureOpenAI`, `AzureChatOpenAI`, `.openai.azure.com`, `AZURE_OPENAI_*`) uses this SDK but is billed by Azure: read `azure-openai`. The ai role counts here only for direct OpenAI use (`new OpenAI(`, `= OpenAI(`, `@ai-sdk/openai` and similar); `OpenAI` pointed at an `/openai/v1` Azure endpoint, or Go `openai.NewClient(option…)` with `azure.WithEndpoint(`, still counts, so check the base URL.
 - Cost grows per user and per request (tokens in and out), not as a flat plan. Estimate tokens per request × requests per user × users, and read prices for the exact model. Rate limits follow the usage tier, and a new organization starts low. A launch spike can hit RPM or TPM limits before any budget; flag it as a Risk.
 - Training use, retention (ZDR) and data residency are Requirement questions: compare them with the project's data rules, not with the bill.
 - OpenAI has a docs-only MCP server (`https://developers.openai.com/mcp`, search and read docs). It holds no account data; no official account MCP exists, so ask the user for numbers.

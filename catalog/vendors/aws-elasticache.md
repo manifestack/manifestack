@@ -19,7 +19,7 @@ pages:
   quotas: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/quota-limits.html
   memorydb_pricing: https://aws.amazon.com/memorydb/pricing/
 read:
-  - node-based caches per node-hour by node type and engine (Valkey, Redis OSS, Memcached), reserved nodes, data tiering nodes
+  - node-based caches per node-hour by node type and engine (Valkey, Redis OSS, Memcached), reserved nodes or Database Savings Plans, data tiering nodes
   - Serverless per GB-hour of data stored with the minimum metered storage per cache by engine, plus per ECPU
   - the Valkey discount against Redis OSS and Memcached
   - backup storage, and data transfer across Availability Zones and Regions

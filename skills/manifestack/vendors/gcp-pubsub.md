@@ -12,7 +12,7 @@ detect:
   imports: ["@google-cloud/pubsub", "@google-cloud/tasks", "@google-cloud/scheduler", "@google-cloud/workflows", "@google-cloud/eventarc", "@google-cloud/eventarc-publishing"]
   env_prefixes: ["PUBSUB_EMULATOR_HOST"]
   config_files: []
-  service_signals: ["google.cloud.pubsub", "google.cloud import pubsub", "google.cloud import tasks", "google.cloud import scheduler", "google.cloud import workflows", "google.cloud.workflows", "google.cloud import eventarc", "\"google_pubsub_", "\"google_cloud_tasks_queue", "\"google_cloud_scheduler_job\"", "\"google_workflows_workflow\"", "\"google_eventarc_", "gcp.pubsub.", "gcp.cloudtasks.", "gcp.cloudscheduler.", "gcp.workflows.", "gcp.eventarc.", "pubsub.googleapis.com", "cloudtasks.googleapis.com", "cloudscheduler.googleapis.com", "workflows.googleapis.com", "eventarc.googleapis.com", "PUBSUB_EMULATOR_HOST", "firebase-functions/v2/pubsub", "firebase-functions/v2/scheduler", "firebase-functions/v2/tasks", "functions.pubsub."]
+  service_signals: ["google.cloud.pubsub", "google.cloud import pubsub", "google.cloud import tasks", "google.cloud import scheduler", "google.cloud import workflows", "google.cloud.workflows", "google.cloud import eventarc", "\"google_pubsub_", "\"google_cloud_tasks_queue", "\"google_cloud_scheduler_job\"", "\"google_workflows_workflow\"", "\"google_eventarc_", "gcp.pubsub.", "gcp.cloudtasks.", "gcp.cloudscheduler.", "gcp.workflows.", "gcp.eventarc.", "pubsub.googleapis.com/", "cloudtasks.googleapis.com/", "cloudscheduler.googleapis.com/", "workflows.googleapis.com/", "eventarc.googleapis.com/", "PUBSUB_EMULATOR_HOST", "firebase-functions/v2/pubsub", "firebase-functions/v2/scheduler", "firebase-functions/v2/tasks", "functions.pubsub."]
 pages:
   pricing: https://cloud.google.com/pubsub/pricing
   quotas: https://docs.cloud.google.com/pubsub/quotas
@@ -61,7 +61,7 @@ verified: 2026-10-11
 
 - Small unbatched messages are billed at the per-request minimum, not their size, and each subscription bills delivery again, so fan-out multiplies throughput. Messages a subscription filter drops still bill.
 - Eventarc triggers on Google sources ride on Cloud Audit Logs: Data Access logs must be on and bill in Cloud Logging (`gcp-logging`). Cloud Run functions event triggers create Eventarc triggers and Pub/Sub subscriptions; Firebase `onSchedule` creates Scheduler jobs.
-- Pub/Sub Lite is deprecated and closed to new customers: a Fit finding. Read the turndown date on the Lite page (the pricing page shows an older one) and migrate to Pub/Sub or Managed Service for Apache Kafka.
+- Pub/Sub Lite is deprecated and closed to new customers: a Fit finding. It is turned down on 2027-01-31 per the Lite page (the pricing page still shows an older date) and migrate to Pub/Sub or Managed Service for Apache Kafka.
 - `new PubSub(` and `pubsub.publish(` are not signals: graphql-subscriptions uses the same names.
 - Pub/Sub, Tasks or Workflows with Inngest, Trigger.dev, Upstash QStash or SQS is Overlap unless split on purpose (infrastructure events versus app jobs).
 - MCP: the remote server (`pubsub.googleapis.com/mcp`) has publish, create, update and delete tools and no read-only endpoint, and push endpoint URLs can hold tokens. Do not use it.

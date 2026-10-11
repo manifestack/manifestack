@@ -9,7 +9,7 @@ detect:
   pypi: ["ddtrace", "datadog", "datadog-api-client", "datadog-lambda"]
   go: ["github.com/DataDog/dd-trace-go", "gopkg.in/DataDog/dd-trace-go.v1", "github.com/DataDog/datadog-go", "github.com/DataDog/datadog-api-client-go", "github.com/DataDog/datadog-lambda-go"]
   imports: ["dd-trace", "dd-trace-api", "@datadog/", "datadog-lambda-js"]
-  env_prefixes: ["DD_", "DATADOG_", "NEXT_PUBLIC_DATADOG_", "VITE_DATADOG_"]
+  env_prefixes: ["DD_API_KEY", "DD_APP_KEY", "DD_TRACE_", "DD_AGENT_HOST", "DD_LOGS_", "DD_RUM_", "DD_PROFILING_", "DATADOG_", "NEXT_PUBLIC_DATADOG_", "VITE_DATADOG_"]
   config_files: ["datadog.yaml", "datadog-values.yaml", "datadog-ci.json"]
 pages:
   pricing: https://www.datadoghq.com/pricing/
@@ -70,5 +70,5 @@ verified: 2026-10-08
 - Datadog bills many meters at once and keeps ingesting past what is included, charging on-demand rates. It has no global spend cap. Logs (ingested GB plus indexed events), custom metrics (tag cardinality) and APM (hosts plus ingested and indexed spans) are the usual surprise lines. Read each meter the project uses, not only the per-host price.
 - The site is fixed per organization (EU1 is in Germany; US1 is the default). A data-region requirement means checking the site in the app URL (`app.datadoghq.eu` vs `app.datadoghq.com`), and moving means a new organization.
 - MCP: the official Datadog MCP server (remote, `toolsets` and `omit_tools` URL parameters) has no read-only switch. Writes are blocked only if the authorizing user's Datadog role lacks write permissions, which the skill cannot check, and its core tools return log, span and RUM contents that can hold user data. Do not use it for the audit; ask the usage questions instead.
-- Detection: `DD_` env names are weak alone (short prefix). `datadog.yaml` is the Agent config and `datadog-values.yaml` the usual Helm values file; both mean the Agent is deployed from this repo. `hot-shots` and other StatsD clients can send to Datadog, but they are not counted, because they also send to plain StatsD.
+- Detection: only Datadog's own `DD_` names count (`DD_API_KEY`, `DD_APP_KEY`, `DD_TRACE_*` and similar); other tools use `DD_` too (DefectDojo's `DD_SITE_URL`, `DD_ENV_PATH`), so `DD_SITE`, `DD_ENV` and `DD_SERVICE` are not signals. `datadog.yaml` is the Agent config and `datadog-values.yaml` the usual Helm values file; both mean the Agent is deployed from this repo. `hot-shots` and other StatsD clients can send to Datadog, but they are not counted, because they also send to plain StatsD.
 - Datadog next to Sentry (errors, APM), PostHog or LogRocket (session replay vs RUM), or a second log platform is a candidate Overlap. Two monitoring tools often do different jobs, so confirm in the code which features each one uses and ask the user before reporting it.

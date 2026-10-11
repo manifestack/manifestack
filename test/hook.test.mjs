@@ -308,6 +308,22 @@ test('STACK.md vendor names match by prefix, from 3 characters', (t) => {
 	assert.match(run({ cwd: dir, tool_name: 'Bash', tool_input: { command: 'npm i stripe' } }).stdout, /Stripe/, 'two letters are not a match');
 });
 
+test('a cloud in STACK.md does not cover its services; a service listed by its own name does', (t) => {
+	const out = (stack, command) => run({ cwd: project(t, {}, stack), tool_name: 'Bash', tool_input: { command } }).stdout;
+	assert.match(out('## Hosting: AWS\n', 'npm i @aws-sdk/client-dynamodb'), /Amazon DynamoDB \(database\) was added/);
+	assert.match(out('## Other: Azure\n', 'npm i @azure/cosmos'), /Azure Cosmos DB \(database\) was added/);
+	assert.equal(out('## Database: DynamoDB\n', 'npm i @aws-sdk/client-dynamodb'), '');
+	assert.equal(out('## Database: Cosmos DB\n', 'npm i @azure/cosmos'), '');
+	assert.equal(out('## Other: AWS\n', 'npm i @aws-sdk/credential-providers'), '', 'the cloud account itself is listed');
+	for (const [stack, command] of [['## Jobs: Amazon SQS\n', 'npm i @aws-sdk/client-sqs'], ['## Jobs: SQS\n', 'npm i @aws-sdk/client-sqs'], ['## Storage: S3\n', 'npm i @aws-sdk/client-s3'], ['## Database: Aurora\n', 'npm i @aws-sdk/client-rds']]) {
+		assert.equal(out(stack, command), '', `${stack.trim()} covers ${command}`);
+	}
+	assert.match(out('## AI: OpenAI\n', 'npm i @azure/openai'), /Azure OpenAI/, 'another vendor named like the service slice does not cover it');
+	assert.match(out('## Other: Basecamp\n', 'npm i firebase'), /Firebase/);
+	const go = JSON.parse(out('## Hosting: Vercel\n', 'go get cloud.google.com/go/storage')).hookSpecificOutput.additionalContext;
+	assert.match(go, /^Manifestack: Google Cloud Storage \(storage\) was added/, 'the Go module is the service, not the whole cloud');
+});
+
 test('shellCommands keeps quoted text, heredoc bodies and redirections out of the commands', () => {
 	assert.deepEqual(shellCommands(`git commit -m "deps; npm install resend" && echo 'a | b'`), [['git', 'commit', '-m', 'deps; npm install resend'], ['echo', 'a | b']]);
 	assert.deepEqual(shellCommands("cat > README.md <<'EOF'\nnpm install @sentry/nextjs\nEOF\nnpm i stripe"), [['cat'], ['npm', 'i', 'stripe']]);

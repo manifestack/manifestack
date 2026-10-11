@@ -29,6 +29,7 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 - Managed platforms (Vercel, Netlify, Cloudflare, Render, Fly.io) for small teams and up to hundreds of thousands of users; watch data transfer and function usage.
 - A commercial product must not run on a non-commercial plan: some hosts' free tiers are for personal use only. Check the plan's terms on the vendor's page.
 - Containers on a managed service when there is a long-running process or a special runtime.
+- Scale-to-zero services of a big cloud (Lambda, Cloud Run, Container Apps) fit small apps too, above all with credits or an existing account; watch the account-level costs around them (NAT gateway, log ingestion, egress).
 - Kubernetes, Terraform-managed multi-region clusters, service meshes: when several teams run many services, or contractual uptime and scale demand it. Not for one app, not for a few thousand users.
 
 ### Database
@@ -103,7 +104,7 @@ There is no best stack, only one that fits this project and keeps fitting as it 
 
 Report an `Overbuilt` finding when the scan shows these against small usage or a tight budget:
 
-- Kubernetes manifests, Helm charts, Terraform for a single app with low traffic (hundreds or a few thousand users).
+- Kubernetes manifests or Helm charts for a single app with low traffic (hundreds or a few thousand users). Terraform, Bicep, CloudFormation or Pulumi alone are not Overbuilt: judge what they create (clusters, multi-region, NAT gateways, always-on instances), not the tool.
 - Multi-region or multi-cloud setup with no requirement for it.
 - SSR framework for pages that are static.
 - Several paid services for jobs one managed service already does in the stack (queues, cron, storage).

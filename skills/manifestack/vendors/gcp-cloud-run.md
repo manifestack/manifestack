@@ -10,7 +10,7 @@ detect:
   pypi: ["google-cloud-run", "google-cloud-functions", "functions-framework"]
   go: ["cloud.google.com/go/run", "cloud.google.com/go/functions", "github.com/GoogleCloudPlatform/functions-framework-go"]
   imports: ["@google-cloud/run", "@google-cloud/functions", "@google-cloud/functions-framework"]
-  service_signals: ["google_cloud_run_", "google_cloudfunctions", "gcloud run ", "gcloud beta run ", "gcloud functions ", "args: ['run', 'deploy'", "args: [\"run\", \"deploy\"", "args: ['functions', 'deploy'", "args: [\"functions\", \"deploy\"", "allow-unauthenticated", "serving.knative.dev", "run.googleapis.com", "cloudfunctions.googleapis.com", ".a.run.app", ".run.app/", ".run.app\"", ".run.app'", "cloudfunctions.net", "gcp.cloudrun", "gcp.cloudfunctions", "/gcp/cloudrun", "/gcp/cloudfunctions", "run_v2.ServicesClient", "\"K_SERVICE\"", "'K_SERVICE'", "env.K_SERVICE", "CLOUD_RUN_JOB"]
+  service_signals: ["google_cloud_run_", "google_cloudfunctions", "gcloud run ", "gcloud beta run ", "gcloud functions ", "args: ['run', 'deploy'", "args: [\"run\", \"deploy\"", "args: ['functions', 'deploy'", "args: [\"functions\", \"deploy\"", "allow-unauthenticated", "serving.knative.dev", "run.googleapis.com/", "cloudfunctions.googleapis.com/", ".a.run.app", ".run.app/", ".run.app\"", ".run.app'", "cloudfunctions.net", "gcp.cloudrun", "gcp.cloudfunctions", "/gcp/cloudrun", "/gcp/cloudfunctions", "run_v2.ServicesClient", "\"K_SERVICE\"", "'K_SERVICE'", "env.K_SERVICE", "CLOUD_RUN_JOB"]
 pages:
   pricing: https://cloud.google.com/run/pricing
   billing_settings: https://docs.cloud.google.com/run/docs/configuring/billing-settings

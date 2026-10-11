@@ -8,8 +8,10 @@ detect:
   pypi: ["anthropic", "claude-agent-sdk", "langchain-anthropic", "llama-index-llms-anthropic"]
   go: ["github.com/anthropics/anthropic-sdk-go"]
   imports: ["@anthropic-ai/sdk", "@anthropic-ai/claude-agent-sdk", "@ai-sdk/anthropic", "@langchain/anthropic"]
-  env_prefixes: ["ANTHROPIC_"]
+  env_prefixes: ["ANTHROPIC_API_KEY", "ANTHROPIC_ADMIN_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL"]
   config_files: []
+  role_signals:
+    ai: ["new Anthropic(", "= Anthropic(", "= AsyncAnthropic(", "anthropic.Anthropic(", "anthropic.AsyncAnthropic(", "anthropic.NewClient()", "anthropic.NewClient(option.", "Anthropic()", "Anthropic(api_key", "\"anthropic:", "'anthropic:", "api.anthropic.com", "ANTHROPIC_API_KEY", "@ai-sdk/anthropic", "createAnthropic(", "@langchain/anthropic", "langchain_anthropic", "ChatAnthropic(", "llama_index.llms.anthropic", "@anthropic-ai/claude-agent-sdk", "claude_agent_sdk"]
 pages:
   pricing: https://platform.claude.com/docs/en/about-claude/pricing
   rate_limits: https://platform.claude.com/docs/en/api/rate-limits
@@ -58,7 +60,7 @@ common_fixes:
 verified: 2026-10-08
 ---
 
-- Claude through Amazon Bedrock (`@anthropic-ai/bedrock-sdk`) or Google Cloud (`@anthropic-ai/vertex-sdk`) is billed and rate-limited by that cloud, not by this map; read the cloud's pricing instead.
+- Claude through Amazon Bedrock (`@anthropic-ai/bedrock-sdk`, read `aws-bedrock`), Microsoft Foundry (`@anthropic-ai/foundry-sdk`, read `azure-openai`) or Google Cloud Vertex AI (`@anthropic-ai/vertex-sdk`, no map: read the cloud's pricing) is billed and rate-limited by that cloud, not by this map. The `ai` role counts here only for direct Anthropic API use (`new Anthropic(`, `= Anthropic(`, `@ai-sdk/anthropic`, the Agent SDK); `AnthropicBedrock` and `AnthropicVertex` are the cloud's.
 - Cost grows per user and per request (tokens in and out), not as a flat plan. Estimate tokens per request × requests per user × users, and read prices for the exact model. Rate limits and the monthly spend cap follow the usage tier, and a new organization starts low. At the cap, requests return 429 until next month; flag a launch on a low tier as a Risk.
 - Training use, retention (ZDR, models that require longer retention) and data residency are Requirement questions: compare them with the project's data rules, not with the bill.
 - Anthropic has a docs-only MCP server (`https://platform.claude.com/docs/mcp`). It holds no account data; no official account MCP exists (community Admin API servers are not official), so ask the user for numbers.

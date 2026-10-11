@@ -44,17 +44,18 @@ When a change needs more, raise the budget in the same pull request and say why.
 1. Copy `catalog/vendors/_template.md` to `catalog/vendors/<id>.md`. The `id` is lowercase and matches the file name.
 2. Fill in:
    - `detect`: npm package names (a trailing `/` matches a whole scope), PyPI names (`pypi`) and Go module paths (`go`) of the official SDKs, imports (a name matches itself and its subpaths; a trailing `/` or `:` makes it a prefix), env var name prefixes, config files. Verify every name on npmjs.com, pypi.org and pkg.go.dev. Add `role_signals` if the vendor has several roles and a role should count only when its code is used. Role and service signals are searched in source files and in Terraform, Bicep, `serverless.yml` and other YAML files.
-   - `family` and `detect.service_signals` (for a large vendor split into service maps, such as `aws` and `aws-s3`): the family map covers the account (billing, budgets, regions, compliance); each service map covers one service, with its own role, its own SDK packages and `service_signals`, strings in code or infrastructure files (`boto3.client('s3')`, `resource "aws_s3_bucket"`, `AWS::S3::Bucket`) that count only when the family is found. The skill reads the family map along with each service map, so keep account-wide facts in the family map only.
+   - `family` and `detect.service_signals` (for a large vendor split into service maps, such as `aws` and `aws-s3`): the family map covers the account (billing, budgets, regions, compliance); each service map covers one service, with its own role, its own SDK packages and `service_signals`, strings in code or infrastructure files (`boto3.client('s3')`, `resource "aws_s3_bucket"`, `AWS::S3::Bucket`) that count only when the family is found. A family map's own `service_signals` (`provider "aws"`, `AWSTemplateFormatVersion`) find the family without an SDK. The skill reads the family map along with each service map, so keep account-wide facts in the family map only.
    - `pages`: official pricing, limits, regions and security/compliance pages. Open every URL.
    - `read`: what the auditor extracts from the pages: quota *names*, what happens at the limit, the next plan.
    - `usage_questions`: what to ask and the exact dashboard path. Use the standard metric names where they fit (`db_size`, `monthly_sent`, `daily_peak`, `transfer_tb`, `mau`, `users`, `monthly_bill`).
-   - `mcp`: only if the vendor has an official MCP server with a real read-only mode. List only read-only tools in `allowed_tools`, and leave out anything that returns keys or connection strings.
+   - `mcp`: `official: true` if the vendor has an official MCP server; `readonly_flag` and `allowed_tools` only for a real read-only mode the user turns on when connecting. List only read-only tools in `allowed_tools`, and leave out anything that returns keys, connection strings or user data.
    - `verified`: today's date.
 3. **No prices or quota numbers in the map.** They are read from the page at run time. A test fails on dollar amounts.
 4. If the vendor was in `packages/core/src/known-sdks.mjs` (unmapped SDKs), remove it there.
 5. Add a fixture in `test/fixtures/` that uses the vendor's SDK, and a detection test in `test/core-detect.test.mjs`.
-6. Run `node tools/sync.mjs && npm test`.
-7. Add the vendor to the vendor maps line under `[Unreleased]` → Added in `CHANGELOG.md`.
+6. Add the vendor to the Vendors table in `README.md`, and to `skills/manifestack/references/mcp.md`: a row when `readonly_flag` is set, or the "none" list when the server is official without one.
+7. Run `node tools/sync.mjs && npm test`.
+8. Add the vendor to `CHANGELOG.md` under `[Unreleased]` → Added, in the vendor maps list under its role.
 
 ## Change the scripts
 
@@ -89,7 +90,7 @@ One version for everything in 0.x: `packages/cli/package.json`, `packages/core/p
    - the invocation name of the plugin skill (`claude plugin details manifestack` after installing from the marketplace) and of the npm-installed skill (`/manifestack`, `$manifestack` in Codex);
    - project skill paths per agent in `packages/cli/src/agents.js`;
    - the Cursor hook format (`.cursor/hooks.json`, event name and output) and whether Codex has hooks yet;
-   - read-only flags of the Supabase and Neon MCP servers and their tool lists in `catalog/vendors/`;
+   - read-only flags and tool lists of every server in `skills/manifestack/references/mcp.md` and `catalog/vendors/`;
    - the vendor pages listed in each map still load, and `verified` dates are recent.
 5. Run the manual scenarios in `test/evals/README.md` in Claude Code, Cursor and Codex; every finding needs a `source` with a date.
 6. `npx skills add ./ --list` shows both skills.

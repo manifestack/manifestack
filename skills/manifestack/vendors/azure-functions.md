@@ -22,17 +22,17 @@ pages:
   dedicated: https://learn.microsoft.com/en-us/azure/azure-functions/dedicated-plan
   costs: https://learn.microsoft.com/en-us/azure/azure-functions/functions-consumption-costs
   storage: https://learn.microsoft.com/en-us/azure/azure-functions/storage-considerations
-  durable_billing: https://learn.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-billing
-  durable_task_scheduler_billing: https://learn.microsoft.com/en-us/azure/azure-functions/durable/durable-task-scheduler/durable-task-scheduler-billing
+  durable_billing: https://learn.microsoft.com/en-us/azure/durable-task/durable-functions/durable-functions-billing
+  durable_task_scheduler_billing: https://learn.microsoft.com/en-us/azure/durable-task/scheduler/durable-task-scheduler-billing
   monitoring: https://learn.microsoft.com/en-us/azure/azure-functions/configure-monitoring
   runtime_versions: https://learn.microsoft.com/en-us/azure/azure-functions/functions-versions
 read:
   - Flex Consumption - on-demand GB-seconds of instance memory while executing and executions, with monthly free grants per subscription; always-ready instances bill a baseline while idle plus execution time and executions, with no free grant; minimum billable execution and rounding
   - legacy Consumption - GB-seconds and executions with its own free grant; Linux Consumption retirement date and the earlier stop date for v3 apps on it; Windows Consumption is legacy; Flex is Linux only
   - Premium (Elastic Premium, EP) - vCPU and memory per second for every allocated instance, no execution charge; at least one instance per plan always billed; always ready and prewarmed instances
-  - Dedicated - an App Service plan at App Service rates, Always On required, no Free or Shared; Container Apps hosting bills as Container Apps
+  - Dedicated - an App Service plan at App Service rates, Always On needed for reliable triggers, no Free or Shared; Container Apps hosting bills as Container Apps
   - the storage account every function app needs bills apart and sits outside the free grant; Durable Functions on Azure Storage add queue polling, blob lease and table transactions, and on Consumption each orchestrator replay bills as an execution
-  - Durable Task Scheduler - Dedicated per Capacity Unit or Consumption (preview) per action
+  - Durable Task Scheduler - Dedicated per Capacity Unit or Consumption per action
   - savings plan for compute on Flex Consumption and Premium meters
   - quota names - Flex Consumption regional subscription memory quota (cores; lower on Free Trial and Students), maximum instances per plan, function apps per subscription; timeouts per plan and the HTTP response limit
 usage_questions:

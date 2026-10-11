@@ -11,7 +11,7 @@ detect:
   imports: ["@azure/communication-email", "@azure/communication-sms", "@azure/communication-phone-numbers", "@azure/communication-chat", "@azure/communication-calling", "@azure/communication-call-automation", "@azure/communication-identity", "@azure/communication-rooms", "@azure/communication-common", "@azure/communication-react", "@azure-rest/communication-messages"]
   env_prefixes: ["COMMUNICATION_SERVICES_CONNECTION_STRING", "AZURE_COMMUNICATION_"]
   config_files: []
-  service_signals: ["azure.communication.", ".communication.azure.com", "\"azurerm_communication_service\"", "\"azurerm_email_communication_service", "Microsoft.Communication/", "azure-native.communication", "azure_native.communication"]
+  service_signals: ["azure.communication.", ".communication.azure.com", "\"azurerm_communication_service\"", "\"azurerm_email_communication_service", "Microsoft.Communication/", "azure-native:communication:", "azure_native.communication"]
   role_signals:
     email: ["@azure/communication-email", "azure.communication.email", "\"azurerm_email_communication_service", "Microsoft.Communication/emailServices"]
 pages:
@@ -67,4 +67,4 @@ verified: 2026-10-11
 - The email role counts only when the Email SDK or an email resource is in the code; SMS, chat or calling alone give no role. Email needs two resources: an Email Communication Service with its domains, linked to a Communication Services resource.
 - An Azure-managed domain is for testing; its limits cannot be raised. A launch on it is a Risk finding.
 - ACS Email next to Resend, SendGrid, Postmark, Mailgun or SES is Overlap unless split on purpose. ACS SMS next to Twilio is not reported (Twilio has the role other in this catalog); mention it when both send SMS.
-- MCP: the Azure MCP Server's Communication tools only send email and SMS; older versions marked them read-only. Do not use them.
+- MCP: the Azure MCP Server's Communication tools only send email and SMS. Do not use them.

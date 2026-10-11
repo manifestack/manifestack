@@ -2,7 +2,6 @@
 
 <img width="72" height="72" alt="Manifestack logo" src="https://github.com/user-attachments/assets/f73c4146-dee0-4e17-b1fb-7ca675bd7090" />
 
-
 # Manifestack
 
 **A stack that fits your project, and keeps fitting as it changes.**
@@ -35,7 +34,7 @@ Then run `/manifestack`, or just ask your agent: "what breaks first at 50k users
 ## What it does
 
 - **New project:** asks about users, budget, data rules and your team, then picks hosting, database, auth, email and the rest, priced from launch to 100k users, and says what you don't need.
-- **Existing project:** scans the whole product (JS, Python and Go dependencies, config files, env var names) and reports what breaks or costs too much, by severity, with a fix for each.
+- **Existing project:** scans the whole product (JS, Python and Go dependencies, Terraform, Bicep and CloudFormation, config files, env var names) and reports what breaks or costs too much, by severity, with a fix for each.
 - **Choosing a vendor:** compares two or three vendors for the same job on your workload: requirements, cost at your size, the first limit, the features you use and what it takes to leave.
 - **Every change:** in Claude Code and Cursor, a hook flags each new vendor SDK and checks it against your requirements before you rely on it.
 
@@ -166,7 +165,7 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Storage | Cloudinary, UploadThing, Mux |
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar, PayPal (with Braintree) |
 | SMS and voice | Twilio |
-| AWS | account map plus S3, CloudFront, Lambda, ECS and Fargate, EC2 and Lightsail, Amplify, RDS and Aurora, DynamoDB, ElastiCache, OpenSearch, SES, Cognito, SQS and SNS, Bedrock, CloudWatch |
+| AWS | account map plus S3, CloudFront, Lambda, ECS and Fargate (with App Runner), EC2 and Lightsail, Amplify, RDS and Aurora, DynamoDB, ElastiCache, OpenSearch, SES, Cognito, SQS and SNS (with EventBridge, Step Functions), Bedrock, CloudWatch |
 | Google Cloud | account map plus Cloud Run (with functions), App Engine, Compute Engine, GKE, Cloud Storage, Cloud SQL and AlloyDB, Firestore, Memorystore, BigQuery, Pub/Sub (with Tasks, Scheduler, Workflows, Eventarc), Cloud Logging and Monitoring; Firebase is part of this family |
 | Azure | account map plus App Service and Static Web Apps, Functions, Container Apps, AKS, Virtual Machines, Blob Storage, SQL Database, PostgreSQL and MySQL, Cosmos DB, Redis, Service Bus (with Event Grid, Event Hubs, Queue Storage), Monitor and Application Insights, Entra External ID, Azure OpenAI and Foundry, AI Search, Communication Services |
 | Search | Algolia, Elastic Cloud |

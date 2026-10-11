@@ -47,8 +47,8 @@ usage_questions:
     where: Space → Settings → Subscription (plan and overage estimate, without seats and traffic)
 mcp:
   official: true
-  readonly_flag: "read-only permissions for selected spaces on the OAuth consent screen of https://mcp.storyblok.com/mcp, or a personal access token with read scopes only"
-  allowed_tools: [search, describe, execute_readonly]
+  readonly_flag: null
+  allowed_tools: []
 common_fixes:
   - pass the cv value the API returns (updated by webhook) instead of a timestamp, so requests are served from the CDN
   - request draft content only in preview environments; published content is cached, drafts are not
@@ -62,5 +62,5 @@ verified: 2026-10-11
 
 - Storyblok is detected from `@storyblok/`, `storyblok-js-client`, the `storyblok` CLI, older `storyblok-*` and Gatsby packages, `STORYBLOK_*` names and CLI files (`storyblok.config.*`, `storyblok-components.d.ts`). The API host in the code shows the region (`api-us`, `api-ca`, `api-ap`, `storyblokchina.cn`).
 - `support.storyblok.com` answers automated requests with a challenge; docs pages serve markdown at `<url>.md`. The overage one-pager and the pricing page disagree on Growth Plus add-ons; cite the pricing page and technical limits.
-- On the MCP server, `execute_readonly` runs any GET: never request space API keys, the space object (it holds the preview token and billing address) or collaborators. Statistics need a token with the Statistics scope.
+- The MCP server's `execute_readonly` runs any Management API GET, including space API keys, the space object (preview token, billing address), collaborators and stories; read-only scopes do not narrow that. Do not use it; ask the user for numbers instead.
 - Storyblok next to Contentful, Sanity, Strapi or another CMS is Overlap unless split on purpose.

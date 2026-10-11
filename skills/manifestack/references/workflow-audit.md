@@ -9,7 +9,8 @@ Run `node <skill-dir>/scripts/detect.mjs .` from the repository root. It returns
 - `empty`: true when there is no code yet (use init instead);
 - `scanned_files` and `truncated`: how many files were read, and whether the scan stopped at the file limit;
 - `vendors`: mapped vendors with `evidence` (package from package.json, requirements*.txt, pyproject.toml, Pipfile or go.mod; import; config; env name; service or code signal, also from Terraform, Bicep and YAML) and `roles_used`; `family` when the entry is one service of a larger vendor;
-- `unmapped`: known SDKs without a page map (AWS, Mistral, Twilio, …);
+- An entry with empty `roles_used` is present without a role signal: CloudWatch, Cloud Logging or Azure Monitor collecting platform logs, or the `openai` package as the client of Azure OpenAI. Read its map's notes first. It can carry a `Bill` finding (log ingestion, retention), never an `Overlap`; in STACK.md it goes under `Other` (`## Other: Amazon CloudWatch (Lambda logs)`), or nowhere when another vendor bills that usage;
+- `unmapped`: known SDKs without a page map (Mistral, Groq, Liveblocks, …);
 - `overlaps`: roles served by more than one vendor (candidate `Overlap` findings);
 - `frameworks` and `infra`: inputs for `Overbuilt` (Next.js, Django, FastAPI, Gin, Docker, Terraform, Bicep, Helm, Kubernetes manifests);
 - `env_names`: variable names only;
@@ -42,7 +43,7 @@ If there is no `.manifestack/STACK.md`, continue; you will create it in Step 6.
 
 Check that vendor pages load (`references/vendor-pages.md` → Before the questions). Then ask what the code cannot show, in one round (`references/interview.md` → How to ask), only what STACK.md does not already say, together with the usage numbers from Step 4:
 
-1. **Plans and regions** of each vendor found: show your guess from the code and ask to confirm.
+1. **Plans and regions** of each vendor found: show your guess from the code and ask to confirm. For a cloud family, ask once for the account (plan, credits and their expiry, Regions) from the family map's questions.
 2. **Services outside the code**: a CDN or proxy in front, DNS, cron or queue services, backups, analytics, anything set up only in a dashboard.
 3. **Spend settings**: budgets, caps and alerts in vendor dashboards.
 4. **Credits or committed spend**, and when they expire.
@@ -59,7 +60,7 @@ For every vendor in the scan and in STACK.md, read its pages as `references/vend
 
 ## Step 4. Collect usage
 
-Follow `references/usage-sources.md`. In short: ask the user for the missing numbers in the same round as the questions from Step 2 (each with the dashboard path from `vendors/<id>.md`), read exports if the user put them in the repo, or use a read-only vendor MCP if one is connected. For growth you need two points in time.
+Follow `references/usage-sources.md`. In short: ask the user for the missing numbers in the same round as the questions from Step 2 (each with the dashboard path from `vendors/<id>.md`), read exports if the user put them in the repo, or use a read-only vendor MCP if one is connected. For growth you need two points in time. For a cloud family, ask the family map's cost-by-service question (or for the billing export) first; ask a service map's questions only for services that are on the bill or have a signal for a finding, and list the others under "Checked, no finding" as not on the bill.
 
 Ask only for numbers that change a finding. If an answer will not change anything, do not ask.
 
@@ -82,7 +83,7 @@ When `Requirements` has a `budget` and a user target (`users: 9k now, 50k by Q3`
    - `Bill`: overage on published rates, now or growing.
    - `Risk`: something that breaks at a peak (daily send caps, rate limits, pausing, cold starts on launch day).
    - `Requirement`: a vendor's published region or certification against `Requirements` (also: a commercial product on a non-commercial plan).
-   - `Overlap`: from `overlaps`, confirmed in the code (both really used, not one leftover import) and doing the same job. Two monitoring tools often do different jobs (errors and product analytics), and two AI providers can be a deliberate fallback; ask before calling either an Overlap.
+   - `Overlap`: from `overlaps`, confirmed in the code (both really used, not one leftover import) and doing the same job. Two monitoring tools often do different jobs (errors and logs, for example Sentry next to CloudWatch), and two AI providers can be a deliberate fallback; ask before calling either an Overlap.
    - `Overbuilt`: from `frameworks` and `infra` against the users and budget (`references/fit.md`).
 2. Give each finding a severity (`references/report.md` → Severity), then order them by severity, by `when` (nearest first) and by cost.
 3. If you noted blockers in Step 1, add the "Also noticed" list.

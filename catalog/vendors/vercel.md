@@ -4,9 +4,9 @@ id: vercel
 name: Vercel
 roles: [hosting, storage]
 detect:
-  packages: ["vercel", "@vercel/"]
+  packages: ["vercel", "@vercel/analytics", "@vercel/speed-insights", "@vercel/functions", "@vercel/node", "@vercel/edge", "@vercel/blob", "@vercel/edge-config", "@vercel/global-config", "@vercel/flags", "@vercel/sandbox", "@vercel/queue", "@vercel/firewall", "@vercel/oidc", "@vercel/microfrontends", "@vercel/toolbar", "@vercel/remix", "@vercel/connect"]
   pypi: ["vercel", "vercel-sandbox", "vercel-queue", "vercel-workflow", "vercel-cache", "vercel-oidc", "vercel-headers", "vercel-connect"]
-  imports: ["@vercel/"]
+  imports: ["@vercel/analytics", "@vercel/speed-insights", "@vercel/functions", "@vercel/node", "@vercel/edge", "@vercel/blob", "@vercel/edge-config", "@vercel/global-config", "@vercel/flags", "@vercel/sandbox", "@vercel/queue", "@vercel/firewall", "@vercel/oidc", "@vercel/microfrontends", "@vercel/toolbar", "@vercel/remix", "@vercel/connect"]
   env_prefixes: ["VERCEL_", "NEXT_PUBLIC_VERCEL_", "BLOB_READ_WRITE_TOKEN"]
   config_files: ["vercel.json", "vercel.ts", "vercel.toml"]
   role_signals:
@@ -67,4 +67,5 @@ verified: 2026-10-08
 - Usage is per team; filter the Usage page by project to see one app.
 - Overage rates differ by region. Note the region of the traffic when you compute a Bill finding.
 - Vercel MCP (`mcp.vercel.com`) has write tools (deployments, file uploads, purchases) and no read-only mode. Do not use it; ask the user for numbers instead.
+- Only Vercel's platform packages count. `@vercel/og`, `@vercel/otel`, `@vercel/ncc`, `@vercel/nft` and `@vercel/style-guide` are libraries that run anywhere, so they say nothing about hosting.
 - `@vercel/kv` and `@vercel/postgres` are deprecated and now backed by Upstash and Neon. If you see them, the database vendor is Upstash or Neon, billed through Vercel Marketplace.

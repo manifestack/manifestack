@@ -12,9 +12,9 @@ detect:
   imports: ["@aws-sdk/client-s3", "@aws-sdk/lib-storage", "@aws-sdk/s3-request-presigner", "@aws-sdk/s3-presigned-post"]
   env_prefixes: []
   config_files: []
-  service_signals: ["client('s3'", "client(\"s3\"", "resource('s3'", "resource(\"s3\"", "new AWS.S3(", "aws-sdk/clients/s3", "aws-sdk-go/service/s3", '"aws_s3_', "AWS::S3::", "AWS::S3Express::", "aws-cdk-lib/aws-s3", "aws_cdk.aws_s3", "aws.s3.Bucket", "sst.aws.Bucket(", "arn:aws:s3:::", "s3.amazonaws.com"]
+  service_signals: ["client('s3'", "client(\"s3\"", "resource('s3'", "resource(\"s3\"", "new AWS.S3(", "aws-sdk/clients/s3", "aws-sdk-go/service/s3", '"aws_s3_', "AWS::S3::", "AWS::S3Express::", "aws-cdk-lib/aws-s3", "aws_cdk.aws_s3", "aws.s3.Bucket", "sst.aws.Bucket(", "arn:aws:s3:::", "s3.amazonaws.com", "aws_s3 as"]
   role_signals:
-    storage: ['"aws_s3_', "AWS::S3::", "AWS::S3Express::", "aws-cdk-lib/aws-s3", "aws_cdk.aws_s3", "aws.s3.Bucket", "sst.aws.Bucket(", "arn:aws:s3:::", "s3:GetObject", "s3:PutObject", "s3.amazonaws.com", "s3-accelerate.amazonaws.com"]
+    storage: ['"aws_s3_', "AWS::S3::", "AWS::S3Express::", "aws-cdk-lib/aws-s3", "aws_cdk.aws_s3", "aws.s3.Bucket", "sst.aws.Bucket(", "arn:aws:s3:::", "s3:GetObject", "s3:PutObject", "s3.amazonaws.com/${", "s3-accelerate.amazonaws.com", "aws_s3 as"]
 pages:
   pricing: https://aws.amazon.com/s3/pricing/
   storage_classes: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
@@ -28,7 +28,7 @@ read:
   - Intelligent-Tiering monitoring and automation fee per object and the size below which objects are not monitored
   - free transfers (in, same Region, to CloudFront), Transfer Acceleration and Replication
   - S3 Express One Zone storage, request and per-GB upload and retrieval fees; one Availability Zone only
-  - error responses not billed to the bucket owner
+  - which error responses are not billed to the bucket owner (5XX, a listed set of 3XX and 4XX codes, AccessDenied from outside the account or organization); other 4XX requests are billed
   - Storage Lens advanced metrics, Inventory, Batch Operations, S3 Metadata
   - general purpose bucket quota per account
 usage_questions:

@@ -6,7 +6,7 @@ body:
     id: vendor
     attributes:
       label: Vendor
-      placeholder: Turso
+      placeholder: Loops
     validations:
       required: true
   - type: dropdown

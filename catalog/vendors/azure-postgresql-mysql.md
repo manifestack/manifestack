@@ -29,11 +29,11 @@ pages:
   mysql_stop_start: https://learn.microsoft.com/en-us/azure/mysql/flexible-server/how-to-stop-start-server-portal
   mysql_versions: https://learn.microsoft.com/en-us/azure/mysql/concepts-version-policy
 read:
-  - compute per vCore-hour by tier (Burstable, General Purpose, Memory Optimized; MySQL meters name the last one Business Critical) and VM series; Burstable CPU credits
+  - compute per vCore-hour by tier (Burstable, General Purpose, Memory Optimized; some MySQL docs call it Business Critical) and VM series; Burstable CPU credits
   - storage per GB-month provisioned (not used); Premium SSD v2 IOPS and throughput above the baseline billed separately; MySQL pre-provisioned or autoscale IOPS
-  - storage autogrow, on by default, and that storage only grows (shrinking needs a dump and restore to a new server)
+  - storage autogrow (on by default on MySQL; opt-in on PostgreSQL Premium SSD, where each step doubles the disk) and that storage only grows (shrinking needs a dump and restore to a new server)
   - high availability bills a standby with the same compute and storage; each read replica bills as its own server
-  - backup storage free up to provisioned storage, retention between the minimum and maximum days, geo-redundant backup counted twice and chosen at creation only
+  - backup storage free up to provisioned storage, retention between the minimum and maximum days, geo-redundant backup counted twice and chosen at creation only on PostgreSQL (MySQL can move to it later)
   - stopped servers stop compute billing; how long until the service starts them again (PostgreSQL and MySQL differ)
   - Extended Support per vCore-hour for major versions past standard support, applied automatically, and the dates for the versions in use
   - Azure free account allowance (Burstable B1MS hours, storage and backup storage per month, for the first months only)
@@ -66,6 +66,6 @@ verified: 2026-10-11
 - Next to Supabase, Neon, PlanetScale, Cloud SQL, RDS or another managed database it is Overlap unless split on purpose.
 - Single Server for both engines is retired. `"azurerm_postgresql_server"`, `"azurerm_mysql_server"` or a `Microsoft.DBforPostgreSQL/servers` resource is a Fit finding to migrate to flexible server.
 - PostgreSQL 11 to 13 and MySQL 5.7 are already in paid Extended Support; read the version tables for MySQL 8.0 and PostgreSQL 14. A stopped server pays storage and backups but no Extended Support.
-- A free account B1MS server bills at pay-as-you-go rates once the free months end; HA, replicas and extra servers bill from day one.
+- A free account B1MS server bills at pay-as-you-go rates once the free months end; the free hours are shared by all B1MS servers, and HA or replicas need a larger tier that the allowance does not cover.
 - `Microsoft.DBforPostgreSQL/serverGroupsv2` or `"azurerm_cosmosdb_postgresql_cluster"` is Azure Cosmos DB for PostgreSQL, on a retirement path and priced per node: a Fit finding.
-- MCP: in `--read-only` mode the Azure MCP Server hides `database query` and `server param set`; list tools return server, database and table names, and `server config get` returns SKU, storage, retention and geo-backup. Never `table schema get` or query tools.
+- MCP: `--read-only` hides only `server param set`; `database query` and `table schema get` are marked read-only and stay exposed, so start with the `--tool` list above; call `postgres_list` and `mysql_list` without `--server` (server names only, through ARM): with `--server` they log in to the database as a user, and never pass `--password`. `server config get` returns SKU, storage, retention and geo-backup. Never `table schema get` or query tools.

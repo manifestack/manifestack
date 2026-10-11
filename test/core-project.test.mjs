@@ -32,6 +32,20 @@ test('site example: 136 MB at +14 MB/week reaches 500 MB 26 weeks later (around 
 	assert.equal(eta({ current: 38, limit: 500, ratePerDay: 2, from: '2026-01-01' }).weeks, 33);
 });
 
+test('eta: a reading old enough to project past today is reached now, with the projected date', () => {
+	const r = eta({ current: 312, limit: 500, ratePerDay: 1.1, from: '2026-01-06' });
+	assert.equal(r.reached, true);
+	assert.equal(r.when, 'Now');
+	assert.equal(r.date, '2026-06-26');
+	assert.equal(r.projected, true);
+});
+
+test('parseQuantity: binary and petabyte units', () => {
+	assert.equal(parseQuantity('500 MiB').value, 524.288);
+	assert.equal(Math.round(parseQuantity('2 GiB').value), 2147);
+	assert.equal(parseQuantity('1.5 PB').value, 1.5e9);
+});
+
 test('site example: Supabase 312/500 MB at +1.1 MB/day → ETA ~Mar 2027', () => {
 	const r = eta({ current: 312, limit: 500, ratePerDay: 1.1, from: '2026-10-06' });
 	assert.equal(r.when, 'ETA ~Mar 2027');

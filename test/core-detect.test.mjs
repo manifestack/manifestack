@@ -497,6 +497,60 @@ test('Azure: Terraform alone; auth, email and AI roles only for real use; host.j
 	assert.deepEqual(ids(run({ 'host.json': '{"version":"2.0"}', 'package.json': JSON.stringify({ dependencies: { express: '5' } }) })), []);
 });
 
+test('pre-release fixes: lockfiles, fixtures, Terraform comments, Go service modules, Lambda types', (t) => {
+	const lock = tempDir(t);
+	writeFileSync(join(lock, 'package.json'), JSON.stringify({ dependencies: { firebase: '11', '@supabase/supabase-js': '2' } }));
+	writeFileSync(join(lock, 'auth.ts'), "import { getAuth } from 'firebase/auth';\nimport { createClient } from '@supabase/supabase-js';\n");
+	writeFileSync(join(lock, 'pnpm-lock.yaml'), "packages:\n  '@firebase/firestore@4.7.3':\n    resolution: {integrity: x}\n  '@firebase/storage@0.13.4':\n    resolution: {integrity: x}\n");
+	let r = detectVendors(lock, { signatures });
+	assert.deepEqual(r.vendors.find((v) => v.id === 'firebase').roles_used, ['auth'], 'pnpm-lock.yaml lists packages the code does not use');
+	assert.deepEqual(r.overlaps.filter((o) => o.role === 'database'), []);
+
+	const fx = tempDir(t);
+	mkdirSync(join(fx, 'test/fixtures/aws-app'), { recursive: true });
+	writeFileSync(join(fx, 'test/fixtures/aws-app/package.json'), JSON.stringify({ dependencies: { '@aws-sdk/client-s3': '3' } }));
+	writeFileSync(join(fx, 'package.json'), JSON.stringify({ dependencies: { next: '15' } }));
+	writeFileSync(join(fx, 'next.config.ts'), "export default { images: { remotePatterns: [{ hostname: 'my-bucket.s3.amazonaws.com' }] } };\n");
+	r = detectVendors(fx, { signatures });
+	assert.deepEqual(ids(r), [], 'an AWS fixture does not make the app an S3 user');
+	assert.deepEqual(r.samples.map((s) => s.id), ['aws-s3']);
+
+	const tf = tempDir(t);
+	writeFileSync(join(tf, 'main.tf'), 'provider "google" {}\n// provider "aws" {}\n/* resource "aws_db_instance" "old" {}\n*/\nresource "google_storage_bucket" "files" {}\n');
+	assert.deepEqual(ids(detectVendors(tf, { signatures })), ['gcp', 'gcp-cloud-storage'], 'Terraform // and /* */ comments are not signals');
+
+	const go = tempDir(t);
+	writeFileSync(join(go, 'go.mod'), 'module example.com/app\n\ngo 1.23\n\nrequire cloud.google.com/go/storage v1.50.0\n');
+	assert.deepEqual(ids(detectVendors(go, { signatures })), ['gcp-cloud-storage'], 'the longest Go module pattern owns the module');
+
+	const netlify = tempDir(t);
+	writeFileSync(join(netlify, 'package.json'), JSON.stringify({ devDependencies: { '@types/aws-lambda': '8' } }));
+	writeFileSync(join(netlify, 'netlify.toml'), '[build]\n  functions = "netlify/functions"\n');
+	writeFileSync(join(netlify, 'fn.ts'), "import type { Handler } from 'aws-lambda';\n");
+	r = detectVendors(netlify, { signatures });
+	assert.deepEqual(ids(r), ['netlify'], 'Lambda handler types are also how Netlify Functions are typed');
+
+	const run = (files) => {
+		const dir = tempDir(t);
+		for (const [f, c] of Object.entries(files)) writeFileSync(join(dir, f), c);
+		return detectVendors(dir, { signatures });
+	};
+	r = run({ 'package.json': JSON.stringify({ dependencies: { '@anthropic-ai/foundry-sdk': '0.5' } }), '.env': 'ANTHROPIC_FOUNDRY_API_KEY=x\n' });
+	assert.deepEqual(ids(r), ['azure-openai'], 'the longest env prefix wins: ANTHROPIC_FOUNDRY_ is not ANTHROPIC_');
+	r = run({ 'requirements.txt': 'anthropic[bedrock]\n', 'app.py': 'from anthropic import AnthropicBedrock\nclient = AnthropicBedrock()\n' });
+	assert.deepEqual(r.vendors.map((v) => [v.id, v.roles_used]), [['anthropic', []], ['aws', ['other']], ['aws-bedrock', ['ai']]], 'Claude on Bedrock is billed by AWS');
+	assert.deepEqual(ids(run({ 'package.json': JSON.stringify({ dependencies: { '@vercel/og': '1', '@vercel/otel': '2' } }), 'netlify.toml': '' })), ['netlify'], '@vercel/ libraries run anywhere');
+	assert.deepEqual(ids(run({ '.env': 'EAS_CONTRACT_ADDRESS=x\nDD_SECRET_KEY=y\nDD_SITE_URL=z\nDD_ENV_PATH=w\n' })), [], 'Ethereum Attestation Service and DefectDojo names');
+	r = run({ 'package.json': JSON.stringify({ dependencies: { stripe: '18', openai: '6' } }), 'glob.ts': "export const isPrefix = (p) => /[/*]$/.test(p);\nimport Stripe from 'stripe';\nimport OpenAI from 'openai';\n" });
+	assert.ok(r.vendors.find((v) => v.id === 'stripe').evidence.some((e) => e.kind === 'import'), 'an unclosed /* in a regex does not hide the rest of the file');
+	const sampleRole = tempDir(t);
+	mkdirSync(join(sampleRole, 'examples'));
+	writeFileSync(join(sampleRole, 'package.json'), JSON.stringify({ dependencies: { openai: '6', '@anthropic-ai/sdk': '0.60' } }));
+	writeFileSync(join(sampleRole, 'app.ts'), "import Anthropic from '@anthropic-ai/sdk';\nconst c = new Anthropic();\n");
+	writeFileSync(join(sampleRole, 'examples/o.ts'), "import OpenAI from 'openai';\nconst o = new OpenAI();\n");
+	assert.deepEqual(detectVendors(sampleRole, { signatures }).overlaps, [], 'a role signal in examples/ does not count for the product');
+});
+
 test('Google Cloud: Terraform or Python alone; Firebase is in the family; Cloud Run next to Vercel is an Overlap', (t) => {
 	const tf = tempDir(t);
 	writeFileSync(join(tf, 'main.tf'), 'provider "google" {}\nresource "google_container_cluster" "main" {}\nresource "google_redis_instance" "cache" {}\nresource "google_bigquery_dataset" "events" {}\n');
@@ -540,7 +594,7 @@ test('a virtualenv under any name is skipped and the file limit drops source bef
 	const r = detectVendors(dir, { signatures, maxFiles: 3 });
 	assert.deepEqual(ids(r), ['clerk', 'stripe'], 'the deep manifest is read, only some source files are');
 	assert.equal(r.truncated, true);
-	assert.equal(r.scanned_files, 3);
+	assert.equal(r.scanned_files, 4, 'the limit counts source files; the manifest is read on top');
 	const full = detectVendors(dir, { signatures });
 	assert.equal(full.truncated, false);
 	assert.equal(full.scanned_files, 11);

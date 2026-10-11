@@ -17,7 +17,7 @@ pages:
   pricing: https://azure.microsoft.com/en-us/pricing/details/azure-openai/
   deployment_types: https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types
   quotas: https://learn.microsoft.com/en-us/azure/foundry/openai/quotas-limits
-  quota_management: https://learn.microsoft.com/en-us/azure/foundry-classic/openai/how-to/quota
+  quota_management: https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/quota
   provisioned: https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/provisioned-throughput
   provisioned_billing: https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/provisioned-throughput-billing
   batch: https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/batch
@@ -49,10 +49,10 @@ usage_questions:
     where: Azure OpenAI or Foundry resource → Monitoring → Metrics (ProcessedPromptTokens, GeneratedTokens), Sum, split by ModelDeploymentName
   - metric: deployments
     ask: Which deployments exist, with deployment type, model version and TPM or PTU each, including fine-tuned and provisioned ones?
-    where: Foundry portal → project → Models + endpoints (Deployments list); Azure portal → resource → Model deployments
+    where: Foundry portal → Build → Models (classic portal: project → Models + endpoints); Azure portal → resource → Model deployments
   - metric: usage_tier
     ask: Quota per model and region against current use, and any 429 throttling?
-    where: Foundry portal → Management center → Quota; resource → Metrics (AzureOpenAIRequests split by StatusCode)
+    where: Foundry portal → Manage → Quota (classic portal: Management center → Quota); resource → Metrics (AzureOpenAIRequests split by StatusCode)
 mcp:
   official: true
   readonly_flag: "--read-only on the local Azure MCP Server with only the tools below (npx -y @azure/mcp@latest server start --read-only --tool foundryextensions_resource_get --tool foundryextensions_openai_models-list); sign in with a Reader identity"

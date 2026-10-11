@@ -12,7 +12,7 @@ detect:
   imports: ["@google-cloud/bigquery", "@google-cloud/bigquery-storage", "@google-cloud/bigquery-data-transfer", "@google-cloud/bigquery-reservation", "@googleapis/bigquery"]
   env_prefixes: []
   config_files: []
-  service_signals: ['"google_bigquery_', "gcp.bigquery.", "gcp:bigquery:", "bigquery.cnrm.cloud.google.com", "from google.cloud import bigquery", "google.cloud.bigquery", "bigquery.googleapis.com", "bq query", "bq load", "bq mk "]
+  service_signals: ['"google_bigquery_', "gcp.bigquery.", "gcp:bigquery:", "bigquery.cnrm.cloud.google.com", "from google.cloud import bigquery", "google.cloud.bigquery", "bigquery.googleapis.com/", "bq query", "bq load", "bq mk "]
 pages:
   pricing: https://cloud.google.com/bigquery/pricing
   editions: https://docs.cloud.google.com/bigquery/docs/editions-intro

@@ -7,7 +7,7 @@ roles: [cms]
 detect:
   packages: ["@strapi/", "@strapi-enterprise/", "strapi", "create-strapi-app", "@nuxtjs/strapi", "strapi-sdk-js", "gatsby-source-strapi"]
   imports: ["@strapi/", "@strapi-enterprise/", "strapi-sdk-js"]
-  env_prefixes: ["STRAPI_", "NEXT_PUBLIC_STRAPI_", "PUBLIC_STRAPI_", "VITE_STRAPI_", "NUXT_PUBLIC_STRAPI_", "GATSBY_STRAPI_", "API_TOKEN_SALT", "ADMIN_JWT_SECRET", "TRANSFER_TOKEN_SALT"]
+  env_prefixes: ["STRAPI_", "NEXT_PUBLIC_STRAPI_", "PUBLIC_STRAPI_", "VITE_STRAPI_", "NUXT_PUBLIC_STRAPI_", "GATSBY_STRAPI_", "API_TOKEN_SALT", "TRANSFER_TOKEN_SALT"]
   config_files: [".strapi-cloud.json", "src/admin/app.example.tsx", "types/generated/contentTypes.d.ts"]
 pages:
   pricing: https://strapi.io/pricing-cloud

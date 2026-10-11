@@ -4,30 +4,37 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-11
+
+108 vendor maps, up from 36: AWS, Google Cloud and Azure as vendor families, 27 more vendors and six new roles. To update an installed project, run `npx manifestack@latest`; it also updates the new-vendor hook, which carries its own copy of the vendor list. With the hook added by `npx manifestack hook`, run `npx manifestack@latest hook`; with the Claude Code plugin, update the plugin.
+
 ### Added
 
-- Vendor maps: Vultr (Cloud Compute, Bare Metal, Object Storage, Managed Databases, Serverless Inference), with its read-only MCP server.
-- Vendor maps: Turso, Prisma Postgres, Pinecone, OpenRouter and Mailgun, which were detected before but had no page map. Turso counts as a database only when the code points to Turso Cloud, and the Prisma ORM alone is not Prisma Postgres.
-- Vendor maps: Pusher, Ably, Inngest and Trigger.dev. Pusher counts as realtime only when the code points to Pusher's service, so Laravel projects on Reverb or the old `.env.example` names are not mistaken for it.
-- Vendor maps: Mux, OneSignal and Hetzner. OneSignal counts for email only when the code sends email through it; Hetzner counts for storage only with an Object Storage endpoint in the code.
-- Vendor maps: Algolia, Contentful, Sanity, Storyblok and Strapi. Strapi notes how to tell Strapi Cloud from a self-hosted server, where Strapi itself costs nothing.
-- Vendor maps: Segment, Mixpanel, Amplitude and LaunchDarkly. Segment feeding an analytics tool is not an Overlap; Mixpanel and Amplitude count for flags only when the code uses their feature flags.
-- Vendor maps: New Relic, Grafana Cloud and Elastic Cloud. Grafana Cloud and Elastic Cloud notes tell the hosted service from free self-hosted Grafana and Elasticsearch; Elastic counts for search or monitoring only when the code uses that part.
-- Vendor maps: Twilio and PayPal (with Braintree). PayPal next to Stripe is usually a wallet button next to card payments; the maps say when it is an Overlap.
-- AWS as a vendor family: an account map (Free plan and credits, spend limits, Budgets, data transfer, NAT Gateway, public IPv4, support plans, regions) and 15 service maps, from SDK clients, boto3 calls, Terraform, CloudFormation, SAM, CDK, Pulumi and SST. AWS is no longer an unmapped SDK. Services of one family in the same role (CloudFront in front of Lambda) are not an Overlap, and a family map's own signals (a Terraform `aws` provider, a CloudFormation template) find the family without an SDK.
-- Google Cloud as a vendor family: an account map (Free Trial and credits, Cloud Billing budgets, spend caps, network egress, regions) and 11 service maps, from client libraries, Python and Go modules, Terraform, Pulumi, Config Connector, `cloudbuild.yaml` and `gcloud` deploy commands. Firebase is now a service of this family, so Firestore next to Cloud SQL or Firebase Storage next to Cloud Storage is not an Overlap. Cloud Run, GKE and App Engine logs make Cloud Logging a bill check, not a second monitoring tool. Google Cloud is no longer an unmapped SDK.
-- Azure as a vendor family: an account map (free account and credits, spending limit, budgets, bandwidth, public IPv4, reservations and savings plans, support plans, regions) and 16 service maps, from client libraries, Python and Go modules, Terraform, Bicep, Pulumi, `azure.yaml` (Azure Developer CLI), Azure Pipelines and `az` commands. Container Apps, Functions and AKS logs make Azure Monitor a bill check, not a second monitoring tool. Communication Services is marked as retiring. Azure is no longer an unmapped SDK.
-- Bicep files are scanned for service signals like Terraform files, and listed in `infra`.
-- Roles `Analytics` and `Search` for STACK.md sections and vendor maps. PostHog is `Analytics`, and counts for `Monitoring` only when the code uses its error tracking.
-- Roles `Realtime` and `Jobs`, so two realtime services or two job runners are reported as an Overlap. Upstash counts for `Jobs` when the code uses QStash or Workflow.
-- Role `CMS`, so two content management systems are reported as an Overlap.
-- Role `Flags`, so two feature flag services are reported as an Overlap. PostHog counts for `Flags` when the code reads its feature flags.
-- Vendor families: a large vendor can be split into a family map and one map per service (`family`, `detect.service_signals`), so a project reads only the services it uses. Service signals are also found in Terraform, `serverless.yml`, SAM and CloudFormation files, where many services are declared.
+- Vendor families: a large vendor is split into an account map and one map per service (`family`, `detect.service_signals`), so an audit reads only the services a project uses. Service signals are also found in Terraform, Bicep, `serverless.yml`, SAM, CloudFormation and other YAML files. Services of one family in the same role (CloudFront in front of Lambda) are not an Overlap, and a family's own signals (a Terraform provider, a CloudFormation YAML template, `azure.yaml`) find it without an SDK. `detect.mjs` marks such entries with `family` and lists Bicep files in `infra`.
+- AWS: an account map (Free plan and credits, spend limits, Budgets, data transfer, NAT Gateway, public IPv4, support plans, regions) and 15 service maps, found from SDK clients, boto3 calls, Terraform, CloudFormation, SAM, CDK, Pulumi and SST.
+- Google Cloud: an account map (Free Trial and credits, budgets and spend caps, network egress, regions) and 11 service maps, found from client libraries, Python and Go modules, Terraform, Pulumi, Config Connector, `cloudbuild.yaml` and `gcloud` deploy commands. Firebase joins this family, so Firestore next to Cloud SQL, or Firebase Storage next to Cloud Storage, is not an Overlap.
+- Azure: an account map (free account and credits, spending limit, budgets, bandwidth, public IPv4, reservations and savings plans, support plans, regions) and 16 service maps, found from client libraries, Python and Go modules, Terraform, Bicep, Pulumi, `azure.yaml` (Azure Developer CLI), Azure Pipelines and `az` commands. Communication Services is flagged as retiring. Azure OpenAI through the `openai` SDK (`AzureOpenAI`) is read from the Azure OpenAI map, and OpenAI counts for `AI` only when the code calls OpenAI directly.
+- Platform logs (Lambda, Cloud Run, GKE, App Engine, Container Apps, Functions, AKS) make CloudWatch, Cloud Logging or Azure Monitor a bill to check, not a second monitoring tool next to Sentry or Datadog.
+- Vendor maps:
+  - Hosting: Vultr (with its read-only MCP server) and Hetzner. Hetzner counts for storage only with an Object Storage endpoint in the code.
+  - Database and AI: Turso, Prisma Postgres, Pinecone and OpenRouter, which were detected before without a map. Turso counts as a database only when the code points to Turso Cloud, and the Prisma ORM alone is not Prisma Postgres.
+  - Email, SMS and push: Mailgun, Twilio and OneSignal. OneSignal counts for email only when the code sends email through it.
+  - Payments: PayPal, with Braintree. PayPal next to Stripe is usually a wallet button next to card payments; the map says when it is an Overlap.
+  - Video: Mux.
+  - Realtime and jobs: Pusher, Ably, Inngest and Trigger.dev. Pusher counts only when the code uses a Pusher client or host, so Laravel projects on Reverb's defaults are not mistaken for it.
+  - Search and CMS: Algolia, Contentful, Sanity, Storyblok and Strapi. Strapi notes how to tell Strapi Cloud from a self-hosted server.
+  - Analytics and flags: Segment, Mixpanel, Amplitude and LaunchDarkly. Segment feeding an analytics tool is not an Overlap; Mixpanel and Amplitude count for flags only when the code uses their feature flags.
+  - Monitoring: New Relic, Grafana Cloud and Elastic Cloud. Their notes tell Grafana Cloud and Elastic Cloud apart from free self-hosted Grafana and Elasticsearch. Elastic counts for search or monitoring only when the code uses that part.
+- Roles `Analytics`, `Search`, `Realtime`, `Jobs`, `CMS` and `Flags` for STACK.md sections and vendor maps, so two services doing the same job are reported as an Overlap. PostHog is `Analytics`, and counts for `Monitoring` or `Flags` only when the code uses error tracking or feature flags. Upstash counts for `Jobs` when the code uses QStash or Workflow. `Other` holds unrelated jobs (SMS, a data pipeline, a cloud account), so two vendors in it are never an Overlap.
 
 ### Fixed
 
-- OpenAI counts for `AI` only when the code calls OpenAI directly: Azure OpenAI through the `openai` SDK (`AzureOpenAI`) is read from the Azure map and is no longer an Overlap with OpenAI.
-- Two vendors in the `Other` role (for example SMS and a CMS) are no longer reported as an Overlap.
+- Detection: only Vercel's platform packages mean Vercel (`@vercel/og`, `@vercel/otel` and `@vercel/ncc` run anywhere); `EAS_` and other tools' `DD_` env names no longer find Expo or Datadog; Claude through Bedrock, Vertex AI or Foundry counts for the cloud, not as Anthropic API use. When the env prefixes of two maps match one name, the longer prefix wins.
+- Detection: an unclosed `/*` (a glob, a regex such as `/[/*]$/`) no longer hides the rest of the file; role signals in tests, fixtures and examples no longer give the product a role; a scan cut at the file limit finds the same vendors on every file system, and the limit counts source files only, so many manifests no longer use it up.
+- Hook: with git missing or slow, upgrading a package the project already has is no longer reported as a new vendor, and all git calls share one time limit. Vendor names with accents in STACK.md match.
+- `npx manifestack` reads `.claude/settings.json` and `.cursor/hooks.json` saved with a byte order mark.
+- STACK.md: `usage` reads GiB, MiB, TiB and PB, and a unit or currency it cannot read is a lint warning instead of a wrong number; parallel `set` calls no longer lose each other's sections; `lint` accepts a vendor map's own metric name when the section has one reading.
+- `project.mjs eta`: a reading old enough that the trend has already passed the limit says `Now`, with the projected date.
 
 ## [0.4.0] - 2026-10-08
 
@@ -98,7 +105,8 @@ To update an installed project: `npx manifestack@latest`, then `npx manifestack 
 - "New vendor" hook for Claude Code and Cursor.
 - Vendor maps: Vercel, Supabase, Neon, Clerk, Resend.
 
-[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/manifestack/manifestack/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/manifestack/manifestack/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/manifestack/manifestack/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/manifestack/manifestack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/manifestack/manifestack/compare/v0.1.0...v0.2.0

@@ -21,7 +21,7 @@ pages:
   quotas: https://docs.aws.amazon.com/general/latest/gr/opensearch-service.html
   sizing: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/sizing-domains.html
 read:
-  - domain instance-hours by type for data, dedicated cluster manager and UltraWarm nodes; EBS storage by volume type and provisioned IOPS and throughput; reserved instances
+  - domain instance-hours by type for data, dedicated cluster manager and UltraWarm nodes; EBS storage by volume type and provisioned IOPS and throughput; reserved instances or Database Savings Plans
   - managed storage for UltraWarm, cold storage and OR1; Multi-AZ with Standby
   - "Serverless: NextGen collections (OCUs scale to zero when idle) versus Classic collections (a minimum OCU charge for the first collection, less in dev-test mode without standby); indexing and search OCU-hours and managed storage per GB-month"
   - collection groups sharing OCUs, and the account or group maximum OCU setting

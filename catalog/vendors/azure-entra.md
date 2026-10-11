@@ -12,7 +12,7 @@ detect:
   env_prefixes: ["AZURE_AD_"]
   config_files: []
   role_signals:
-    auth: ["@azure/msal-react", "@azure/msal-angular", "passport-azure-ad", ".ciamlogin.com", ".b2clogin.com", "loginRedirect(", "loginPopup(", "ssoSilent(", "MsalProvider", "MsalGuard", "useMsalAuthentication", "AuthenticatedTemplate", "getAuthCodeUrl(", "acquireTokenByCode(", "initiate_auth_code_flow(", "acquire_token_by_auth_code_flow(", "get_authorization_request_url(", "AcquireTokenByAuthCode(", "fastapi_azure_auth", "Microsoft.AzureActiveDirectory/ciamDirectories", "Microsoft.AzureActiveDirectory/b2cDirectories", "\"azurerm_aadb2c_directory\""]
+    auth: ["@azure/msal-browser", "acquireTokenRedirect(", "acquireTokenPopup(", "handleRedirectPromise(", "@azure/msal-react", "@azure/msal-angular", "passport-azure-ad", ".ciamlogin.com", ".b2clogin.com", "loginRedirect(", "loginPopup(", "ssoSilent(", "MsalProvider", "MsalGuard", "useMsalAuthentication", "AuthenticatedTemplate", "getAuthCodeUrl(", "acquireTokenByCode(", "initiate_auth_code_flow(", "acquire_token_by_auth_code_flow(", "get_authorization_request_url(", "AcquireTokenByAuthCode(", "fastapi_azure_auth", "Microsoft.AzureActiveDirectory/ciamDirectories", "Microsoft.AzureActiveDirectory/b2cDirectories", "\"azurerm_aadb2c_directory\""]
   service_signals: [".ciamlogin.com", ".b2clogin.com", "login.microsoftonline.com", "Microsoft.AzureActiveDirectory/ciamDirectories", "Microsoft.AzureActiveDirectory/b2cDirectories", "\"azurerm_aadb2c_directory\""]
 pages:
   pricing: https://azure.microsoft.com/en-us/pricing/details/microsoft-entra-external-id/

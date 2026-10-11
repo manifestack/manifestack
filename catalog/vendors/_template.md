@@ -14,7 +14,7 @@ detect:
   imports: ["@example/", "example-sdk"]    # a package name also matches its subpaths; a trailing "/" or ":" is a prefix
   env_prefixes: ["EXAMPLE_"]               # env var NAME prefixes (values are never read)
   config_files: ["example.config.json"]    # repo-relative paths or file names
-  service_signals: []                      # family members only: strings in code, Terraform or YAML (boto3.client('s3'), aws_s3_bucket) that find this service once its family is found
+  service_signals: []                      # service maps: strings in code, Terraform, Bicep or YAML (boto3.client('s3'), aws_s3_bucket) that find this service once its family is found; family maps: strings that find the family itself (provider "aws")
   role_signals:                            # optional: a role counts only if one of these strings is in the code
     auth: ["example.auth."]
 pages:

@@ -5,12 +5,14 @@ name: AWS Lambda
 family: aws
 roles: [hosting]
 detect:
-  packages: ["@aws-sdk/client-lambda", "@types/aws-lambda", "@aws-lambda-powertools/", "aws-lambda-ric", "@codegenie/serverless-express", "@vendia/serverless-express", "serverless"]
+  packages: ["@aws-sdk/client-lambda", "@aws-lambda-powertools/", "aws-lambda-ric", "@codegenie/serverless-express", "@vendia/serverless-express", "serverless"]
   pypi: ["aws-lambda-powertools", "awslambdaric", "mangum", "chalice", "zappa"]
   go: ["github.com/aws/aws-sdk-go-v2/service/lambda", "github.com/aws/aws-lambda-go", "github.com/awslabs/aws-lambda-go-api-proxy"]
-  imports: ["@aws-sdk/client-lambda", "aws-lambda", "@aws-lambda-powertools/", "hono/aws-lambda", "@codegenie/serverless-express", "@vendia/serverless-express"]
+  imports: ["@aws-sdk/client-lambda", "@aws-lambda-powertools/", "hono/aws-lambda", "@codegenie/serverless-express", "@vendia/serverless-express"]
   config_files: ["serverless.yml", "serverless.yaml", "serverless.ts", ".chalice/config.json", "zappa_settings.json"]
-  service_signals: ["client('lambda'", "client(\"lambda\"", "aws_lambda_function", "AWS::Lambda::Function", "AWS::Lambda::Url", "AWS::Serverless::Function", "aws-cdk-lib/aws-lambda", "aws_cdk.aws_lambda", "new AWS.Lambda(", "aws-sdk-go/service/lambda", "sst.aws.Function(", "aws:lambda:Function"]
+  service_signals: ["client('lambda'", "client(\"lambda\"", "aws_lambda_function", "AWS::Lambda::Function", "AWS::Lambda::Url", "AWS::Serverless::Function", "aws-cdk-lib/aws-lambda", "aws_cdk.aws_lambda", "new AWS.Lambda(", "aws-sdk-go/service/lambda", "sst.aws.Function(", "aws:lambda:Function", "from 'aws-lambda'", "from \"aws-lambda\"", "aws.lambda.Function", "aws.lambda_.Function", "aws_lambda as"]
+  role_signals:
+    hosting: ["@aws-lambda-powertools/", "aws-lambda-ric", "@codegenie/serverless-express", "@vendia/serverless-express", "hono/aws-lambda", "aws_lambda_powertools", "awslambdaric", "mangum", "chalice", "zappa", "aws-lambda-go", "aws_lambda_function", "AWS::Lambda::Function", "AWS::Serverless::Function", "aws-cdk-lib/aws-lambda", "aws_cdk.aws_lambda", "aws_lambda as", "sst.aws.Function(", "aws:lambda:Function", "aws.lambda.Function", "aws.lambda_.Function", "from 'aws-lambda'", "from \"aws-lambda\"", "(event, context)", "runtime: nodejs", "runtime: python3", "runtime: provided", "Runtime: nodejs", "Runtime: python3"]
 pages:
   pricing: https://aws.amazon.com/lambda/pricing/
   quotas: https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html
@@ -62,3 +64,4 @@ verified: 2026-10-11
 - Lambda beside another host is an Overlap only when the same web traffic runs on both; jobs or webhooks on Lambda are a split.
 - A function URL with auth type NONE is public; abuse becomes a Bill finding.
 - Function logs bill under CloudWatch Logs and can cost more than compute; API Gateway bills separately.
+- The `hosting` role needs code or infrastructure that runs on Lambda (handlers, Powertools, adapters, IaC); calling Lambda from another host (`InvokeCommand`) lists the map without it.

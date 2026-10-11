@@ -60,4 +60,4 @@ verified: 2026-10-11
 - Overbuilt: a cluster for one web service, a small API or a pre-launch app pays the cluster fee plus idle nodes; Cloud Run usually fits. A regional Standard cluster for a small app is worse.
 - Standard nodes appear under Compute Engine SKUs; count them here.
 - GKE beside another host for the same app is an Overlap unless split on purpose.
-- MCP: in the read-only toolset, `get_k8s_resource` and `describe_k8s_resource` can read Secrets and `get_k8s_logs` returns log lines, so they are left out. The default `/mcp` endpoint and local `gke-mcp` have create and update tools.
+- MCP: in the read-only toolset, `get_k8s_resource` and `describe_k8s_resource` can read Secrets and `get_k8s_logs` returns log lines, so they are left out. Call `list_clusters` and `get_cluster` with the default `readMask`; `*` returns the whole cluster object. The default `/mcp` endpoint and local `gke-mcp` have create and update tools.

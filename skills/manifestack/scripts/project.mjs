@@ -144,7 +144,7 @@ function withinCwd(file) {
 // Cost and limit projections. Prices are inputs: the skill reads them from vendor pages at run time.
 // Sizes are decimal (1 GB = 1000 MB), as vendors bill them. Money is USD. No network.
 
-const SIZE_UNITS = { B: 1e-6, KB: 1e-3, MB: 1, GB: 1e3, TB: 1e6 };
+const SIZE_UNITS = { B: 1e-6, KB: 1e-3, MB: 1, GB: 1e3, TB: 1e6, PB: 1e9, KIB: 1.024e-3, MIB: 1.048576, GIB: 1073.741824, TIB: 1099511.627776 };
 const PERIOD_DAYS = { day: 1, d: 1, week: 7, wk: 7, w: 7, month: 30.4375, mo: 30.4375, year: 365.25, yr: 365.25 };
 const DAY_MS = 86400000;
 /** A plain number on a metric named *_mb, *_gb or *_tb is in that unit; this is the unit in MB. */
@@ -161,7 +161,7 @@ export function parseQuantity(input) {
 	// Runs of spaces become one, so the optional parts below cannot backtrack over a long gap.
 	const s = String(input).trim().replace(/\s+/g, ' ');
 	if (s.length > 64) throw new Error(`cannot read quantity "${s.slice(0, 24)}…": too long`);
-	const m = /^([+-])?\s*(\$)?\s*(\d{1,3}(?:([, _])\d{3})(?:\4\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)\s*([kKmM](?![bB]))?\s*(%|[KMGT]?B\b)?\s*(?:\/\s*(day|d|week|wk|w|month|mo|year|yr))?$/i.exec(s);
+	const m = /^([+-])?\s*(\$)?\s*(\d{1,3}(?:([, _])\d{3})(?:\4\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)\s*([kKmM](?![bB]))?\s*(%|(?:[KMGTP]i?)?B\b)?\s*(?:\/\s*(day|d|week|wk|w|month|mo|year|yr))?$/i.exec(s);
 	if (!m) throw new Error(`cannot read quantity "${input}"`);
 	const [, sign, dollar, num, , mult, unit, period] = m;
 	let value = Number(num.replace(/[, _]/g, ''));
@@ -261,6 +261,8 @@ export function eta({ current, limit, ratePerDay, growthPerMonth, points, from =
 	}
 	const date = Number.isFinite(days) ? addDays(from, days) : null;
 	if (!date) return { ...base, reached: false, method, rate_per_day: ratePerDay ?? null, days: null, date: null, when: 'Not on current trend' };
+	// An old reading can project past today: on this trend the limit is already reached.
+	if (date <= todayIso()) return { ...base, reached: true, method, rate_per_day: ratePerDay ?? null, days: Math.round(days), weeks: round(days / 7, 1), date, projected: true, when: 'Now' };
 	return { ...base, reached: false, method, rate_per_day: ratePerDay ?? null, days: Math.round(days), weeks: round(days / 7, 1), date, when: `ETA ${approxMonth(date)}` };
 }
 

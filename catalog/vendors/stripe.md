@@ -60,7 +60,7 @@ verified: 2026-10-07
 ---
 
 - Stripe is not the merchant of record by default: the business owes sales tax and VAT where it is registered or over a threshold. If the requirements say "EU VAT handled for us", Stripe alone is a Requirement-type finding; Stripe Tax (business still registers) or Managed Payments (Stripe as merchant of record, limited to eligible digital products sold through Checkout or Payment Links, no Connect) are the options to compare.
-- Stripe and another payment provider (Paddle, Lemon Squeezy, Polar) in the same codebase is an Overlap finding, unless one is a documented migration in progress.
+- Stripe and another payment provider (Paddle, Lemon Squeezy, Polar) in the same codebase is an Overlap finding, unless one is a documented migration in progress. PayPal next to Stripe is usually a wallet button next to card payments, not an Overlap; it is one when both take cards, or when Stripe already offers PayPal in the account's country.
 - Do not use the Stripe MCP server. It is official (remote `https://mcp.stripe.com`) and its `stripe_api_write` tool creates refunds, invoices, payment links and subscriptions. Permissions can be narrowed with OAuth grants or agent API keys, but there is no server-side read-only switch, and the skill never handles keys. Ask the user for numbers from the Balance summary report instead.
 - Fees in the Balance summary are in the settlement currency, after conversion. Stripe Billing and Stripe Tax fees show up as Stripe fees (`fee` reporting category), separate from per-payment processing fees.
 - `stripe` also matches a common word in imports and env vars. Trust the package.json entry first.

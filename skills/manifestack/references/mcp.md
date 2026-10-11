@@ -25,7 +25,7 @@ Only if the user already connected it. Never ask the user to connect one with wr
 | LaunchDarkly | local `@launchdarkly/mcp-server` with `--scope read` and a Reader-role token | Flag lists, status and code references; never `get-environments` (SDK keys); no usage tools |
 | New Relic | read-only by design (remote `https://mcp.newrelic.com/mcp/`, OAuth scope `observability:read`, Organization Read Only user) | `execute_nrql_query` on `NrMTDConsumption` / `NrConsumption` only; never Log, Span or Transaction data |
 | Grafana Cloud | local `mcp-grafana --disable-write --enabled-tools datasource,prometheus` with a Viewer service-account token (not the hosted Cloud MCP, which bills each user) | `query_prometheus` on the `grafanacloud-usage` data source and `grafanacloud_*` metrics only |
-| Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres, Mux, OneSignal, Sanity, Mixpanel, Amplitude, Elastic Cloud | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
+| Vercel, Resend, Stripe, Postmark, Cloudflare, Firebase, Netlify, Railway, Render, Fly.io, Heroku, DigitalOcean, Polar, WorkOS, Datadog, Cloudinary, RevenueCat, Expo, Pinecone, Mailgun, OpenRouter, Prisma Postgres, Mux, OneSignal, Sanity, Mixpanel, Amplitude, Elastic Cloud, Twilio, PayPal | none | Do not use: they have write tools (deploy, send email, refunds, secrets) without a read-only mode |
 
 Rules:
 

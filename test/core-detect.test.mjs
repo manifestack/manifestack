@@ -314,6 +314,30 @@ test('look-alikes: Grafana plugin packages, k6, OpenSearch and the Elasticsearch
 	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
 });
 
+test('checkout-sms-app: PayPal and Stripe are reported for the auditor to judge; Twilio is other; Braintree utilities are not vendors', () => {
+	const r = detect('checkout-sms-app');
+	assert.deepEqual(ids(r), ['paypal', 'stripe', 'twilio']);
+	assert.deepEqual(r.overlaps, [{ role: 'payments', vendors: ['paypal', 'stripe'] }]);
+	assert.deepEqual(r.unmapped, []);
+});
+
+test('Braintree is found as PayPal from Python and env names; Twilio from its serverless config', (t) => {
+	const dir = tempDir(t);
+	writeFileSync(join(dir, 'requirements.txt'), 'braintree==4.47.0\n');
+	writeFileSync(join(dir, 'pay.py'), 'import paypalserversdk\n');
+	writeFileSync(join(dir, '.env'), 'BT_MERCHANT_ID=x\n');
+	writeFileSync(join(dir, '.twilioserverlessrc'), '{}');
+	const r = detectVendors(dir, { signatures });
+	assert.deepEqual(ids(r), ['paypal', 'twilio']);
+	assert.ok(r.vendors[0].evidence.some((e) => e.kind === 'import' && e.match === 'paypalserversdk'));
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { '@twilio-paste/core': '20', 'card-validator': '10' } }));
+	rmSync(join(dir, 'requirements.txt'));
+	rmSync(join(dir, 'pay.py'));
+	rmSync(join(dir, '.env'));
+	rmSync(join(dir, '.twilioserverlessrc'));
+	assert.deepEqual(ids(detectVendors(dir, { signatures })), []);
+});
+
 test('mobile-app: subscription SDKs, EAS from eas.json and expo-updates, newer storage and database maps', () => {
 	const r = detect('mobile-app');
 	assert.deepEqual(ids(r), ['adapty', 'cloudinary', 'convex', 'expo', 'lemon-squeezy', 'planetscale', 'polar', 'revenuecat', 'uploadthing']);

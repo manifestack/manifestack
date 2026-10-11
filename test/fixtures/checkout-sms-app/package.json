@@ -1,0 +1,12 @@
+{
+  "name": "checkout-sms-app",
+  "private": true,
+  "dependencies": {
+    "next": "15.5.0",
+    "@paypal/react-paypal-js": "10.6.0",
+    "@paypal/paypal-server-sdk": "2.5.0",
+    "stripe": "19.0.0",
+    "twilio": "6.1.2",
+    "@braintree/sanitize-url": "7.1.1"
+  }
+}

@@ -570,6 +570,7 @@ function parseVendorMap(text, file = '<vendor map>') {
 			imports: detect.imports ?? [],
 			env_prefixes: detect.env_prefixes ?? [],
 			config_files: detect.config_files ?? [],
+			service_signals: detect.service_signals ?? [],
 			role_signals: detect.role_signals ?? {},
 		},
 		pages: data.pages ?? {},
@@ -580,7 +581,7 @@ function parseVendorMap(text, file = '<vendor map>') {
 	};
 }
 
-const DETECT_LISTS = ['packages', 'pypi', 'go', 'imports', 'env_prefixes', 'config_files'];
+const DETECT_LISTS = ['packages', 'pypi', 'go', 'imports', 'env_prefixes', 'config_files', 'service_signals'];
 const isStringList = (x) => Array.isArray(x) && x.every((s) => typeof s === 'string' && s.trim() !== '');
 
 function validateVendorMap(v) {
@@ -593,6 +594,10 @@ function validateVendorMap(v) {
 	// Detection calls .some() on these and an empty pattern matches everything, so the shape is checked here.
 	for (const field of DETECT_LISTS) if (!isStringList(d[field])) errors.push(`detect.${field} must be a list of non-empty strings`);
 	if (!DETECT_LISTS.some((field) => Array.isArray(d[field]) && d[field].length)) errors.push('detect needs at least one signature');
+	// A service of a larger vendor (aws-s3 of aws): its service signals count only when the family is found.
+	if (v.family !== undefined && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(v.family))) errors.push('family must be the id of another map');
+	if (v.family === v.id) errors.push('family must be another map, not this one');
+	if ((d.service_signals ?? []).length && !v.family) errors.push('detect.service_signals needs a family');
 	const signals = d.role_signals ?? {};
 	if (typeof signals !== 'object' || Array.isArray(signals)) errors.push('detect.role_signals must map roles to lists');
 	else {
@@ -626,7 +631,22 @@ function loadCatalog(dir) {
 	}
 	const clash = packageClashes(vendors)[0];
 	if (clash) throw new Error(clash);
+	const family = familyErrors(vendors)[0];
+	if (family) throw new Error(family);
 	return vendors;
+}
+
+/** Each family must be a map of its own, and a family map cannot belong to another family. */
+function familyErrors(vendors) {
+	const byId = new Map(vendors.map((v) => [v.id, v]));
+	const errors = [];
+	for (const v of vendors) {
+		if (!v.family) continue;
+		const parent = byId.get(v.family);
+		if (!parent) errors.push(`${v.id}.md: family "${v.family}" has no map`);
+		else if (parent.family) errors.push(`${v.id}.md: family "${v.family}" belongs to family "${parent.family}"; families do not nest`);
+	}
+	return errors;
 }
 
 /** Package patterns that two maps both claim: the dependency would be reported as two vendors. */
@@ -648,7 +668,7 @@ function packageClashes(vendors) {
 
 /** The part of a map that detection needs; embedded into the hook so it runs without the catalog. */
 function vendorSignatures(vendors) {
-	return vendors.map((v) => ({ id: v.id, name: v.name, roles: v.roles, ...v.detect }));
+	return vendors.map((v) => ({ id: v.id, name: v.name, roles: v.roles, ...(v.family ? { family: v.family } : {}), ...v.detect }));
 }
 
 // ---- packages/core/src/detect.mjs
@@ -833,7 +853,7 @@ const isSample = (rel) => SAMPLE_DIR.test(rel);
 const INFRA_FILE = /^(Dockerfile(\..+)?|(docker-)?compose(\.[\w-]+)?\.ya?ml|.+\.tf|Chart\.yaml|(helmfile|skaffold|kustomization)\.ya?ml|Pulumi\.ya?ml|serverless\.ya?ml)$/;
 
 // Evidence kept per vendor, most telling first; every kind found keeps at least one slot.
-const EVIDENCE_ORDER = ['package', 'config', 'import', 'code', 'env'];
+const EVIDENCE_ORDER = ['package', 'config', 'import', 'service', 'code', 'env'];
 
 function pickEvidence(all) {
 	const sorted = [...all].sort((a, b) => EVIDENCE_ORDER.indexOf(a.kind) - EVIDENCE_ORDER.indexOf(b.kind));
@@ -905,6 +925,25 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		scanned++;
 		return text;
 	};
+	// Role signals say how a found vendor is used; service signals say which service of a vendor family is used
+	// (boto3.client('s3'), resource "aws_s3_bucket"). Both are read from source and infrastructure-as-code files.
+	const scanSignals = (src, rel) => {
+		for (const sig of sigs) {
+			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
+				const needle = needles.find((n) => src.includes(n));
+				if (needle) hit(sig, 'code', rel, needle, role);
+			}
+			const service = (sig.service_signals ?? []).find((n) => src.includes(n));
+			if (service) hit(sig, 'service', rel, service);
+		}
+	};
+	// Terraform, serverless.yml, SAM and CloudFormation name services the application code may never import.
+	const scanInfraCode = (full, rel, text) => {
+		try {
+			if (text === undefined && statSync(full).size > MAX_SOURCE_BYTES) return;
+			scanSignals(stripComments(text ?? read(full), { hash: true }), rel);
+		} catch {}
+	};
 
 	// Config files are also checked at their exact path: the walk skips dot-directories such as .do/.
 	for (const sig of sigs) for (const cfg of sig.config_files) if (isFileSync(join(root, cfg))) hit(sig, 'config', cfg, cfg);
@@ -961,11 +1000,17 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		if (INFRA_FILE.test(name) && isSample(rel)) continue;
 		if (name === 'Dockerfile' || /^Dockerfile\./.test(name)) infra.push({ kind: 'docker', file: rel });
 		else if (/^(docker-)?compose(\.[\w-]+)?\.ya?ml$/.test(name)) infra.push({ kind: 'docker-compose', file: rel });
-		else if (/\.tf$/.test(name)) infra.push({ kind: 'terraform', file: rel });
+		else if (/\.tf$/.test(name)) {
+			infra.push({ kind: 'terraform', file: rel });
+			scanInfraCode(full, rel);
+		}
 		else if (name === 'Chart.yaml') infra.push({ kind: 'helm', file: rel });
 		else if (/^(helmfile|skaffold|kustomization)\.ya?ml$/.test(name)) infra.push({ kind: 'kubernetes', file: rel });
 		else if (/^Pulumi\.ya?ml$/.test(name)) infra.push({ kind: 'pulumi', file: rel });
-		else if (/^serverless\.ya?ml$/.test(name)) infra.push({ kind: 'serverless-framework', file: rel });
+		else if (/^serverless\.ya?ml$/.test(name)) {
+			infra.push({ kind: 'serverless-framework', file: rel });
+			scanInfraCode(full, rel);
+		}
 		else if (/\.ya?ml$/.test(name) || SOURCE_EXT.test(name)) deferred.push({ full, rel, name });
 	}
 
@@ -976,7 +1021,10 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		}
 		if (/\.ya?ml$/.test(name)) {
 			try {
-				if (!isSample(rel) && statSync(full).size < 256 * 1024 && isKubernetesManifest(read(full))) infra.push({ kind: 'kubernetes', file: rel });
+				if (statSync(full).size >= 256 * 1024) continue;
+				const text = read(full);
+				if (!isSample(rel) && isKubernetesManifest(text)) infra.push({ kind: 'kubernetes', file: rel });
+				scanInfraCode(full, rel, text);
 			} catch {}
 			continue;
 		}
@@ -993,18 +1041,19 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 		if (native) for (const v of matchDependencies(native[1], sigs, native[0]).vendors) for (const p of v.packages) hit(sigs.find((x) => x.id === v.id), 'import', rel, p);
 		// As for dependencies, a map that names the package beats one that only claims its scope (@vercel/kv is Upstash).
 		const owners = new Map(specs.map(([, pkg]) => [pkg, sigs.filter((sig) => sig.imports.some((p) => !/[/:]$/.test(p) && (pkg === p || pkg.startsWith(p + '/')))).map((sig) => sig.id)]));
-		for (const sig of sigs) {
-			for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports) && (!owners.get(pkg).length || owners.get(pkg).includes(sig.id))) hit(sig, 'import', rel, spec);
-			for (const [role, needles] of Object.entries(sig.role_signals ?? {})) {
-				const needle = needles.find((n) => src.includes(n));
-				if (needle) hit(sig, 'code', rel, needle, role);
-			}
-		}
+		for (const sig of sigs) for (const [spec, pkg] of specs) if (importMatches(pkg, sig.imports) && (!owners.get(pkg).length || owners.get(pkg).includes(sig.id))) hit(sig, 'import', rel, spec);
+		scanSignals(src, rel);
 	}
+
+	// A vendor is found by a package, import, config file or env name. A service signal also counts once its family is
+	// found, by the family's own map or another of its services: boto3 plus boto3.client('s3') is S3.
+	const direct = (evidence) => [...evidence.values()].some((e) => e.kind !== 'code' && e.kind !== 'service');
+	const families = new Set();
+	for (const { sig, evidence } of found.values()) if (direct(evidence)) families.add(sig.family ?? sig.id);
 
 	const all = [...found.values()]
 		// A role signal (".storage.from(") only says how a vendor found otherwise is used; on its own it is too generic.
-		.filter(({ evidence }) => [...evidence.values()].some((e) => e.kind !== 'code'))
+		.filter(({ sig, evidence }) => direct(evidence) || (sig.family && families.has(sig.family) && [...evidence.values()].some((e) => e.kind === 'service')))
 		.map(({ sig, evidence, roleHits }) => {
 			// Roles with signals count only when a signal matched; other roles count once the vendor is present.
 			const signalled = Object.keys(sig.role_signals ?? {});
@@ -1012,7 +1061,7 @@ export function detectVendors(root, { signatures, maxFiles = 5000, plugin = fals
 			// Product code needs its own non-code evidence; a vendor that is a dependency only in fixtures is a sample.
 			const product = [...evidence.values()].filter((e) => !isSample(e.file));
 			const sample = !product.some((e) => e.kind !== 'code');
-			return { id: sig.id, name: sig.name, roles: sig.roles, roles_used, evidence: pickEvidence(sample ? evidence.values() : product), sample };
+			return { id: sig.id, name: sig.name, ...(sig.family ? { family: sig.family } : {}), roles: sig.roles, roles_used, evidence: pickEvidence(sample ? evidence.values() : product), sample };
 		})
 		.sort((a, b) => a.id.localeCompare(b.id));
 	const vendors = all.filter((v) => !v.sample).map(({ sample, ...v }) => v);

@@ -18,6 +18,7 @@ All notable changes are listed here, in the [Keep a Changelog](https://keepachan
 - Roles `Realtime` and `Jobs`, so two realtime services or two job runners are reported as an Overlap. Upstash counts for `Jobs` when the code uses QStash or Workflow.
 - Role `CMS`, so two content management systems are reported as an Overlap.
 - Role `Flags`, so two feature flag services are reported as an Overlap. PostHog counts for `Flags` when the code reads its feature flags.
+- Vendor families: a large vendor can be split into a family map and one map per service (`family`, `detect.service_signals`), so a project reads only the services it uses. Service signals are also found in Terraform, `serverless.yml`, SAM and CloudFormation files, where many services are declared.
 
 ### Fixed
 

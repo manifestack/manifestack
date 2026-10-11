@@ -3,6 +3,7 @@
 schema: 1
 id: firebase
 name: Firebase
+family: gcp
 roles: [database, auth, hosting, storage]
 detect:
   packages: ["firebase", "firebase-admin", "firebase-functions", "firebase-tools", "@firebase/", "@react-native-firebase/", "reactfire", "react-firebase-hooks", "@angular/fire", "vuefire", "@apphosting/"]
@@ -21,7 +22,6 @@ pages:
   plans: https://firebase.google.com/docs/projects/billing/firebase-pricing-plans
   avoid_surprise_bills: https://firebase.google.com/docs/projects/billing/avoid-surprise-bills
   spend_caps: https://firebase.google.com/docs/projects/billing/spend-caps
-  billing_alerts: https://firebase.google.com/docs/projects/billing/advanced-billing-alerts-logic
   firestore_quotas: https://firebase.google.com/docs/firestore/quotas
   rtdb_limits: https://firebase.google.com/docs/database/usage/limits
   auth_limits: https://firebase.google.com/docs/auth/limits
@@ -38,7 +38,7 @@ read:
   - Spark (no-cost) quota kinds per product (Firestore stored data, document reads, writes and deletes per day, outbound transfer; Hosting storage and transfer; Realtime Database connections and storage) and which are per day versus per month
   - what happens when a Spark quota runs out (usage of that product is shut off for the rest of the period; Hosting sites are disabled when transfer runs out)
   - Blaze is pay-as-you-go on top of the same no-cost quotas, billed through Google Cloud per unit used
-  - budget alerts do not cap usage or charges; spend caps exist only for some services (AI Logic, App Hosting, Cloud Functions, Extensions), are not instant, and do not cover Firestore, Hosting, Storage or Auth
+  - Cloud Billing spend cap budgets (Preview) cover only AI Logic, App Hosting, Cloud Functions and Extensions, not Firestore, Hosting, Storage or Auth (the gcp map covers budgets and the billing account)
   - services that require Blaze (Cloud Functions, Cloud Storage for Firebase even for default buckets, App Hosting, phone/SMS sign-in)
   - Authentication limits (daily active user tiers on Spark, SMS on Blaze only) and the per-MAU pricing if the project upgrades to Identity Platform
   - commercial-use terms on Spark (none stated on the pricing pages at last check)
@@ -65,14 +65,13 @@ common_fixes:
   - paginate Firestore queries with limit() and cursors and detach realtime listeners when a view closes, since every document returned is a billed read
   - cache data on the client or a server instead of re-reading the same documents on each page load
   - add App Check so only your app can call Firestore, Storage and Functions
-  - create a budget alert in Cloud Billing and, for a hard stop, a function that disables billing on a budget notification (it shuts the project down, so test it first)
   - set spend caps on Cloud Functions and App Hosting where available
   - serve images through Hosting's CDN or a resized copy instead of downloading full files from Storage
   - create the production Firestore database in the region the requirements ask for, because it cannot be moved later
 verified: 2026-10-08
 ---
 
-- Blaze surprise bills are a known trap: budget alerts only email, and the services most likely to spike (Firestore reads, Storage egress) have no spend cap. A Blaze project with no alert at all is a Bill finding.
+- Blaze surprise bills are a known trap: the services most likely to spike (Firestore reads, Storage egress) have no spend cap. A Blaze project with no budget alert at all is a Bill finding. Firebase is part of the Google Cloud family: read the gcp map for the billing account, budgets and Free Trial; Firestore next to Cloud SQL, or Firebase Storage next to Cloud Storage, is not flagged as an Overlap, so judge it by hand.
 - The Firebase MCP server (`npx firebase-tools mcp`) is official but has no read-only mode. `--only` limits it to feature groups, and those groups still contain write tools (deploy, add/update/delete documents, set Realtime Database data, update users). `firebase_get_sdk_config` returns app config including the API key. Do not use it; ask the user for numbers instead.
 - Firebase Hosting without Cloud Functions or App Hosting leaves no code signal. If `firebase.json` has a `hosting` section, count hosting by hand; otherwise Firebase is probably only the backend (for example behind Vercel).
 - Firebase Auth and another auth provider (Clerk, Supabase Auth, Auth0) in the same code is an Overlap finding. So is Firestore or Realtime Database next to another database (Supabase, Neon, D1).

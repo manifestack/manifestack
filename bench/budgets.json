@@ -4,8 +4,8 @@
     "mode:audit": 17200,
     "mode:compare": 14300,
     "mode:guard": 1450,
-    "vendor-map:avg": 1450,
-    "vendor-map:max": 2200,
+    "vendor-map:avg": 1600,
+    "vendor-map:max": 2500,
     "hook:without-stack": 150,
     "hook:with-stack": 200
   },

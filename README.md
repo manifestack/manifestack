@@ -166,6 +166,7 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar, PayPal (with Braintree) |
 | SMS and voice | Twilio |
 | AWS | account map plus S3, CloudFront, Lambda, ECS and Fargate, EC2 and Lightsail, Amplify, RDS and Aurora, DynamoDB, ElastiCache, OpenSearch, SES, Cognito, SQS and SNS, Bedrock, CloudWatch |
+| Google Cloud | account map plus Cloud Run (with functions), App Engine, Compute Engine, GKE, Cloud Storage, Cloud SQL and AlloyDB, Firestore, Memorystore, BigQuery, Pub/Sub (with Tasks, Scheduler, Workflows, Eventarc), Cloud Logging and Monitoring; Firebase is part of this family |
 | Search | Algolia, Elastic Cloud |
 | CMS | Contentful, Sanity, Storyblok, Strapi |
 | Realtime | Pusher, Ably |

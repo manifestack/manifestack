@@ -1,0 +1,6 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', 'europe-west1-docker.pkg.dev/$PROJECT_ID/app/api', '.']
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args: ['run', 'deploy', 'api', '--image', 'europe-west1-docker.pkg.dev/$PROJECT_ID/app/api', '--region', 'europe-west1']

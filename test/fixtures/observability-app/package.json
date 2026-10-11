@@ -1,0 +1,10 @@
+{
+  "name": "observability-app",
+  "private": true,
+  "dependencies": {
+    "express": "4.21.0",
+    "newrelic": "14.7.0",
+    "@elastic/elasticsearch": "9.5.1",
+    "@grafana/faro-web-sdk": "2.12.1"
+  }
+}

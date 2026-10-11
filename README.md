@@ -164,12 +164,12 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | Email | Resend, Postmark, SendGrid, Mailgun |
 | Storage | Cloudinary, UploadThing, Mux |
 | Payments | Stripe, Paddle, Lemon Squeezy, Polar |
-| Search | Algolia |
+| Search | Algolia, Elastic Cloud |
 | CMS | Contentful, Sanity, Storyblok, Strapi |
 | Realtime | Pusher, Ably |
 | Jobs | Inngest, Trigger.dev |
 | Mobile | RevenueCat, Adapty, Expo EAS, OneSignal |
-| Monitoring | Sentry, Datadog |
+| Monitoring | Sentry, Datadog, New Relic, Grafana Cloud, Elastic Cloud |
 | Analytics | PostHog, Mixpanel, Amplitude, Segment |
 | Flags | LaunchDarkly |
 | AI | OpenAI, Anthropic, Google Gemini, OpenRouter |

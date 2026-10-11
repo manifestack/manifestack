@@ -348,7 +348,7 @@ const acme = { id: 'acme', name: 'Acme Cloud', roles: ['other'], packages: ['acm
 const acmeStore = { id: 'acme-store', name: 'Acme Store', family: 'acme', roles: ['storage'], packages: ['@acme/store'], pypi: [], go: [], imports: ['@acme/store'], env_prefixes: [], config_files: [], service_signals: ["acme.client('store')", 'acme_store_bucket', 'Acme::Store::Bucket'], role_signals: {} };
 const withAcme = [...signatures, acme, acmeStore];
 
-test('families: a service signal finds the service once its family is found, in code, Terraform or SAM', (t) => {
+test('families: a service signal finds the service once its family is found, in code, Terraform, Bicep or SAM', (t) => {
 	const dir = tempDir(t);
 	writeFileSync(join(dir, 'app.py'), "s3 = acme.client('store')\n");
 	assert.deepEqual(ids(detectVendors(dir, { signatures: withAcme })), [], 'a service signal alone finds nothing');
@@ -373,6 +373,14 @@ test('families: a service signal finds the service once its family is found, in 
 	rmSync(join(dir, 'infra/main.tf'));
 	writeFileSync(join(dir, 'template.yaml'), 'Resources:\n  Files:\n    Type: Acme::Store::Bucket\n');
 	assert.deepEqual(ids(detectVendors(dir, { signatures: withAcme })), ['acme', 'acme-store']);
+
+	rmSync(join(dir, 'template.yaml'));
+	writeFileSync(join(dir, 'infra/main.bicep'), "// resource old 'acme_store_bucket@2024' = {}\n/* resource older 'acme_store_bucket@2023' = {} */\nparam site string = 'https://example.com'\n");
+	assert.deepEqual(ids(detectVendors(dir, { signatures: withAcme })), ['acme'], 'Bicep comments are stripped, a URL in a string is kept');
+	writeFileSync(join(dir, 'infra/main.bicep'), "resource files 'acme_store_bucket@2024' = { name: 'files' }\n");
+	r = detectVendors(dir, { signatures: withAcme });
+	assert.deepEqual(ids(r), ['acme', 'acme-store']);
+	assert.ok(r.infra.some((i) => i.kind === 'bicep' && i.file === 'infra/main.bicep'));
 });
 
 test('families: a service found by its own package makes the family present for its siblings', (t) => {
@@ -443,6 +451,50 @@ test('gcp-cloud-run-app: Google Cloud services from client packages and Terrafor
 	assert.ok(!ids(r).includes('gcp-memorystore'), 'a commented-out resource is not a signal');
 	assert.deepEqual(r.overlaps, []);
 	assert.deepEqual(r.unmapped, []);
+});
+
+test('azure-container-app: Azure services from client packages, azd and Bicep; Container Apps logs are a bill, Azure OpenAI is not OpenAI', () => {
+	const r = detect('azure-container-app');
+	assert.deepEqual(ids(r), ['azure', 'azure-blob-storage', 'azure-container-apps', 'azure-cosmos-db', 'azure-monitor', 'azure-openai', 'azure-service-bus', 'openai', 'sentry']);
+	assert.ok(r.vendors.filter((v) => v.id.startsWith('azure-')).every((v) => v.family === 'azure'));
+	const roles = Object.fromEntries(r.vendors.map((v) => [v.id, v.roles_used]));
+	assert.deepEqual(roles['azure-container-apps'], ['hosting']);
+	assert.deepEqual(roles['azure-monitor'], [], 'the Log Analytics workspace of a Container Apps environment');
+	assert.deepEqual(roles['azure-openai'], ['ai']);
+	assert.deepEqual(roles.openai, [], 'the openai package used through AzureOpenAI is billed by Azure');
+	assert.ok(!ids(r).includes('azure-redis'), 'a commented-out Bicep resource is not a signal');
+	assert.ok(r.infra.some((i) => i.kind === 'bicep'));
+	assert.deepEqual(r.overlaps, []);
+	assert.deepEqual(r.unmapped, []);
+});
+
+test('Azure: Terraform alone; auth, email and AI roles only for real use; host.json is not Functions', (t) => {
+	const run = (files) => {
+		const dir = tempDir(t);
+		for (const [f, c] of Object.entries(files)) writeFileSync(join(dir, f), c);
+		return detectVendors(dir, { signatures });
+	};
+	let r = run({ 'main.tf': 'provider "azurerm" {\n  features {}\n}\nresource "azurerm_linux_web_app" "web" {}\nresource "azurerm_postgresql_flexible_server" "db" {}\nresource "azurerm_redis_cache" "cache" {}\n' });
+	assert.deepEqual(ids(r), ['azure', 'azure-app-service', 'azure-postgresql-mysql', 'azure-redis']);
+	assert.deepEqual(r.overlaps, [], 'PostgreSQL and Redis of one family are not an Overlap');
+
+	r = run({ 'requirements.txt': 'msal==1.31\n', 'job.py': 'import msal\napp = msal.ConfidentialClientApplication("id", client_credential="x")\ntoken = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])\n', 'package.json': JSON.stringify({ dependencies: { '@clerk/nextjs': '6' } }) });
+	assert.deepEqual(r.vendors.find((v) => v.id === 'azure-entra').roles_used, [], 'MSAL calling Graph as a daemon is not user sign-in');
+	assert.deepEqual(r.overlaps, []);
+	r = run({ 'package.json': JSON.stringify({ dependencies: { '@azure/msal-browser': '4', '@clerk/nextjs': '6' } }), 'auth.ts': "import { PublicClientApplication } from '@azure/msal-browser';\nexport const msal = new PublicClientApplication({ auth: { clientId: 'x', authority: 'https://contoso.ciamlogin.com/' } });\nawait msal.loginRedirect();\n" });
+	assert.deepEqual(r.overlaps, [{ role: 'auth', vendors: ['azure-entra', 'clerk'] }]);
+
+	r = run({ 'package.json': JSON.stringify({ dependencies: { '@azure/communication-sms': '1', resend: '4' } }), 'sms.ts': "import { SmsClient } from '@azure/communication-sms';\n" });
+	assert.deepEqual(r.overlaps, [], 'SMS through Communication Services is not a second email service');
+	r = run({ 'package.json': JSON.stringify({ dependencies: { '@azure/communication-email': '1', resend: '4' } }), 'mail.ts': "import { EmailClient } from '@azure/communication-email';\nimport { Resend } from 'resend';\n" });
+	assert.deepEqual(r.overlaps, [{ role: 'email', vendors: ['azure-communication', 'resend'] }]);
+
+	r = run({ 'package.json': JSON.stringify({ dependencies: { openai: '6' } }), 'ai.ts': "import OpenAI from 'openai';\nconst client = new OpenAI();\n" });
+	assert.deepEqual(r.vendors.map((v) => [v.id, v.roles_used]), [['openai', ['ai']]]);
+	r = run({ 'package.json': JSON.stringify({ dependencies: { openai: '6', '@azure/identity': '4' } }), 'ai.ts': "import OpenAI, { AzureOpenAI } from 'openai';\nconst a = new OpenAI();\nconst b = new AzureOpenAI({ endpoint: 'https://x.openai.azure.com' });\n" });
+	assert.deepEqual(r.overlaps, [{ role: 'ai', vendors: ['azure-openai', 'openai'] }]);
+
+	assert.deepEqual(ids(run({ 'host.json': '{"version":"2.0"}', 'package.json': JSON.stringify({ dependencies: { express: '5' } }) })), []);
 });
 
 test('Google Cloud: Terraform or Python alone; Firebase is in the family; Cloud Run next to Vercel is an Overlap', (t) => {

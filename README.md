@@ -168,6 +168,7 @@ Works with any vendor. Built-in page maps make these faster and more reliable:
 | SMS and voice | Twilio |
 | AWS | account map plus S3, CloudFront, Lambda, ECS and Fargate, EC2 and Lightsail, Amplify, RDS and Aurora, DynamoDB, ElastiCache, OpenSearch, SES, Cognito, SQS and SNS, Bedrock, CloudWatch |
 | Google Cloud | account map plus Cloud Run (with functions), App Engine, Compute Engine, GKE, Cloud Storage, Cloud SQL and AlloyDB, Firestore, Memorystore, BigQuery, Pub/Sub (with Tasks, Scheduler, Workflows, Eventarc), Cloud Logging and Monitoring; Firebase is part of this family |
+| Azure | account map plus App Service and Static Web Apps, Functions, Container Apps, AKS, Virtual Machines, Blob Storage, SQL Database, PostgreSQL and MySQL, Cosmos DB, Redis, Service Bus (with Event Grid, Event Hubs, Queue Storage), Monitor and Application Insights, Entra External ID, Azure OpenAI and Foundry, AI Search, Communication Services |
 | Search | Algolia, Elastic Cloud |
 | CMS | Contentful, Sanity, Storyblok, Strapi |
 | Realtime | Pusher, Ably |

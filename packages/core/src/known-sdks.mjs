@@ -3,7 +3,6 @@
 // npm prefix entries end with `/` and match every package in that scope or path. `pypi` and `go` follow the rules in
 // manifests.mjs (PyPI names normalized, trailing `*` = prefix; Go module path prefixes).
 export const UNMAPPED_SDKS = [
-	{ name: 'Azure', role: 'other', packages: ['@azure/'], pypi: ['azure-*'], go: ['github.com/Azure/azure-sdk-for-go'] },
 	{ name: 'Auth.js', role: 'auth', packages: ['next-auth', '@auth/'] },
 	{ name: 'Better Auth', role: 'auth', packages: ['better-auth'] },
 	{ name: 'Loops', role: 'email', packages: ['loops'] },
